@@ -22,6 +22,8 @@ main() {
   # TODO: If needs sudo, ask here
 
   . "script/run_setups_for_modules.sh"
+  . "script/create_symbolic_links.sh"
+
   # ./install/main.sh
   #
   # ./preferences/main.sh
