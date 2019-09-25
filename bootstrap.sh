@@ -13,6 +13,8 @@ main() {
   # Load utilities
   . "script/utils.sh"
 
+  . "script/verify_os.sh"
+
   # ./install/main.sh
   #
   # ./preferences/main.sh
