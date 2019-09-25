@@ -15,6 +15,13 @@ main() {
 
   . "script/verify_os.sh"
 
+  # Check if iteractive
+  skip_questions "$@" \
+    && skipQuestions=true
+
+  # TODO: If needs sudo, ask here
+
+  . "script/run_setups_for_modules.sh"
   # ./install/main.sh
   #
   # ./preferences/main.sh
