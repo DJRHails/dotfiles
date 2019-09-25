@@ -2,6 +2,31 @@
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+skip_questions() {
+     while :; do
+        case $1 in
+            -y|--yes) return 0;;
+                   *) break;;
+        esac
+        shift 1
+    done
+
+    return 1
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+ask() {
+    print_question "$1 "
+    read -r
+}
+
+get_answer() {
+    printf "%s" "$REPLY"
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 print_error() {
     print_in_red "   [✖] $1 $2\n"
 }
