@@ -21,10 +21,12 @@ main() {
 
   # TODO: If needs sudo, ask here
 
-  . "script/run_setups_for_modules.sh"
+  . "script/module_runner.sh" "setup"
   . "script/create_symbolic_links.sh"
 
-  # ./install/main.sh
+  . "script/module_runner.sh" "install"
+  . "script/module_runner.sh" "install.$(get_os)"
+
   #
   # ./preferences/main.sh
   . "script/restart.sh"
