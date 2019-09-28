@@ -14,6 +14,10 @@ skip_questions() {
     return 1
 }
 
+cmd_exists() {
+    command -v "$1" &> /dev/null
+}
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 ask() {
