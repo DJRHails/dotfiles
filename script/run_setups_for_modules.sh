@@ -3,7 +3,8 @@
 setup_modules() {
   for src in $(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*setup.sh' -not -path '*.git*')
   do
-    print_in_purple "   Setting up '$(basename "${src%.*.*}")'\n"
+    module_name="$(basename "$(dirname "$src")")"
+    print_in_purple "   Setting up '$module_name'\n"
     . $src
     print_result $? "setup completed"
   done
