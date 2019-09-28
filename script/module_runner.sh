@@ -15,6 +15,7 @@ main() {
 
   if [ -n "$matching_scripts" ]
   then
+    print_in_purple "\n • Running '${1}' in $(print_in_bold "${#matching_scripts[@]} modules")\n\n"
     execute_for_all_modules $@ $matching_scripts
   fi
 }

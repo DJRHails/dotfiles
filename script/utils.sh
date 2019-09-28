@@ -53,6 +53,13 @@ print_error_stream() {
     done
 }
 
+print_in_bold() {
+  printf "%b" \
+      "$(tput smso 2> /dev/null)" \
+      "$1" \
+      "$(tput rmso 2> /dev/null)"
+}
+
 print_in_color() {
     printf "%b" \
         "$(tput setaf "$2" 2> /dev/null)" \
