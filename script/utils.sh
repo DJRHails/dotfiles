@@ -21,8 +21,20 @@ ask() {
     read -r
 }
 
+ask_for_confirmation() {
+    print_question "$1 (y/n) "
+    read -r -n 1
+    printf "\n"
+}
+
 get_answer() {
     printf "%s" "$REPLY"
+}
+
+answer_is_yes() {
+    [[ "$REPLY" =~ ^[Yy]$ ]] \
+        && return 0 \
+        || return 1
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

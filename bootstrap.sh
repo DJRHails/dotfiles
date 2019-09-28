@@ -27,6 +27,7 @@ main() {
   # ./install/main.sh
   #
   # ./preferences/main.sh
+  . "script/restart.sh"
 }
 
 # Move to the correct directory for duration of this script
