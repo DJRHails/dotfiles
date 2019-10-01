@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 setup_gitconfig () {
-  if ! [ -f git/gitconfig.local.symlink ]
+  local LOCAL_GIT_CONFIG=git/gitconfig.local
+  if ! [ -f $LOCAL_GIT_CONFIG ]
   then
     git_credential='cache'
     if [ "$(uname -s)" == "Darwin" ]
@@ -18,7 +19,7 @@ setup_gitconfig () {
     sed -e "s/AUTHORNAME/$git_authorname/g" \
       -e "s/AUTHOREMAIL/$git_authoremail/g" \
       -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
-      git/gitconfig.local.example > git/gitconfig.local
+      $LOCAL_GIT_CONFIG.example > $LOCAL_GIT_CONFIG
 
     log::success 'generated git/gitconfig.local'
   fi
