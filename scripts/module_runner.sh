@@ -1,24 +1,35 @@
 #!/usr/bin/env bash
 
 execute_for_all_modules() {
-  module_scripts=$2
-  for idx in "${!module_scripts[@]}"
+  local script_name=$1
+  shift
+  local scripts=("$@")
+
+  for idx in "${!scripts[@]}"
   do
-    local src="${module_scripts[$idx]}"
+    local src="${scripts[$idx]}"
     module_name="$(basename "$(dirname "$src")")"
-    log::subheader "$((idx+1)). Executing ${1%.*} for '$module_name'"
+    log::subheader "$((idx+1)). Executing ${script_name%.*} for '$module_name'"
     . $src
-    log::result $? "${1%.*} completed"
+    log::result $? "${script_name%.*} completed"
   done
 }
 
-main() {
-  matching_scripts=$(find -H "$DOTFILES" -maxdepth 2 -name "${1}" -not -path '*.git*')
+find_matching_scripts() {
+  local -n found_scripts=$2
+  while IFS=  read -r -d $'\0'; do
+      found_scripts+=("$REPLY")
+  done < <(find -H "$DOTFILES" -maxdepth 2 -name "$1" -print0)
+}
 
-  if [ -n "$matching_scripts" ]
+main() {
+  scripts=()
+  find_matching_scripts $1 scripts
+
+  if [ -n "$scripts" ]
   then
-    log::header "Running '${1}' in $(log::bold "${#matching_scripts[@]} modules")"
-    execute_for_all_modules $1 $matching_scripts
+    log::header "Running '${1}' in $(log::bold "${#scripts[@]} modules")"
+    execute_for_all_modules $1 "${scripts[@]}"
   fi
 }
 
