@@ -19,3 +19,7 @@ if [[ -z $ZPLUG_HOME ]]; then
   export ZPLUG_HOME=~/.zplug
   git clone https://github.com/zplug/zplug $ZPLUG_HOME
 fi
+
+# Install fira code
+brew tap homebrew/cask-fonts
+brew cask install font-fira-code
