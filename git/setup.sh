@@ -14,9 +14,13 @@ setup_gitconfig () {
     ask ' - What is your github author email?'
     git_authoremail=$(get_answer)
 
-    sed -e "s/AUTHORNAME/$git_authorname/g" -e "s/AUTHOREMAIL/$git_authoremail/g" -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" git/gitconfig.local.symlink.example > git/gitconfig.local.symlink
 
-    print_success 'generated git/gitconfig.local.symlink'
+    sed -e "s/AUTHORNAME/$git_authorname/g" \
+      -e "s/AUTHOREMAIL/$git_authoremail/g" \
+      -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
+      git/gitconfig.local.example > git/gitconfig.local
+
+    print_success 'generated git/gitconfig.local'
   fi
 }
 

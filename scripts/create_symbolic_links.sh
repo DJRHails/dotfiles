@@ -67,25 +67,30 @@ link_file () {
   fi
 }
 
+extract_symlinks() {
+  declare -A links
+  local sep=' -> '
+  while read line
+  do
+    src=${line%%$sep*}
+    dst=${line#*$sep}
+    links[$src]=$dst
+  done < $1
+
+  for src in ${!links[*]}
+  do
+    link_file "$(dirname $1)/$src" "${links[$src]/#\~/$HOME}"
+  done
+}
+
 create_links() {
   # If skipQuestions then backup
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
-  for symlink_file in $(find -H "$DOTFILES" -maxdepth 2 -name 'symlinks.sh' -not -path '*.git*')
+  for symlink_file in $(find -H "$DOTFILES" -maxdepth 2 -name 'symlinks.conf' -not -path '*.git*')
   do
-    declare -A module_links
-    source "$symlink_file"
-    link module_links
-    for key in "${!module_links[@]}"; do
-      printf '%s = %s\n' "$key" "${module_links[$key]}"
-    done
-
+    extract_symlinks "$symlink_file"
   done
-  # for src in $(find -H "$DOTFILES" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
-  # do
-  #   dst="$HOME/.$(basename "${src%.*}")"
-  #   link_file "$src" "$dst"
-  # done
 }
 
 main() {
