@@ -21,7 +21,7 @@ zplug zsh-users/zsh-autosuggestions
 # Load the theme
 # setopt prompt_subst
 # zplug "yardnsm/blox-zsh-theme", use:blox.zsh-theme, defer:3
-zplug denysdovhan/spaceship-zsh-theme, use:spaceship.zsh, from:github, as:theme
+zplug "denysdovhan/spaceship-prompt", use:spaceship.zsh, from:github, as:theme
 # zplug "themes/juanghurtado", from:oh-my-zsh, as:theme
 
 # Install plugins if there are plugins that have not been installed
@@ -36,3 +36,4 @@ zplug load
 
 # Apply theme hacks
 SPACESHIP_CHAR_SYMBOL='λ '
+SPACESHIP_EXIT_CODE_SHOW=true
