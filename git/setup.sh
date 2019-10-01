@@ -21,5 +21,5 @@ setup_gitconfig () {
 }
 
 
-. "$DOTFILES_ROOT/script/utils.sh"
+. "$DOTFILES/script/core/main.sh"
 setup_gitconfig
