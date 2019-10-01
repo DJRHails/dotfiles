@@ -11,7 +11,7 @@ add_ssh_configs() {
         "  IdentityFile $1" \
         "  LogLevel ERROR" >> ~/.ssh/config
 
-    print_result $? "Add SSH configs"
+    log::result $? "Add SSH configs"
 
 }
 
@@ -20,15 +20,15 @@ copy_public_ssh_key_to_clipboard () {
     if cmd_exists "pbcopy"; then
 
         pbcopy < "$1"
-        print_result $? "Copy public SSH key to clipboard"
+        log::result $? "Copy public SSH key to clipboard"
 
     elif cmd_exists "xclip"; then
 
         xclip -selection clip < "$1"
-        print_result $? "Copy public SSH key to clipboard"
+        log::result $? "Copy public SSH key to clipboard"
 
     else
-        print_warning "Please copy the public SSH key ($1) to clipboard"
+        log::warning "Please copy the public SSH key ($1) to clipboard"
     fi
 
 }
@@ -38,7 +38,7 @@ generate_ssh_keys() {
     ask "Please provide an email address: " && printf "\n"
     ssh-keygen -t rsa -b 4096 -C "$(get_answer)" -f "$1"
 
-    print_result $? "Generate SSH keys"
+    log::result $? "Generate SSH keys"
 
 }
 
@@ -54,7 +54,7 @@ open_github_ssh_page() {
     elif cmd_exists "open"; then
         open "$GITHUB_SSH_URL"
     else
-        print_warning "Please add the public SSH key to GitHub ($GITHUB_SSH_URL)"
+        log::warning "Please add the public SSH key to GitHub ($GITHUB_SSH_URL)"
     fi
 
 }
@@ -100,12 +100,12 @@ test_ssh_connection() {
 
 main() {
 
-    print_in_purple "\n • Set up GitHub SSH keys\n\n"
+    log::in_purple "\n • Set up GitHub SSH keys\n\n"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     if ! is_git_repository; then
-        print_error "Not a Git repository"
+        log::error "Not a Git repository"
         exit 1
     fi
 
@@ -119,9 +119,9 @@ main() {
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    print_result $? "Set up GitHub SSH keys"
+    log::result $? "Set up GitHub SSH keys"
 
 }
 
-. "$DOTFILES_ROOT/script/utils.sh"
+. "$DOTFILES/scripts/core/main.sh"
 main

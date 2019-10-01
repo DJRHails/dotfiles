@@ -16,10 +16,10 @@ link_file () {
       then
         skip=true;
       else
-        ask "File already exists: $dst ($(basename "$src")), what do you want to do?\n\
+        feedback::ask "File already exists: $dst ($(basename "$src")), what do you want to do?\n\
         [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
 
-        case "$(get_answer)" in
+        case "$(feedback::get_answer)" in
           o )
             overwrite=true;;
           O )
@@ -45,25 +45,25 @@ link_file () {
     if [ "$overwrite" == "true" ]
     then
       rm -rf "$dst"
-      print_success "removed $dst"
+      log::success "removed $dst"
     fi
 
     if [ "$backup" == "true" ]
     then
       mv "$dst" "${dst}.backup"
-      print_success "moved $dst to ${dst}.backup"
+      log::success "moved $dst to ${dst}.backup"
     fi
 
     if [ "$skip" == "true" ]
     then
-      print_success "skipped $src"
+      log::success "skipped $src"
     fi
   fi
 
   if [ "$skip" != "true" ]  # "false" or empty
   then
     ln -s "$1" "$2"
-    print_success "linked $1 to $2"
+    log::success "linked $1 to $2"
   fi
 }
 
@@ -71,17 +71,27 @@ create_links() {
   # If skipQuestions then backup
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
-  for src in $(find -H "$DOTFILES_ROOT" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
+  for symlink_file in $(find -H "$DOTFILES" -maxdepth 2 -name 'symlinks.sh' -not -path '*.git*')
   do
-    dst="$HOME/.$(basename "${src%.*}")"
-    link_file "$src" "$dst"
+    declare -A module_links
+    source "$symlink_file"
+    link module_links
+    for key in "${!module_links[@]}"; do
+      printf '%s = %s\n' "$key" "${module_links[$key]}"
+    done
+
   done
+  # for src in $(find -H "$DOTFILES" -maxdepth 2 -name '*.symlink' -not -path '*.git*')
+  # do
+  #   dst="$HOME/.$(basename "${src%.*}")"
+  #   link_file "$src" "$dst"
+  # done
 }
 
 main() {
-  print_in_purple "\n • Create symbolic links\n\n"
+  log::header "Create symbolic links\n"
   create_links
 }
 
-. "$DOTFILES_ROOT/script/utils.sh"
+. "$DOTFILES/scripts/core/main.sh"
 main

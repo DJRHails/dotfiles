@@ -115,9 +115,9 @@ verify_os() {
 }
 
 main() {
-  print_in_purple "\n • Verify OS verion\n\n"
-  verify_os && print_success "$os_name with v$os_version is valid"
+  log::header "Verify OS verion\n"
+  verify_os && log::success "$os_name with v$os_version is valid"
 }
 
-. "$DOTFILES_ROOT/script/utils.sh"
+. "$DOTFILES/scripts/core/main.sh"
 main
