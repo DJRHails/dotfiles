@@ -1,19 +1,37 @@
 #!/usr/bin/env bash
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-readonly DOTFILES_ROOT=$(pwd -P)
+# Move to the correct directory for duration of this script
+cd "$(dirname "${BASH_SOURCE[0]}")" \
+  || exit 1
+readonly DOTFILES=$(pwd -P)
 declare skipQuestions=false
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+skip_questions() {
+     while :; do
+        case $1 in
+            -y|--yes) return 0;;
+                   *) break;;
+        esac
+        shift 1
+    done
+
+    return 1
+}
+
+cmd_exists() {
+    command -v "$1" &> /dev/null
+}
+
 main() {
 
-  echo "Installing .files from $DOTFILES_ROOT"
+  echo "Installing .files from $DOTFILES"
   # Load utilities
-  . "script/utils.sh"
+  . "scripts/core/main.sh"
 
-  . "script/verify_os.sh"
+  . "scripts/verify_os.sh"
 
   # Check if iteractive
   skip_questions "$@" \
@@ -21,18 +39,15 @@ main() {
 
   # TODO: If needs sudo, ask here
 
-  . "script/module_runner.sh" "setup.sh"
-  . "script/create_symbolic_links.sh"
+  . "scripts/module_runner.sh" "setup.sh"
+  . "scripts/create_symbolic_links.sh"
 
-  . "script/module_runner.sh" "install.sh"
-  . "script/module_runner.sh" "install.$(get_os).sh"
+  . "scripts/module_runner.sh" "install.sh"
+  . "scripts/module_runner.sh" "install.$(get_os).sh"
 
   #
   # ./preferences/main.sh
-  . "script/restart.sh"
+  . "scripts/restart.sh"
 }
 
-# Move to the correct directory for duration of this script
-cd "$(dirname "${BASH_SOURCE[0]}")" \
-  || exit 1
 main "$@"
