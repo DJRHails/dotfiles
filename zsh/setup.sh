@@ -1,24 +1,27 @@
 #!/usr/bin/env bash
 
 setup_zshrc () {
-  if ! [ -f zsh/zshrc.local.symlink ]
+  if ! [ -f zsh/zshrc ]
   then
+    sed -e "s+DOTFILES+$DOTFILES+g" \
+      zsh/zshrc.example > zsh/zshrc
 
-    feedback::ask " - Where are you keeping your dotfiles? ($DOTFILES)"
-    local dotfiles="$(feedback::get_answer)"
-    dotfiles=${dotfiles:-"$DOTFILES"}
+    log::result $? 'generated zsh/zshrc'
+  fi
 
+  local LOCAL_ZSHRC=zsh/zshrc.local
+  if ! [ -f $LOCAL_ZSHRC ]
+  then
     feedback::ask " - Where are you going to store your projects? ($HOME/projects)"
     local project_dir="$(feedback::get_answer)"
     project_dir=${project_dir:-"$HOME/projects"}
 
-    sed -e "s+DOTFILES+$dotfiles+g" -e "s+PROJECT_ROOT+$project_dir+g" \
-      zsh/zshrc.symlink.example > zsh/zshrc.symlink
+    sed -e "s+PROJECT_ROOT+$project_dir+g" \
+      $LOCAL_ZSHRC.example > $LOCAL_ZSHRC
 
-    log::result $? 'generated zsh/zshrc.symlink'
+    log::result $? 'generated zsh/zshrc'
   fi
 }
-
 
 . "$DOTFILES/scripts/core/main.sh"
 setup_zshrc

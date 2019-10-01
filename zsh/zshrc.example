@@ -1,15 +1,12 @@
 # shortcut to this dotfiles path is $ZSH
 export ZSH=DOTFILES
 
-# your project folder that we can `c [tab]` to
-export PROJECTS=PROJECT_ROOT
-
-# Stash your environment variables in ~/.localrc. This means they'll stay out
+# Stash any private elements in ~/.zshrc.local. This means they'll stay out
 # of your main dotfiles repository (which may be public, like this one), but
 # you'll have access to them in your scripts.
-if [[ -a ~/.localrc ]]
+if [[ -a ~/.zshrc.local ]]
 then
-  source ~/.localrc
+  source ~/.zshrc.local
 fi
 
 # all of our zsh files

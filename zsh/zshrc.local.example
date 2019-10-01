@@ -1,0 +1,2 @@
+# your project folder that we can `p [tab]` to
+export PROJECTS=PROJECT_ROOT
