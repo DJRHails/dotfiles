@@ -1,5 +1,7 @@
 # shortcut to this dotfiles path is $ZSH
 export ZSH=DOTFILES
+export ZPLUG_HOME=~/.zplug
+
 
 # Stash any private elements in ~/.zshrc.local. This means they'll stay out
 # of your main dotfiles repository (which may be public, like this one), but
