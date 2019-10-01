@@ -9,10 +9,10 @@ setup_gitconfig () {
       git_credential='osxkeychain'
     fi
 
-    ask ' - What is your github author name?'
-    git_authorname=$(get_answer)
-    ask ' - What is your github author email?'
-    git_authoremail=$(get_answer)
+    feedback::ask ' - What is your github author name?'
+    git_authorname=$(feedback::get_answer)
+    feedback::ask ' - What is your github author email?'
+    git_authoremail=$(feedback::get_answer)
 
 
     sed -e "s/AUTHORNAME/$git_authorname/g" \
@@ -20,10 +20,10 @@ setup_gitconfig () {
       -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
       git/gitconfig.local.example > git/gitconfig.local
 
-    print_success 'generated git/gitconfig.local'
+    log::success 'generated git/gitconfig.local'
   fi
 }
 
 
-. "$DOTFILES/script/core/main.sh"
+. "$DOTFILES/scripts/core/main.sh"
 setup_gitconfig
