@@ -4,7 +4,7 @@
 if ! platform::command_exists "zsh"
 then
   apt install zsh
-  log::result $? "Set Zsh as default shell"
+  log::result $? "Install zsh"
 fi
 
 # Set as default shell
@@ -19,4 +19,5 @@ fi
 if [[ -z $ZPLUG_HOME ]]; then
   export ZPLUG_HOME=~/.zplug
   git clone https://github.com/zplug/zplug $ZPLUG_HOME
+  log::result $? "Clone zplug to $ZPLUG_HOME"
 fi
