@@ -3,7 +3,7 @@
 # Check version exisiting
 if ! platform::command_exists "zsh"
 then
-  apt install zsh
+  $(platform::main_package_manager) install zsh
   log::result $? "Install zsh"
 fi
 
