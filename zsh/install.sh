@@ -11,7 +11,7 @@ fi
 ZSH_SHELL_LOC=$(which zsh)
 if [ "$SHELL" != "$ZSH_SHELL_LOC" ]
 then
-  chsh -s /bin/zsh
+  chsh -s "$ZSH_SHELL_LOC"
   log::result $? "Set Zsh as default shell"
 fi
 
