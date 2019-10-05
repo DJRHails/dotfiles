@@ -26,4 +26,3 @@ zplug load
 
 # Apply theme hacks
 SPACESHIP_CHAR_SYMBOL='λ '
-SPACESHIP_EXIT_CODE_SHOW=true
