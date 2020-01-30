@@ -1,0 +1,16 @@
+#!/bin/zsh
+#
+# This lets you quickly jump into a sites directory.
+#
+# Type:
+#
+#   s <tab>
+#
+# ...to autocomplete on all of your projects in the directories specified in
+# `functions/_s`. Typically I'm using it like:
+#
+#    s hai<tab>
+#
+# ...to quickly jump into hails.info, for example.
+
+cd "$SITES/$1"
