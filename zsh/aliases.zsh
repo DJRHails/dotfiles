@@ -1,7 +1,7 @@
 #!/bin/bash
 
 alias reload!='. ~/.zshrc'
-
+alias reset!="cd $DOTFILES && ./bootstrap.sh"
 alias cls='clear' # Good 'ol Clear Screen command
 
 alias ..="cd .."
