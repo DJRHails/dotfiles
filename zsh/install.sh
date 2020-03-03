@@ -18,6 +18,15 @@ fi
 # Install zplug for the next bit
 if [[ -z $ZPLUG_HOME ]]; then
   export ZPLUG_HOME=~/.zplug
-  git clone https://github.com/zplug/zplug $ZPLUG_HOME
+  git clone --depth 1 https://github.com/zplug/zplug $ZPLUG_HOME
   log::result $? "Clone zplug to $ZPLUG_HOME"
+fi
+
+# Install fzf
+if [[ -z $FZF_BASE ]]; then
+  export FZF_BASE=~/.fzf
+  git clone --depth 1 https://github.com/junegunn/fzf.git $FZF_BASE
+  log::result $? "Clone fzf to $FZF_BASE"
+  $FZF_BASE/install --no-bash --all
+  log::result $? "Install fzf"
 fi
