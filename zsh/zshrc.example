@@ -1,5 +1,8 @@
 # shortcut to this dotfiles path is $ZSH
-export DOTFILES=DOTFILES_
+if [[ -z $DOTFILES ]]
+then
+  export DOTFILES=DOTFILES_
+fi
 export ZSH=DOTFILES_
 export ZPLUG_HOME=~/.zplug
 

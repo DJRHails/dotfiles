@@ -13,4 +13,16 @@
 #
 # ...to quickly jump into gituser/repository, for example.
 
-cd "$PROJECTS/$1"
+p () {
+  local query="$PROJECTS/$1"
+
+  if [[ -d $query ]] && [ "$PROJECTS/" != "$query" ]
+  then
+    cd $query
+  else
+    local dir
+    dir=$(find $PROJECTS -path '*/\.*' -prune \
+                    -o -type d -print 2> /dev/null | sed "s;$PROJECTS/;;g" | fzf +m -q "$1") &&
+    cd "$PROJECTS/$dir"
+  fi
+}
