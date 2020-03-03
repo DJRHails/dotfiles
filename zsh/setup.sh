@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 
 setup_zshrc () {
-  if ! [ -f zsh/zshrc ]
-  then
-    sed -e "s+DOTFILES+$DOTFILES+g" \
-      zsh/zshrc.example > zsh/zshrc
+  sed -e "s+DOTFILES_+$DOTFILES+g" \
+    zsh/zshrc.example > zsh/zshrc
 
-    log::result $? 'generated zsh/zshrc'
-  fi
+  log::result $? 'generated zsh/zshrc'
 
   local LOCAL_ZSHRC=zsh/zshrc.local
   if ! [ -f $LOCAL_ZSHRC ]
