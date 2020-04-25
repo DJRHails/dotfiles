@@ -13,4 +13,18 @@
 #
 # ...to quickly jump into hails.info, for example.
 
-cd "$SITES/$1"
+
+s() {
+  local root="$SITES"
+  local query="$root/$1"
+  
+  if [[ -d $query ]] && [ "$root/" != "$query" ]
+  then
+	 cd $query
+  else
+	local dir
+	dir=$(find $root -path '*/\.*' -prune \
+                     -o -type d -print 2> /dev/null | sed "s;$root/;;g" | fzf +m -q "$1") &&
+	cd "$root/$dir"
+  fi
+}

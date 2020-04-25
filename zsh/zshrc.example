@@ -31,6 +31,18 @@ do
   source $file
 done
 
+# Shell functions, freload unsets functions
+freload() { while (( $# )); do; unfunction $1; autoload -U $1; shift; done }
+
+# Where to look for autoloaded function definitions
+fpath=($fpath "$DOTFILES/functions")
+
+# Autoload all shell functions from all directories in $fpath (following
+# symlinks) that have the executable bit on (the executable bit is not
+# necessary, but gives you an easy way to stop the autoloading of a
+# particular shell function). $fpath should not be empty for this to work.
+for func in $^fpath/*(N-.x:t); autoload $func
+
 # initialize autocomplete here, otherwise functions won't be loaded
 autoload -U compinit
 compinit
