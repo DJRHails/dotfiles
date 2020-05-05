@@ -30,3 +30,10 @@ if [[ -z $FZF_BASE ]]; then
   $FZF_BASE/install --no-bash --all
   log::result $? "Install fzf"
 fi
+
+# Install fd, necessary for p
+if ! platform::command_exists "fdfind"
+then
+  $(platform::main_package_manager) install fd-find
+  log::result $? "Install fd (aka fd-find)"
+fi

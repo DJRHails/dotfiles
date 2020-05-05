@@ -23,6 +23,9 @@ alias m="man"
 # Gets the current ip address
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
+# fdfind -> fd as short binary is taken
+alias fd="fdfind"
+
 # months
 alias months='locale mon | sed '\''s/;/\n/g'\'' | awk '\''{ print NR, $1 }'\'' | fzf'
 # Capture takes over the std ouput of a process
