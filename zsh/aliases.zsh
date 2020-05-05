@@ -28,6 +28,11 @@ alias fd="fdfind"
 
 # months
 alias months='locale mon | sed '\''s/;/\n/g'\'' | awk '\''{ print NR, $1 }'\'' | fzf'
+
+# Project and Site shortcuts
+alias p='cd $(fd . "${PROJECTS//:/ }" | fzf --ansi -1)'
+alias s='cd $(fd . "${SITES//:/ }" | fzf --ansi -1)'
+
 # Capture takes over the std ouput of a process
 capture() {
     sudo dtrace -p "$1" -qn '

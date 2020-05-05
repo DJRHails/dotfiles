@@ -1,4 +1,0 @@
-#compdef s
-_files -W $SITES -/
-
-# See further documentation in `functions/s`.
