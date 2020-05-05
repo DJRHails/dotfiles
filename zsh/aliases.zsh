@@ -23,6 +23,8 @@ alias m="man"
 # Gets the current ip address
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
+# months
+alias months='locale mon | sed '\''s/;/\n/g'\'' | awk '\''{ print NR, $1 }'\'' | fzf'
 # Capture takes over the std ouput of a process
 capture() {
     sudo dtrace -p "$1" -qn '
