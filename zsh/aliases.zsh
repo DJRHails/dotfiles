@@ -23,6 +23,14 @@ alias m="man"
 # Gets the current ip address
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
+# List of commands I use most often, these are candidates for aliases
+candidates() {
+  history | \
+    awk '{CMD[$2]++;count++;}END { for (a in CMD)print CMD[a] " " CMD[a]/count*100 "% " a;}' | \
+    grep -v "./" | \
+    column -c3 -s " " -t | \
+    sort -nr | nl |  head -n 20
+}
 # Month <-> number.
 months() {
   locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf
