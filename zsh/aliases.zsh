@@ -23,15 +23,22 @@ alias m="man"
 # Gets the current ip address
 alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
+# Month <-> number.
+months() {
+  locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf
+}
+
 # fdfind -> fd as short binary is taken
 alias fd="fdfind"
 
-# months
-alias months='locale mon | sed '\''s/;/\n/g'\'' | awk '\''{ print NR, $1 }'\'' | fzf'
-
 # Project and Site shortcuts
-alias p='cd $(fd . $(echo "${PROJECTS//:/ }") | fzf --ansi -1)'
-alias s='cd $(fd . $(echo "${SITES//:/ }") | fzf --ansi -1)'
+p() {
+  cd $(fd . $(echo "${PROJECTS//:/ }") | fzf -1 -q ${1:-""})
+}
+
+s() {
+  cd $(fd . $(echo "${SITES//:/ }") | fzf -1 -q ${1:-""})
+}
 
 # Capture takes over the std ouput of a process
 capture() {
