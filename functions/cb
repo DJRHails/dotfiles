@@ -1,6 +1,7 @@
 #!/bin/sh
 #description: unify the copy and paste commands into one intelligent chainable command
               #https://gist.github.com/RichardBronosky/56d8f614fab2bacdd8b048fb58d0c0c7
+              #https://github.com/javier-lopez/learn/master/sh/tools/cb
 #usage: `date | cb`, or `cb` or `date | cb | tee updates.log`
 
 #example:
@@ -16,7 +17,6 @@ _usage() {
     printf "%s\\n" "  -a, --append              append to the given clipboard, do not overwrite"
     printf "%s\\n" "  -i, --ignore-interrupts   ignore interrupt signals"
     printf "\\n"
-    printf "%b\\n" "  -U, --update              update this program to latest version"
     printf "%s\\n" "  -v, --version             display version"
     printf "%s\\n" "  -h, --help                show this help message and exit"
 }
@@ -41,57 +41,6 @@ _basename() {
 _die() {
     [ -z "${1}" ] || printf "%s\\n" "${*}" >&2
     _usage >&2; exit 1
-}
-
-_update() {
-    _u__current_file="$(cd "$(dirname "${0}")" && pwd)/${PROGNAME}"
-    _u__current_version_long="$(awk -F\" \
-        '/VERSION=/{print $2;exit}' "${_u__current_file}" 2>/dev/null)"
-    _u__current_version="$(printf "%s\\n" "${_u__current_version_long}" | \
-        awk '{gsub(/[\.:]/,"");gsub(/-/,"");print;exit}' 2>/dev/null)"
-    [ -z "${_u__current_version}" ] && printf "%s\\n%s\\n%s\\n"           \
-        "ERROR: Failed to detect current version, please update manually" \
-        "${PROGNAME}         = ${_u__current_file}"                       \
-        "${PROGNAME} version = ${_u__current_version}" >&2 && return 1
-
-    command -v "wget" >/dev/null 2>&1 || command -v "curl" >/dev/null 2>&1 || \
-        { printf "%s\\n" "ERROR: Install either 'wget' or 'curl' to upgrade" >&2; return 1; }
-
-    _u__url="https://raw.githubusercontent.com/javier-lopez/learn/master/sh/tools/${PROGNAME}"
-    _u__tmpfile="/tmp/${PROGNAME}.${$}.update"
-
-    _u__error_msg="$(wget -q -O- --no-check-certificate "${_u__url}" \
-        > "${_u__tmpfile}" 2>&1   || curl -s "${_u__url}"  \
-        > "${_u__tmpfile}" 2>&1)" || { printf "%s\\n%s\\n" \
-        "ERROR: Failed to fetch update, please try later or update manually" \
-        "${_u__error_msg}" >&2; return 1; }
-
-    _u__update_version_long="$(awk -F\" \
-        '/VERSION=/{print $2;exit}' "${_u__tmpfile}" 2>/dev/null)"
-    _u__update_version="$(printf "%s" "${_u__update_version_long}" | awk \
-        '{gsub(/[\.:]/,"");gsub(/-/,"");print;exit}' 2>/dev/null)"
-    [ -n "${_u__update_version}" ] || _u__update_version="0"
-
-    if [ "${_u__current_version}" -lt "${_u__update_version}" ]; then
-        printf "%s %s\\n" "Updating from version" \
-            "${_u__current_version_long} to ${_u__update_version_long} ..."
-        chmod +x "${_u__tmpfile}"
-        if ! mv -f "${_u__tmpfile}" "${_u__current_file}" 2>/dev/null; then
-            printf "%s\\n" "ERROR: no write permissions on ${_u__current_file}" >&2
-            printf "%s\\n" "INFO : trying with sudo ..." >&2
-            if command -v "sudo" >/dev/null 2>&1; then
-                sudo mv "${_u__tmpfile}" "${_u__current_file}" || return 1
-            else
-                printf "%s\\n" "ERROR: sudo isn't available, exiting ..." >&2
-                rm -rf "${_u__tmpfile}"
-                return 1
-            fi
-        fi
-        printf "%s %s\\n" "${PROGNAME} is up-to-date (${_u__update_version_long})"
-        return 0
-    fi
-    printf "%s %s\\n" "${PROGNAME} is up-to-date (${_u__current_version_long})"
-    rm -rf "${_u__tmpfile}"
 }
 
 _show_version() {
@@ -154,7 +103,6 @@ cb() {
   for arg in "${@}"; do #parse options
       case "${arg}" in
           -h|--help) _usage; return ;;
-          -U|--update) _update; return ;;
           -v|--version) _show_version; return ;;
           -a|--append) append="1"; shift ;;
           -i|--ignore-interrupts) ignore_interrumpts="1"; shift ;;
