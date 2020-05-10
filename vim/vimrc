@@ -1,0 +1,2 @@
+" Allow saving of files as sudo when I forget to start with sudo
+cmap w!! w !sudo tee > /dev/null %
