@@ -16,14 +16,14 @@ then
 fi
 
 # Install zplug for the next bit
-if [[ -z $ZPLUG_HOME ]]; then
+if [[ -z $ZPLUG_HOME ]] && [[ ! -d ~/.zplug ]]; then
   export ZPLUG_HOME=~/.zplug
   git clone --depth 1 https://github.com/zplug/zplug $ZPLUG_HOME
   log::result $? "Clone zplug to $ZPLUG_HOME"
 fi
 
 # Install fzf
-if [[ -z $FZF_BASE ]]; then
+if [[ -z $FZF_BASE ]] && [[ ! -d ~/.fzf ]]; then
   export FZF_BASE=~/.fzf
   git clone --depth 1 https://github.com/junegunn/fzf.git $FZF_BASE
   log::result $? "Clone fzf to $FZF_BASE"
