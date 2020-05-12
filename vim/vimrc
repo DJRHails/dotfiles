@@ -1,2 +1,40 @@
+" Indent Options, 2 spaces
+set autoindent
+set expandtab
+set shiftwidth=2
+set smarttab
+set tabstop=2
+
+" Search Options
+set hlsearch
+set ignorecase
+set incsearch
+set smartcase
+
+" Text Options
+syntax enable
+set wrap
+
+" UI Options
+set ruler
+set wildmenu
+set relativenumber
+set mouse=a
+set title
+set background=dark
+
+" Code Folding Options
+set foldmethod=indent
+set foldnestmax=3
+set nofoldenable
+
+" Misc
+set autoread
+set backspace=indent,eol,start
+set backupdir=~/.cache/vim
+set dir=~/.cache/vim
+set history=1000
+set spell
+
 " Allow saving of files as sudo when I forget to start with sudo
 cmap w!! w !sudo tee > /dev/null %
