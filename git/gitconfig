@@ -118,9 +118,6 @@
         git reset --soft \"HEAD~$n\"; \
     }; f"
 
-[hub]
-        protocol = https
-
 [color "branch"]
 
     current = green bold
