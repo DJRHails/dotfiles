@@ -5,7 +5,6 @@ source $ZPLUG_HOME/init.zsh
 # Bundles from oh-my-zsh
 zplug 'robbyrussell/oh-my-zsh', use:'lib/*'
 zplug "plugins/git", from:oh-my-zsh
-zplug "plugins/globalias", from:oh-my-zsh
 
 # Writing
 zplug zsh-users/zsh-autosuggestions
