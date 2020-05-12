@@ -33,7 +33,7 @@ main() {
 
   . "scripts/verify_os.sh"
 
-  # Check if iteractive
+  # Check if interactive
   skip_questions "$@" \
     && skipQuestions=true
 
