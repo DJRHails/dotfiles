@@ -18,7 +18,7 @@ _usage() {
     printf "%s\\n" "  -i, --ignore-interrupts   ignore interrupt signals"
     printf "\\n"
     printf "%s\\n" "  -v, --version             display version"
-    printf "%s\\n" "  -h, --help                show this help message and exit"
+    printf "%s\\n" "  -h, --help                show this help message"
 }
 
 _basename() {
@@ -40,7 +40,7 @@ _basename() {
 
 _die() {
     [ -z "${1}" ] || printf "%s\\n" "${*}" >&2
-    _usage >&2; exit 1
+    _usage >&2;
 }
 
 _show_version() {
