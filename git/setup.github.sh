@@ -37,6 +37,21 @@ github::generate_ssh_keys() {
     log::result $? "Generate SSH keys"
 }
 
+github::generate_gpg_keys() {
+  local local_genkey_definition=git/genkey
+
+  prompt::author
+  feedback::ask ' - What is your gpg passphrase?'
+  passphrase=$(feedback::get_answer)
+
+  sed -e "s/AUTHORNAME/${GIT_AUTHOR_NAME}/g" \
+    -e "s/AUTHOREMAIL/${GIT_AUTHOR_EMAIL}/g" \
+    -e "s/PASSPHRASE/${passphrase}/g" \
+    $local_genkey_definition.tmpl > $local_genkey_definition
+
+  gpg --gen-key --batch $local_genkey_definition > /dev/null
+  shred -u $local_genkey_definition
+}
 
 github::open_keys_page() {
 
@@ -79,6 +94,50 @@ github::set_ssh_key() {
 
 }
 
+github::get_gpg_key_id() {
+  gpg_key_id="$(gpg --list-secret-keys --keyid-format LONG \
+    | grep git-auto -B 2 \
+    | grep sec \
+    | grep -o -P '(?<=/)[A-Z0-9]{16}')"
+}
+
+github::set_gpg_key() {
+  mkdir -p "$HOME/.gpg"
+  local gpgKeyFileName="$HOME/.gpg/github"
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+  # If there is already a file with that
+  # name, generate another, unique, file name.
+
+  if [ -f "$gpgKeyFileName" ]; then
+      gpgKeyFileName="$(mktemp -u "$HOME/.gpg/github_XXXXX")"
+  fi
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    github::generate_gpg_keys
+    github::get_gpg_key_id
+    gpg --armor --export ${gpg_key_id} > ${gpgKeyFileName}
+    github::copy_public_key_to_clipboard "${gpgKeyFileName}"
+    github::open_keys_page
+    feedback::ask_for_confirmation "Have you copied the PGP Key?"
+    printf "\n"
+
+    if ! feedback::answer_is_yes
+    then
+        gpg --delete-secret-key ${gpg_key_id}
+        gpg --delete-key ${gpg_key_id}
+    else
+      github::update_local_with_gpg
+    fi
+}
+
+github::update_local_with_gpg() {
+  local local_git_config=git/gitconfig.local
+  git config --file $local_git_config user.signingkey $gpg_key_id
+  git config --file $local_git_config push.gpgsign true
+}
 
 github::test_ssh_connection() {
     while true; do
@@ -103,5 +162,20 @@ github::setup() {
     log::result $? "set up GitHub SSH key"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    github::get_gpg_key_id
+    if [[ -z $gpg_key_id ]]
+    then
+      feedback::ask_for_confirmation "Do you want to setup GPG signing?"
+      printf "\n"
+
+      if feedback::answer_is_yes; then
+          github::set_gpg_key
+      fi
+
+      log::result $? "set up GitHub GPG key"
+    else
+      log::success "skipped GitHub GPG key already present ($gpg_key_id)"
+    fi
+
 
 }
