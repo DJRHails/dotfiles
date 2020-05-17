@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 setup_gitconfig () {
-  local LOCAL_GIT_CONFIG=git/gitconfig.local
-  if ! [ -f $LOCAL_GIT_CONFIG ]
+  local local_git_config=git/gitconfig.local
+  if ! [ -f $local_git_config ]
   then
     git_credential='cache'
     if [ "$(uname -s)" == "Darwin" ]
@@ -10,10 +10,7 @@ setup_gitconfig () {
       git_credential='osxkeychain'
     fi
 
-    feedback::ask ' - What is your github author name?'
-    git_authorname=$(feedback::get_answer)
-    feedback::ask ' - What is your github author email?'
-    git_authoremail=$(feedback::get_answer)
+    prompt::author
 
     sed -e "s/AUTHORNAME/$GIT_AUTHOR_NAME/g" \
       -e "s/AUTHOREMAIL/$GIT_AUTHOR_EMAIL/g" \
@@ -21,9 +18,14 @@ setup_gitconfig () {
       $local_git_config.tmpl > $local_git_config
 
     log::success 'generated git/gitconfig.local'
+  else
+    log::success 'skipped gitconfig generation as present'
   fi
 }
 
 
 . "$DOTFILES/scripts/core/main.sh"
+. "$DOTFILES/git/setup.prompt.sh"
+. "$DOTFILES/git/setup.github.sh"
 setup_gitconfig
+github::setup
