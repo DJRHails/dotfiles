@@ -136,7 +136,6 @@ github::set_gpg_key() {
 github::update_local_with_gpg() {
   local local_git_config=git/gitconfig.local
   git config --file $local_git_config user.signingkey $gpg_key_id
-  git config --file $local_git_config push.gpgsign true
 }
 
 github::test_ssh_connection() {
