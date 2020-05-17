@@ -10,6 +10,6 @@ cd ~/.dotfiles
 ```
 
 Inspired by:
-- @holman
-- @alrra
+- [@holman](https://github.com/holman/dotfiles)
+- [@alrra](https://github.com/alrra/dotfiles)
 - @denisdoro
