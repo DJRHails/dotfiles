@@ -2,7 +2,7 @@
 
 setup_zshrc () {
   sed -e "s+DOTFILES_+$DOTFILES+g" \
-    zsh/zshrc.example > zsh/zshrc
+    zsh/zshrc.tmpl > zsh/zshrc
 
   log::result $? 'generated zsh/zshrc'
 
@@ -18,7 +18,7 @@ setup_zshrc () {
     sites_dir=${sites_dir:-"$HOME/sites"}
 
     sed -e "s+PROJECT_ROOT+$project_dir+g;s+SITES_ROOT+$sites_dir+g" \
-      $LOCAL_ZSHRC.example > $LOCAL_ZSHRC
+      $LOCAL_ZSHRC.tmpl > $LOCAL_ZSHRC
 
     log::result $? 'generated zsh/zshrc'
   fi

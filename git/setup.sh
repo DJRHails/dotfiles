@@ -15,11 +15,10 @@ setup_gitconfig () {
     feedback::ask ' - What is your github author email?'
     git_authoremail=$(feedback::get_answer)
 
-
-    sed -e "s/AUTHORNAME/$git_authorname/g" \
-      -e "s/AUTHOREMAIL/$git_authoremail/g" \
+    sed -e "s/AUTHORNAME/$GIT_AUTHOR_NAME/g" \
+      -e "s/AUTHOREMAIL/$GIT_AUTHOR_EMAIL/g" \
       -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
-      $LOCAL_GIT_CONFIG.example > $LOCAL_GIT_CONFIG
+      $local_git_config.tmpl > $local_git_config
 
     log::success 'generated git/gitconfig.local'
   fi
