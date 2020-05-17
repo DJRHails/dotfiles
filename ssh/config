@@ -3,9 +3,9 @@ Host chocolate
   User daniel
 
 Host shell
-        HostName shell3.doc.ic.ac.uk
-        User djh17
+  HostName shell3.doc.ic.ac.uk
+  User djh17
 
 Host lab
-        ProxyCommand ssh -q shell nc -q0 ray14.doc.ic.ac.uk 22
-        User djh17
+  ProxyCommand ssh -q shell nc -q0 ray14.doc.ic.ac.uk 22
+  User djh17
