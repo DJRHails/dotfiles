@@ -7,5 +7,5 @@ Host shell
   User djh17
 
 Host lab
-  ProxyCommand ssh -q shell nc -q0 ray14.doc.ic.ac.uk 22
+  ProxyCommand ssh -q shell nc -q0 gpu03.doc.ic.ac.uk 22
   User djh17
