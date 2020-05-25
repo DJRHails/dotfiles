@@ -93,12 +93,24 @@ _cb_paste() {
     fi
 }
 
+_stdin_is_pipe(){
+  [[ -p /dev/stdin ]]
+}
+
+_stdin_is_tty() {
+  [[ -t 0 ]]
+}
+
+_stdout_is_tty() {
+  [[ -t 1 ]]
+}
+
+_stdin_is_pipe_like(){
+    _stdin_is_pipe || ! _stdin_is_tty
+}
+
 cb() {
   PROGNAME="$(_basename "${0}")"
-
-  [ -p /dev/stdin ] && stdin_is_pipe="1"
-  [ -t 0          ] && stdin_is_tty="1"
-  [ -t 1          ] && stdout_is_tty="1"
 
   for arg in "${@}"; do #parse options
       case "${arg}" in
@@ -110,22 +122,11 @@ cb() {
       esac
   done
 
-  if [ -n "${stdin_is_pipe}" ] || [ ! -n "${stdin_is_tty}" ] ; then #stdin is pipe-ish
-      _cb_copy  #send stdin to the clipboard
-      #if [ ! -n "${stdout_is_tty}" ]; then #also, stdout is either a pipe or a redirection
-          #_cb_paste #send clipboard content to that pipe/redirection, enables chaining `man tee`
-      #fi
-      _cb_paste #doesn't matter if stdout is a pipe a redirection or a tty,
-                #always output clipboard content, it reflects `tee` behavior
-  else #stdin is not a pipe
-      _cb_paste #output the clipboard
-      if [ -n "${stdout_is_tty}" ]; then #stdout is not a pipe so we don't have to
-                                         #be strict about not altering the output
-          :
-          #commented as it could confuse the user about the original content of
-          #the clipboard
-          #printf "\\n" #prevent the prompt from being on the same line
-      fi
+  if _stdin_is_pipe_like; then
+      _cb_copy
+      _cb_paste
+  else
+      _cb_paste
   fi
 }
 
