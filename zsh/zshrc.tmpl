@@ -6,7 +6,6 @@ fi
 export ZSH=DOTFILES_
 export ZPLUG_HOME=~/.zplug
 
-
 # Stash any private elements in ~/.zshrc.local. This means they'll stay out
 # of your main dotfiles repository (which may be public, like this one), but
 # you'll have access to them in your scripts.
@@ -32,7 +31,7 @@ do
 done
 
 # Shell functions, freload unsets functions
-freload() { while (( $# )); do; unfunction $1; autoload -U $1; shift; done }
+freload() { while (( $# )); do; unfunction $1 >/dev/null; autoload -U $1; shift; done }
 
 # Where to look for autoloaded function definitions
 fpath=($fpath "$DOTFILES/functions")
@@ -41,7 +40,7 @@ fpath=($fpath "$DOTFILES/functions")
 # symlinks) that have the executable bit on (the executable bit is not
 # necessary, but gives you an easy way to stop the autoloading of a
 # particular shell function). $fpath should not be empty for this to work.
-for func in $^fpath/*(N-.x:t); autoload $func
+freload $^fpath/*(N-.x:t)
 
 # initialize autocomplete here, otherwise functions won't be loaded
 autoload -U compinit

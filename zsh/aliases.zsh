@@ -4,11 +4,20 @@ alias reload!='. ~/.zshrc'
 alias reset!="cd $DOTFILES && ./bootstrap.sh"
 alias cls='clear' # Good 'ol Clear Screen command
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 alias h="cd ~"
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
 alias cd..="cd .."
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+alias t1="tree -L 1 -I 'node_modules|cache'"
+alias t2="tree -L 2 -I 'node_modules|cache'"
+alias t3="tree -L 3 -I 'node_modules|cache'"
+alias te='tree'
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -20,21 +29,10 @@ alias ll="ls -l"
 alias la="ls -la"
 alias m="man"
 
-# Gets the current ip address
-alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-# List of commands I use most often, these are candidates for aliases
-candidates() {
-  history | \
-    awk '{CMD[$2]++;count++;}END { for (a in CMD)print CMD[a] " " CMD[a]/count*100 "% " a;}' | \
-    grep -v "./" | \
-    column -c3 -s " " -t | \
-    sort -nr | nl |  head -n 20
-}
-# Month <-> number.
-months() {
-  locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf
-}
+# TODO(DJRHails):
+# https://github.com/nikitavoloboev/dotfiles/blob/master/zsh/functions/fzf-functions.zsh
 
 # fdfind -> fd as short binary is taken
 alias fd="fdfind"
@@ -46,6 +44,40 @@ p() {
 
 s() {
   cd $(fd . $(echo "${SITES//:/ }") | fzf -1 -q ${1:-""})
+}
+
+fzf-down() {
+  fzf --height 50% "$@" --border
+}
+
+# Month <-> number.
+months() {
+  locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf-down
+}
+
+fkill() {
+  local pid
+  pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+
+  if [ "x$pid" != "x" ]
+  then
+    echo $pid | xargs kill -${1:-9}
+  fi
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+# Gets the current ip address
+alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+
+# List of commands I use most often, these are candidates for aliases
+candidates() {
+  history | \
+    awk '{CMD[$2]++;count++;}END { for (a in CMD)print CMD[a] " " CMD[a]/count*100 "% " a;}' | \
+    grep -v "./" | \
+    column -c3 -s " " -t | \
+    sort -nr | nl |  head -n 20
 }
 
 # Capture takes over the std ouput of a process
