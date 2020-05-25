@@ -31,7 +31,7 @@ do
 done
 
 # Shell functions, freload unsets functions
-freload() { while (( $# )); do; unfunction $1 >/dev/null; autoload -U $1; shift; done }
+freload() { while (( $# )); do; unfunction $1 2> /dev/null; autoload -U $1; shift; done }
 
 # Where to look for autoloaded function definitions
 fpath=($fpath "$DOTFILES/functions")
