@@ -6,6 +6,9 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+alias open='xdg-open' # Shorten ubuntu's silly open name
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 alias -g G="| grep" # Grep pipe shortcut
 alias -g C="| cb" # Copy to clipboard (see functions/cb)
