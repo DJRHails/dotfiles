@@ -14,6 +14,11 @@ alias cd..="cd .."
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+alias -s git="git clone"
+alias -s {md,txt}="atom"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 alias t1="tree -L 1 -I 'node_modules|cache'"
 alias t2="tree -L 2 -I 'node_modules|cache'"
 alias t3="tree -L 3 -I 'node_modules|cache'"
