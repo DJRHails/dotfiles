@@ -1,6 +1,6 @@
 #!/bin/bash
 
-alias reload!='. ~/.zshrc'
+alias reload!='exec -l zsh' # Allows for a full reload?
 alias reset!="cd $DOTFILES && ./bootstrap.sh"
 alias cls='clear' # Good 'ol Clear Screen command
 
