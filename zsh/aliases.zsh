@@ -6,9 +6,11 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-alias -g G="| grep"
-alias -g C="| cb"
-alias -g "?"="| fzf"
+
+alias -g G="| grep" # Grep pipe shortcut
+alias -g C="| cb" # Copy to clipboard (see functions/cb)
+alias -g "?"="| fzf" # Pipe to fuzzy search e.g (la ?)
+alias -g NF='./*(oc[1])' # Points to newest file/dir e.g. tar xf NF; cd NF
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
