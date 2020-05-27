@@ -46,10 +46,12 @@ alias fd="fdfind"
 p() {
   cd $(fd . $(echo "${PROJECTS//:/ }") | fzf -1 -q ${1:-""})
 }
+hash -d proj=$PROJECTS
 
 s() {
   cd $(fd . $(echo "${SITES//:/ }") | fzf -1 -q ${1:-""})
 }
+hash -d sites=$SITES
 
 fzf-down() {
   fzf --height 50% "$@" --border
