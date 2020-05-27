@@ -54,15 +54,20 @@ alias m="man"
 alias fd="fdfind"
 
 # Project and Site shortcuts
-p() {
-  cd $(fd . $(echo "${PROJECTS//:/ }") | fzf -1 -q ${1:-""})
+jump() {
+  cd $(fd . $(echo "${1//:/ }") | fzf -1 -q ${2:-""})
 }
-hash -d proj=$PROJECTS
+_jump() {
+  _files -W "(${1//:/ })" -/;
+}
 
-s() {
-  cd $(fd . $(echo "${SITES//:/ }") | fzf -1 -q ${1:-""})
-}
-hash -d sites=$SITES
+p() { jump $PROJECTS $1 }
+_p() { _jump $PROJECTS }
+compdef _p p
+
+s() { jump $SITES $1 }
+_s() { _jump $SITES }
+compdef _s s
 
 fzf-down() {
   fzf --height 50% "$@" --border
