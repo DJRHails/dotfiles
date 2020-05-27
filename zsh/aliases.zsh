@@ -6,6 +6,12 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+alias -g G="| grep"
+alias -g C="| cb"
+alias -g "?"="| fzf"
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 alias h="cd ~"
 alias ..="cd .."
 alias ...="cd ../.."
