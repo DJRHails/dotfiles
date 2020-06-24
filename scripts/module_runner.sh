@@ -15,7 +15,7 @@ execute_for_all_modules() {
       printf "\n"
     fi
 
-    if [ "$skipQuestions" = false ] || feedback::answer_is_yes
+    if [ "$skipQuestions" = true ] || feedback::answer_is_yes
     then
       log::subheader "$((idx+1)). Executing ${script_name%.*} for '$module_name'"
       . $src
