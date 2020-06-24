@@ -4,7 +4,7 @@ setup_gitconfig () {
   local local_git_config=git/gitconfig.local
   if ! [ -f $local_git_config ]
   then
-    git_credential='cache'
+    # git_credential='cache'
     if [ "$(uname -s)" == "Darwin" ]
     then
       git_credential='osxkeychain'
