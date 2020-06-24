@@ -1,0 +1,29 @@
+{
+    "editor.fontFamily": "'Fira Code', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'",
+    "editor.fontLigatures": true,
+    "editor.wordWrap": "on",
+    "editor.tabSize": 2,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": true
+    },
+    
+    "git.autofetch": true,
+    
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "eslint.lintTask.enable": true,
+    "eslint.format.enable": true,
+    "eslint.packageManager": "yarn",
+    "eslint.alwaysShowStatus": true,
+    "eslint.validate": [
+        "html",
+        "javascript",
+        "typescript",
+        "javascriptreact",
+        "typescriptreact"
+    ],
+    "vetur.useWorkspaceDependencies": true,
+    "javascript.updateImportsOnFileMove.enabled": "always"
+}
