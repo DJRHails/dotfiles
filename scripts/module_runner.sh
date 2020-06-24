@@ -9,9 +9,18 @@ execute_for_all_modules() {
   do
     local src="${scripts[$idx]}"
     module_name="$(basename "$(dirname "$src")")"
-    log::subheader "$((idx+1)). Executing ${script_name%.*} for '$module_name'"
-    . $src
-    log::result $? "${script_name%.*} completed"
+    
+    if [ "$skipQuestions" = false ]; then
+      feedback::ask_for_confirmation "Do you want to execute ${script_name%.*} for '$module_name'"
+      printf "\n"
+    fi
+
+    if [ "$skipQuestions" = false ] || feedback::answer_is_yes
+    then
+      log::subheader "$((idx+1)). Executing ${script_name%.*} for '$module_name'"
+      . $src
+      log::result $? "${script_name%.*} completed"
+    fi
   done
 }
 

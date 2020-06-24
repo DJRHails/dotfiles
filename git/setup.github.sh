@@ -5,7 +5,7 @@ github::add_ssh_configs() {
     printf "%s\n" \
         "Host github.com" \
         "  IdentityFile $1" \
-        "  LogLevel ERROR" >> ~/.ssh/config
+        "  LogLevel ERROR" >> $HOME/.ssh/config
 
     log::result $? "Add SSH configs"
 
