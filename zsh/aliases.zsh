@@ -53,9 +53,22 @@ alias m="man"
 # fdfind -> fd as short binary is taken
 alias fd="fdfind"
 
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Project and Site shortcuts
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# > echo "$(grab $PROJECTS)"
+# > grab "dir1:dir2"
+grab() {
+  fd . $(echo "${1//:/ }") | fzf -1 -q ${2:-""}
+}
+_grab() {
+  _files -W "(${1//:/ })" -/;
+}
+
+# > jump $PROJECTS
 jump() {
-  cd $(fd . $(echo "${1//:/ }") | fzf -1 -q ${2:-""})
+  cd "$(grab $@)"
 }
 _jump() {
   _files -W "(${1//:/ })" -/;
