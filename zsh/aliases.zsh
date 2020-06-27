@@ -96,6 +96,15 @@ months() {
   locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf-down
 }
 
+# Search in path
+fpath() {
+  echo "${PATH//:/\\n}" | fzf-down
+}
+
+fenv() {
+  env | fzf-down
+}
+
 fkill() {
   local pid
   pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
