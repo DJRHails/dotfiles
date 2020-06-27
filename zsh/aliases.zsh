@@ -68,7 +68,12 @@ _grab() {
 
 # > jump $PROJECTS
 jump() {
-  cd "$(grab $@)"
+  local dest="$(grab $@)"
+  if [[ -d $dest ]]; then
+    cd "$dest"
+  elif [[ -f $dest ]]; then
+    cd "$(dirname $dest)"
+  fi
 }
 _jump() {
   _files -W "(${1//:/ })" -/;
