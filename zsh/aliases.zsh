@@ -87,6 +87,10 @@ s() { jump $SITES $1 }
 _s() { _jump $SITES }
 compdef _s s
 
+j() { jump $JUMPPOINTS $1 }
+_j() { _jump $JUMPPOINTS }
+compdef _j j
+
 fzf-down() {
   fzf --height 50% "$@" --border
 }
