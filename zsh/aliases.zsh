@@ -59,8 +59,12 @@ alias fd="fdfind"
 
 # > echo "$(grab $PROJECTS)"
 # > grab "dir1:dir2"
+# dir1/
+# dir2/
+# dir1/content.txt
+# ...
 grab() {
-  fd . $(echo "${1//:/ }") | fzf -1 -q ${2:-""}
+  { fd . $(echo ${1//:/ }); echo "${1//:/\n}" } | fzf -1 -q ${2:-""}
 }
 _grab() {
   _files -W "(${1//:/ })" -/;
