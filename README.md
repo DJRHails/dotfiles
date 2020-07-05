@@ -4,8 +4,8 @@ I got fed up of re-inventing the wheel.
 
 ## Installation
 ```bash
-git clone git@github.com:DJRHails/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
+git clone git@github.com:DJRHails/dotfiles.git ~/.files
+cd ~/.files
 ./bootstrap.sh
 ```
 
