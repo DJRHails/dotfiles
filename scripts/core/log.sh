@@ -102,6 +102,10 @@ log::purple() {
     log::color "$1" 5
 }
 
+log::blue() {
+    log::color "$1" 6
+}
+
 log::red() {
     log::color "$1" 1
 }
@@ -132,6 +136,15 @@ log::header() {
 
 log::subheader() {
     log::purple "\n   $1\n"
+}
+
+log::splash() {
+  log::blue '     __ _ _                        \n'
+  log::blue '    / _(_) | ___  ___              \n'
+  log::blue '   | |_| | |/ _ \/ __|             \n'
+  log::blue '  _|  _| | |  __/\__ \ from        \n'
+  log::blue ' (_)_| |_|_|\___||___/ Daniel Hails\n'
+  log::blue "\n$1\n\n"
 }
 
 log::success() {
