@@ -13,13 +13,13 @@ install::with() {
 }
 
 install::package() {
-  install::with $1 $2 $3 "$(platform::main_package_manager)"
+  install::with ${1:-''} ${2:-''} ${3:-''} "$(platform::main_package_manager)"
 }
 
 install::snap() {
-  install::with $1 $2 $3 "sudo snap"
+  install::with ${1:-''} ${2:-''} ${3:-''} "sudo snap"
 }
 
 install::cask() {
-  install::with $1 $2 $3 "brew cask"
+  install::with ${1:-''} ${2:-''} ${3:-''} "brew cask"
 }
