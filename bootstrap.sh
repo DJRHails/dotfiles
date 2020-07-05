@@ -9,44 +9,90 @@ declare skipQuestions=false
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-skip_questions() {
-     while :; do
+parse_args() {
+     while [[ $# -gt 0 ]]
+     do
         case $1 in
-            -y|--yes) return 0;;
-                   *) break;;
+          -y|--yes)
+            skipQuestions=true
+          ;;
+          -A|--all)
+            allModules=true
+          ;;
+          -r|--recommended)
+            modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git")
+          ;;
+          *)
+            modules+=("$DOTFILES/modules/$1")
+          ;;
         esac
-        shift 1
+        shift
     done
-
-    return 1
 }
 
 cmd_exists() {
     command -v "$1" &> /dev/null
 }
 
-main() {
+run() {
+  local module_dir=$1
+  local script_name=$2
+  local src="$1/$2"
+  if [ -f $src ]; then
+    log::subheader "Executing ${script_name%.*} for '${module_dir##*/}'"
+    . $src
+    log::result $? "${script_name%.*} completed"
+  fi
+}
 
-  echo "Installing .files from $DOTFILES"
+create_links() {
+  local module_dir="$1"
+  local symlink_file="$module_dir/symlinks.conf"
+  local overwrite_all=false backup_all=$skipQuestions skip_all=false
+
+  if [ -f $src ]; then
+    log::subheader "$((idx+1)). Creating symbolic links for '${module_dir##*/}'"
+    link::extract_and_link "$module_dir/symlinks.conf"
+  fi
+}
+
+main() {
   # Load utilities
   . "scripts/core/main.sh"
+  . "scripts/scan.sh"
+  . "scripts/link.sh"
 
-  . "scripts/verify_os.sh"
+  # Check for arguments
+  modules=()
+  allModules=false
+  skipQuestions=false
+  parse_args "$@"
 
-  # Check if interactive
-  skip_questions "$@" \
-    && skipQuestions=true
+  # Splash Screen
+  log::splash " Bootstrapping .files from $DOTFILES"
 
-  # TODO: If needs sudo, ask here
+  # Verify OS
+  log::header "Verify OS verion\n"
+  platform::is_supported && log::success "$os_name with v$os_version is valid"
 
-  . "scripts/module_runner.sh" "setup.sh"
-  . "scripts/create_symbolic_links.sh"
+  # Grab modules
+  scan::find_valid_modules modules
 
-  . "scripts/module_runner.sh" "install.sh"
-  . "scripts/module_runner.sh" "install.$(get_os).sh"
+  log::header "Installing $(log::bold "${#modules[@]} modules")"
 
-  #
-  # ./preferences/main.sh
+  for idx in "${!modules[@]}"
+  do
+    local module_dir="${modules[$idx]}"
+    if [[ ! -z $module_dir ]]; then
+      log::header "$((idx+1)). Running '${module_dir##*/}'"
+      run "$module_dir" "setup.sh"
+      create_links "$module_dir"
+      run "$module_dir" "install.sh"
+      run "$module_dir" "install.$(platform::os).sh"
+      export ${module_dir##*/}=installed
+    fi
+  done
+
   . "scripts/restart.sh"
 }
 
