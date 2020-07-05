@@ -122,7 +122,6 @@ github::set_gpg_key() {
     github::copy_public_key_to_clipboard "${gpgKeyFileName}"
     github::open_keys_page
     feedback::ask_for_confirmation "Have you copied the PGP Key?"
-    printf "\n"
 
     if ! feedback::answer_is_yes
     then
@@ -150,31 +149,29 @@ github::test_ssh_connection() {
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 github::setup() {
+  # Frustratingly ssh -T returns success in stderr, so I duplicate it
+  # with tee into stdout and stderr, then grep for success in stdout
+  log::execute "ssh -T git@github.com 2> >(tee >(cat >&2)) | grep success" \
+    "Testing ssh credentials"
 
-    log::purple "     - Testing ssh credentials...\n"
-    ssh -T git@github.com &> /dev/null
+  if [ $? -ne 0 ]; then
+      github::set_ssh_key
+      log::result $? "set up GitHub SSH key"
+  fi
 
-    if [ $? -ne 1 ]; then
-        github::set_ssh_key
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  log::execute github::get_gpg_key_id "Get GPG key"
+  if [[ $? -eq 0 && -z $gpg_key_id ]]
+  then
+    feedback::ask_for_confirmation "Do you want to setup GPG signing?"
+
+    if feedback::answer_is_yes; then
+      github::set_gpg_key
     fi
 
-    log::result $? "set up GitHub SSH key"
-
-    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    github::get_gpg_key_id
-    if [[ -z $gpg_key_id ]]
-    then
-      feedback::ask_for_confirmation "Do you want to setup GPG signing?"
-      printf "\n"
-
-      if feedback::answer_is_yes; then
-          github::set_gpg_key
-      fi
-
-      log::result $? "set up GitHub GPG key"
-    else
-      log::success "skipped GitHub GPG key already present ($gpg_key_id)"
-    fi
-
-
+    log::result $? "set up GitHub GPG key"
+  elif [ $? -eq 0 ]
+  then
+    log::success "skipped GitHub GPG key already present ($gpg_key_id)"
+  fi
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 setup_ssh_config () {
-  local LOCAL_CONFIG=ssh/config
+  local LOCAL_CONFIG=modules/ssh/config
   if ! [ -f $LOCAL_CONFIG ]
   then
     cat \

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 setup_gitconfig () {
-  local local_git_config=git/gitconfig.local
+  local local_git_config=modules/git/gitconfig.local
   if ! [ -f $local_git_config ]
   then
     # git_credential='cache'
-    if [ "$(uname -s)" == "Darwin" ]
+    if platform::is_osx
     then
       git_credential='osxkeychain'
     fi
@@ -17,7 +17,7 @@ setup_gitconfig () {
       -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
       $local_git_config.tmpl > $local_git_config
 
-    log::success 'generated git/gitconfig.local'
+    log::success "generated $local_git_config"
   else
     log::success 'skipped gitconfig generation as present'
   fi
@@ -25,7 +25,7 @@ setup_gitconfig () {
 
 
 . "$DOTFILES/scripts/core/main.sh"
-. "$DOTFILES/git/setup.prompt.sh"
-. "$DOTFILES/git/setup.github.sh"
+. "$DOTFILES/modules/git/setup.prompt.sh"
+. "$DOTFILES/modules/git/setup.github.sh"
 setup_gitconfig
 github::setup

@@ -1,18 +1,23 @@
 . "$DOTFILES/scripts/core/main.sh"
 
-# Check version exisiting
-if ! platform::command_exists "zsh"
-then
-  $(platform::main_package_manager) install zsh
-  log::result $? "Install zsh"
-fi
+install::package "ZSH" "zsh"
 
 # Set as default shell
 ZSH_SHELL_LOC=$(which zsh)
+
+# This needs to be done because applications use this file to
+# determine whether a shell is valid.
+# http://www.linuxfromscratch.org/blfs/view/7.4/postlfs/etcshells.html
+if ! grep "$ZSH_SHELL_LOC" < /etc/shells &> /dev/null; then
+    log::execute \
+        "printf '%s\n' '$ZSH_SHELL_LOC' | sudo tee -a /etc/shells" \
+        "ZSH (add '$ZSH_SHELL_LOC' in '/etc/shells')"
+fi
+
 if [ "$SHELL" != "$ZSH_SHELL_LOC" ]
 then
   chsh -s "$ZSH_SHELL_LOC"
-  log::result $? "Set Zsh as default shell"
+  log::result $? "ZSH (use installed version)"
 fi
 
 # Install zplug for the next bit
@@ -29,11 +34,4 @@ if [[ -z $FZF_BASE ]] && [[ ! -d ~/.fzf ]]; then
   log::result $? "Clone fzf to $FZF_BASE"
   $FZF_BASE/install --no-bash --all
   log::result $? "Install fzf"
-fi
-
-# Install fd, necessary for p
-if ! platform::command_exists "fdfind"
-then
-  $(platform::main_package_manager) install fd-find
-  log::result $? "Install fd (aka fd-find)"
 fi

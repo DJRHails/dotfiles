@@ -50,9 +50,6 @@ alias m="man"
 # TODO(DJRHails):
 # https://github.com/nikitavoloboev/dotfiles/blob/master/zsh/functions/fzf-functions.zsh
 
-# fdfind -> fd as short binary is taken
-alias fd="fdfind"
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Project and Site shortcuts
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

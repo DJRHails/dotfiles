@@ -2,11 +2,11 @@
 
 setup_zshrc () {
   sed -e "s+DOTFILES_+$DOTFILES+g" \
-    zsh/zshrc.tmpl > zsh/zshrc
+    modules/zsh/zshrc.tmpl > modules/zsh/zshrc
 
-  log::result $? 'generated zsh/zshrc'
+  log::result $? 'generated modules/zsh/zshrc'
 
-  local LOCAL_ZSHRC=zsh/zshrc.local
+  local LOCAL_ZSHRC=modules/zsh/zshrc.local
   if ! [ -f $LOCAL_ZSHRC ]
   then
     feedback::ask " - Where are you going to store your projects? ($HOME/projects)"
@@ -20,7 +20,7 @@ setup_zshrc () {
     sed -e "s+PROJECT_ROOT+$project_dir+g;s+SITES_ROOT+$sites_dir+g" \
       $LOCAL_ZSHRC.tmpl > $LOCAL_ZSHRC
 
-    log::result $? 'generated zsh/zshrc'
+    log::result $? 'generated modules/zsh/zshrc'
   fi
 }
 
