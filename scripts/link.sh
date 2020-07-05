@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
+. "$DOTFILES/scripts/core/main.sh"
 
-link_file () {
+link::file () {
   local src=$1 dst=$2
 
   local overwrite= backup= skip=
@@ -16,7 +17,7 @@ link_file () {
       then
         skip=true;
       else
-        feedback::ask "File already exists: $dst ($(basename "$src")), what do you want to do?\n\
+        feedback::ask "File already exists: $dst (${src##*/})), what do you want to do?\n\
         [s]kip, [S]kip all, [o]verwrite, [O]verwrite all, [b]ackup, [B]ackup all?"
 
         case "$(feedback::get_answer)" in
@@ -67,7 +68,7 @@ link_file () {
   fi
 }
 
-extract_symlinks() {
+link::extract_and_link() {
   declare -A links
   local sep=' -> '
   while read line
@@ -79,24 +80,6 @@ extract_symlinks() {
 
   for src in ${!links[*]}
   do
-    link_file "$(dirname $1)/$src" "${links[$src]/#\~/$HOME}"
+    link::file "$(dirname $1)/$src" "${links[$src]/#\~/$HOME}"
   done
 }
-
-create_links() {
-  # If skipQuestions then backup
-  local overwrite_all=false backup_all=$skipQuestions skip_all=false
-
-  for symlink_file in $(find -H "$DOTFILES" -maxdepth 2 -name 'symlinks.conf' -not -path '*.git*')
-  do
-    extract_symlinks "$symlink_file"
-  done
-}
-
-main() {
-  log::header "Create symbolic links\n"
-  create_links
-}
-
-. "$DOTFILES/scripts/core/main.sh"
-main
