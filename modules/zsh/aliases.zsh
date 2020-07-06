@@ -101,6 +101,11 @@ months() {
   locale mon | sed 's/;/\n/g' | awk '{ print NR, $1 }' | fzf-down
 }
 
+# Get box characters
+boxchars() {
+  echo "┌ ─ ┐ │ └ ─ ┘" | tr ' ' '\n' | fzf-down | cb
+}
+
 # Search in path
 fpath() {
   echo "${PATH//:/\\n}" | fzf-down
