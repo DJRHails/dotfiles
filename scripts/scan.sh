@@ -21,17 +21,17 @@ scan::find_modules() {
     then
       returnModules+=("$REPLY")
     fi
-  done < <(find -H "$searchDir" -type d -mindepth 1 -maxdepth 1 -print0)
+  done < <(find -H "$searchDir" -mindepth 1 -maxdepth 1 -type d -print0)
   log::header "Found $(log::bold "${#returnModules[@]} modules")"
 }
 
 # Uses skipQuestions & allModules
 scan::find_valid_modules() {
-  local -n returnModules=$1
+  local -n returnValidModules=$1
 
   if [ "$allModules" = true ]
   then
-    scan::find_modules returnModules
+    scan::find_modules returnValidModules
     return
   fi
 
@@ -46,12 +46,12 @@ scan::find_valid_modules() {
   for moduleDir in ${foundModules[@]}
   do
     # If it wasn't already present, ask if we want to install it
-    if [[ ! " ${returnModules[@]} " =~ " $moduleDir " ]]
+    if [[ ! " ${returnValidModules[@]} " =~ " $moduleDir " ]]
     then
       feedback::ask_for_confirmation "Do you want to execute '${moduleDir##*/}'"
       if feedback::answer_is_yes
       then
-        returnModules+=("$moduleDir")
+        returnValidModules+=("$moduleDir")
       fi
     fi
   done
