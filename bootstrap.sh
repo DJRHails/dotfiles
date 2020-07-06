@@ -50,9 +50,9 @@ create_links() {
   local symlink_file="$module_dir/symlinks.conf"
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
-  if [ -f $src ]; then
-    log::subheader "$((idx+1)). Creating symbolic links for '${module_dir##*/}'"
-    link::extract_and_link "$module_dir/symlinks.conf"
+  if [ -f $symlink_file ]; then
+    log::subheader "Creating symbolic links for '${module_dir##*/}'"
+    link::extract_and_link "$symlink_file"
   fi
 }
 
@@ -79,6 +79,8 @@ main() {
   scan::find_valid_modules modules
 
   log::header "Installing $(log::bold "${#modules[@]} modules")"
+
+  platform::ask_for_sudo
 
   for idx in "${!modules[@]}"
   do
