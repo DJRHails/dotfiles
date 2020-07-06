@@ -12,6 +12,10 @@ platform::is_linux() {
    [[ $(uname -s) == "Linux" ]]
 }
 
+platform::is_ubuntu() {
+  [[ $(platform::os) == "ubuntu" ]]
+}
+
 platform::os() {
   local os=""
   if platform::is_osx
@@ -71,8 +75,8 @@ platform::is_supported() {
   declare -r MINIMUM_MACOS_VERSION="10.10"
   declare -r MINIMUM_UBUNTU_VERSION="18.04"
 
-  os_name="$(platform::os)"
-  os_version="$(platform::os_version)"
+  local os_name="$(platform::os)"
+  local os_version="$(platform::os_version)"
 
   # Check if the OS is `macOS` and
   # it's above the required version.
@@ -101,10 +105,39 @@ platform::is_supported() {
   return 1
 }
 
+platform::open() {
+  if platform::command_exists "xdg-open"; then
+    xdg-open "$1" > /dev/null 2>&1
+  elif platform::command_exists "open"; then
+    open "$1" > /dev/null 2>&1
+  else
+    log::warning "Please open url ($1)"
+  fi
+}
+
 platform::relink() {
   local readonly original_path="$(which $1)"
   local readonly new_path="$(dirname "$original_path")/$2"
-  sudo ln -s "$original_path" "$new_path"
+
+  sudo ln -fsn "$original_path" "$new_path"
+  #        |||
+  #override┘||
+  #symbolic-┘|
+}
+
+platform::ask_for_sudo() {
+  sudo -v &> /dev/null
+
+  # Update existing `sudo` time stamp
+  # until this script has finished.
+  #
+  # https://gist.github.com/cowboy/3118588
+
+  while true; do
+      sudo -n true
+      sleep 60
+      kill -0 "$$" || exit
+  done &> /dev/null &
 }
 
 platform::main_package_manager() {
@@ -123,6 +156,14 @@ platform::main_package_manager() {
     echo "apk"
   else
     echo "brew"
+  fi
+}
+
+platform::package_manager_prefix() {
+  if platform::is_ubuntu; then
+    echo "sudo "
+  else
+    echo ""
   fi
 }
 
