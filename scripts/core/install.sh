@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-install::with() {
-  local -r PACKAGE_READABLE_NAME="$1"
-  local -r PACKAGE="$2"
-  local -r EXTRA_ARGUMENTS="$3"
-  local -r PACKAGE_MANAGER="$4"
 
+install::with() {
+  local -r PACKAGE_MANAGER="$1"
+  local -r PACKAGE_READABLE_NAME="$2"
+  local -r PACKAGE="$3"
+  local -r EXTRA_ARGUMENTS="$4"
+  
   if ! platform::command_exists "$PACKAGE"; then
     log::execute "$PACKAGE_MANAGER install $EXTRA_ARGUMENTS $PACKAGE" "$PACKAGE_READABLE_NAME"
   else
@@ -13,13 +14,13 @@ install::with() {
 }
 
 install::package() {
-  install::with ${1:-''} ${2:-''} ${3:-''} "$(platform::main_package_manager)"
+  install::with "$(platform::package_manager_prefix)$(platform::main_package_manager)" "$1" "$2" "$3"
 }
 
 install::snap() {
-  install::with ${1:-''} ${2:-''} ${3:-''} "sudo snap"
+  install::with "sudo snap" "$1" "$2" "$3"
 }
 
 install::cask() {
-  install::with ${1:-''} ${2:-''} ${3:-''} "brew cask"
+  install::with "brew cask" "$1" "$2" "$3"
 }
