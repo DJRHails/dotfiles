@@ -13,12 +13,12 @@ github::add_ssh_configs() {
 
 github::copy_public_key_to_clipboard () {
 
-    if cmd_exists "pbcopy"; then
+    if platform::command_exists "pbcopy"; then
 
         pbcopy < "$1"
         log::result $? "Copy public key to clipboard"
 
-    elif cmd_exists "xclip"; then
+    elif platform::command_exists "xclip"; then
 
         xclip -selection clip < "$1"
         log::result $? "Copy public key to clipboard"
@@ -38,7 +38,7 @@ github::generate_ssh_keys() {
 }
 
 github::generate_gpg_keys() {
-  local local_genkey_definition=git/genkey
+  local local_genkey_definition=modules/git/genkey
 
   prompt::author
   feedback::ask ' - What is your gpg passphrase?'
@@ -57,17 +57,7 @@ github::open_keys_page() {
 
     declare -r GITHUB_KEYS_URL="https://github.com/settings/keys"
 
-    # The order of the following checks matters
-    # as on Ubuntu there is also a utility called `open`.
-
-    if cmd_exists "xdg-open"; then
-        xdg-open "$GITHUB_KEYS_URL"
-    elif cmd_exists "open"; then
-        open "$GITHUB_KEYS_URL"
-    else
-        log::warning "Please add the public key to GitHub ($GITHUB_KEYS_URL)"
-    fi
-
+    platform::open "$GITHUB_KEYS_URL"
 }
 
 github::set_ssh_key() {
@@ -95,7 +85,7 @@ github::set_ssh_key() {
 }
 
 github::get_gpg_key_id() {
-  gpg_key_id="$(gpg --list-secret-keys --keyid-format LONG \
+  gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG \
     | grep git-auto -B 2 \
     | grep sec \
     | grep -o -P '(?<=/)[A-Z0-9]{16}')"
@@ -115,18 +105,17 @@ github::set_gpg_key() {
   fi
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
     github::generate_gpg_keys
-    github::get_gpg_key_id
-    gpg --armor --export ${gpg_key_id} > ${gpgKeyFileName}
+    github::get_gpg_key_id $gpgKeyId
+    gpg --armor --export ${gpgKeyId} > ${gpgKeyFileName}
     github::copy_public_key_to_clipboard "${gpgKeyFileName}"
     github::open_keys_page
     feedback::ask_for_confirmation "Have you copied the PGP Key?"
 
     if ! feedback::answer_is_yes
     then
-        gpg --delete-secret-key ${gpg_key_id}
-        gpg --delete-key ${gpg_key_id}
+        gpg --delete-secret-key ${gpgKeyId}
+        gpg --delete-key ${gpgKeyId}
     else
       github::update_local_with_gpg
     fi
@@ -134,7 +123,7 @@ github::set_gpg_key() {
 
 github::update_local_with_gpg() {
   local local_git_config=git/gitconfig.local
-  git config --file $local_git_config user.signingkey $gpg_key_id
+  git config --file $local_git_config user.signingkey $gpgKeyId
 }
 
 github::test_ssh_connection() {
@@ -160,8 +149,13 @@ github::setup() {
   fi
 
   # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  log::execute github::get_gpg_key_id "Get GPG key"
-  if [[ $? -eq 0 && -z $gpg_key_id ]]
+  log::execute "github::get_gpg_key_id" "get GPG key"
+  local exitCode=$?
+
+  if [[ $exitCode -eq 0 ]]; then
+    github::get_gpg_key_id
+  fi
+  if [[ $exitCode -eq 0 && -z $gpgKeyId ]]
   then
     feedback::ask_for_confirmation "Do you want to setup GPG signing?"
 
@@ -170,8 +164,10 @@ github::setup() {
     fi
 
     log::result $? "set up GitHub GPG key"
-  elif [ $? -eq 0 ]
+  elif [ $exitCode -eq 0 ]
   then
-    log::success "skipped GitHub GPG key already present ($gpg_key_id)"
+    log::success "skipped GitHub GPG key already present ($gpgKeyId)"
+  else
+    echo "why? $exitCode"
   fi
 }
