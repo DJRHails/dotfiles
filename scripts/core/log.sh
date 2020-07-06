@@ -33,11 +33,6 @@ log::spinner() {
   done
 }
 
-set_trap() {
-  trap -p "$1" | grep "$2" &> /dev/null \
-    || trap '$2' "$1"
-}
-
 kill_all_subprocesses() {
   local i=""
   for i in $(jobs -p); do
@@ -54,7 +49,7 @@ log::execute() {
   local exitCode=0
   local cmdsPID=""
 
-  set_trap "EXIT" "kill_all_subprocesses"
+  trap 'kill_all_subprocesses' EXIT 
 
   eval "$CMDS" &> /dev/null 2> "$TMP_FILE" &
   cmdsPID=$!
