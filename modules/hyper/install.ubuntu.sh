@@ -1,3 +1,3 @@
 . "$DOTFILES/scripts/core/main.sh"
 
-install::package "Fira Code" "fonts-firacode"
+install::package 'Fira Code' "fonts-firacode"
