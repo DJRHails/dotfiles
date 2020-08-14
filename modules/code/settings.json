@@ -45,5 +45,7 @@
     "java.semanticHighlighting.enabled": true,
     "java.configuration.checkProjectSettingsExclusions": false,
     "dart.debugExternalLibraries": false,
-    "dart.debugSdkLibraries": false
+    "dart.debugSdkLibraries": false,
+    "git.confirmSync": false,
+    "python.languageServer": "Microsoft"
 }
