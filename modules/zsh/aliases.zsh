@@ -63,9 +63,6 @@ alias m="man"
 grab() {
   { fd . $(echo ${1//:/ }); echo "${1//:/\n}" } | fzf -1 -q ${2:-""}
 }
-_grab() {
-  _files -W "(${1//:/ })" -/;
-}
 
 # > jump $PROJECTS
 jump() {
@@ -76,21 +73,10 @@ jump() {
     cd "$(dirname $dest)"
   fi
 }
-_jump() {
-  _files -W "(${1//:/ })" -/;
-}
 
 p() { jump $PROJECTS $1 }
-_p() { _jump $PROJECTS }
-compdef _p p
-
 s() { jump $SITES $1 }
-_s() { _jump $SITES }
-compdef _s s
-
 j() { jump $JUMPPOINTS $1 }
-_j() { _jump $JUMPPOINTS }
-compdef _j j
 
 fzf-down() {
   fzf --height 50% "$@" --border
