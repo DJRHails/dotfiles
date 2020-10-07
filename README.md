@@ -12,4 +12,4 @@ cd ~/.files
 Inspired by:
 - [@holman](https://github.com/holman/dotfiles)
 - [@alrra](https://github.com/alrra/dotfiles)
-- @denisdoro
+- [@denisdoro](https://github.com/denisidoro/dotfiles)
