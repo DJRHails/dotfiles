@@ -28,4 +28,9 @@ setup_gitconfig () {
 . "$DOTFILES/modules/git/setup.prompt.sh"
 . "$DOTFILES/modules/git/setup.github.sh"
 setup_gitconfig
-github::setup
+
+feedback::ask_for_confirmation "Do you want to setup github?"
+if feedback::answer_is_yes
+then
+  github::setup
+fi
