@@ -4,7 +4,7 @@ log::error() {
 
 log::spinner() {
   local -r FRAMES='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-  local -r NUMBER_OR_FRAMES=${#FRAMES}
+  local -r NUMBER_OF_FRAMES=${#FRAMES}
   local -r INTERVAL=0.08
   local -r PID="$1"
   local -r CMDS="$2"
@@ -26,7 +26,8 @@ log::spinner() {
   tput sc
 
   while kill -0 "$PID" &>/dev/null; do
-    frameText="   [${FRAMES:i++%NUMBER_OR_FRAMES:1}] $MSG"
+    frameNo=(i++ % NUMBER_OF_FRAMES)
+    frameText="   [${FRAMES:$frameNo:1}] $MSG"
     printf "%s\n" "$frameText"
     sleep $INTERVAL
     tput rc
