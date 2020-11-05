@@ -1,3 +1,5 @@
+
+
 #!/usr/bin/env bash
 
 platform::command_exists() {
@@ -160,7 +162,7 @@ platform::main_package_manager() {
 }
 
 platform::package_manager_prefix() {
-  if platform::is_ubuntu; then
+  if platform::is_linux; then
     echo "sudo "
   else
     echo ""

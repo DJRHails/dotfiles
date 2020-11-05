@@ -3,35 +3,34 @@
 
 scan::find_matching_scripts() {
   local scriptName="$1"
-  local -n returnArrayValidScripts=$2
-  local searchDir="${3:-"$DOTFILES/modules"}"
+  local searchDir="${2:-"$DOTFILES/modules"}"
   while IFS=  read -r -d $'\0'
   do
-    returnArrayValidScripts+=("$REPLY")
+    matching_scripts+=("$REPLY")
   done < <(find -H "$searchDir" -mindepth 1 -maxdepth 2 -name "$scriptName" -print0)
 }
 
 scan::find_modules() {
-  local -n returnModules=$1
-  local searchDir="${3:-"$DOTFILES/modules"}"
+  scanned_modules=()
+  local searchDir="${1:-"$DOTFILES/modules"}"
   while IFS=  read -r -d $'\0'
   do
     # Only add if new.
-    if [[ ! " ${returnModules[@]} " =~ " $REPLY " ]]
+    if [[ ! " ${scanned_modules[@]} " =~ " $REPLY " ]]
     then
-      returnModules+=("$REPLY")
+      scanned_modules+=("$REPLY")
     fi
   done < <(find -H "$searchDir" -mindepth 1 -maxdepth 1 -type d -print0)
-  log::header "Found $(log::bold "${#returnModules[@]} modules")"
+  log::header "Found $(log::bold "${#scanned_modules[@]} modules")"
 }
 
 # Uses skipQuestions & allModules
 scan::find_valid_modules() {
-  local -n returnValidModules=$1
 
   if [ "$allModules" = true ]
   then
-    scan::find_modules returnValidModules
+    scan::find_modules
+    scanned_valid_modules = scanned_modules
     return
   fi
 
@@ -41,17 +40,16 @@ scan::find_valid_modules() {
     return
   fi
 
-  local foundModules=()
-  scan::find_modules foundModules
-  for moduleDir in ${foundModules[@]}
+  scan::find_modules
+  for moduleDir in ${scanned_modules[@]}
   do
     # If it wasn't already present, ask if we want to install it
-    if [[ ! " ${returnValidModules[@]} " =~ " $moduleDir " ]]
+    if [[ ! " ${scanned_valid_modules[@]} " =~ " $moduleDir " ]]
     then
       feedback::ask_for_confirmation "Do you want to execute '${moduleDir##*/}'"
       if feedback::answer_is_yes
       then
-        returnValidModules+=("$moduleDir")
+        scanned_valid_modules+=("$moduleDir")
       fi
     fi
   done

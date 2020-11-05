@@ -63,7 +63,7 @@ main() {
   . "scripts/link.sh"
 
   # Check for arguments
-  modules=()
+  scanned_valid_modules=()
   allModules=false
   skipQuestions=false
   parse_args "$@"
@@ -76,15 +76,15 @@ main() {
   platform::is_supported && log::success "$os_name with v$os_version is valid"
 
   # Grab modules
-  scan::find_valid_modules modules
+  scan::find_valid_modules
 
-  log::header "Installing $(log::bold "${#modules[@]} modules")"
+  log::header "Installing $(log::bold "${#scanned_valid_modules[@]} modules")"
 
   platform::ask_for_sudo
 
-  for idx in "${!modules[@]}"
+  for idx in "${!scanned_valid_modules[@]}"
   do
-    local module_dir="${modules[$idx]}"
+    local module_dir="${scanned_valid_modules[$idx]}"
     if [[ ! -z $module_dir ]]; then
       log::header "$((idx+1)). Running '${module_dir##*/}'"
       run "$module_dir" "setup.sh"
