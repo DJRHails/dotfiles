@@ -5,10 +5,10 @@
 </div>
 
 <h1 align="center">
-  <strong>dotfiles</strong>
+  <strong>.files</strong>
 </h1>
 
-`dotfiles` will sanely setup a machine, and provide quality of life improvements.
+`.files` will sanely setup a machine, and provide quality of life improvements.
 
 ## :gear: Installation
 ```bash
