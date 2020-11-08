@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 
+##? Setup .files and install asked for modules
+##?
+##? USAGE:
+##?    ./bootstrap.sh [FLAGS] [<modules>...]
+##? 
+##? FLAGS:
+##?     -y, --yes  Skip any interactive questions asked during setup.
+##?     -A, --all  Run all modules found in $DOTFILES/modules.
+##?     -c, --cli  Install only cli modules, perfect for servers.
+##?
+##? ARGS:
+##?     <modules>...  the modules to install (optional)
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Move to the correct directory for duration of this script
 cd "$(dirname "${BASH_SOURCE[0]}")" \
   || exit 1
 readonly DOTFILES=$(pwd -P)
-declare skipQuestions=false
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -19,11 +31,11 @@ parse_args() {
           -A|--all)
             allModules=true
           ;;
-          -r|--recommended)
-            modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git")
+          -c|--cli)
+            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git")
           ;;
           *)
-            modules+=("$DOTFILES/modules/$1")
+            scanned_valid_modules+=("$DOTFILES/modules/$1")
           ;;
         esac
         shift
@@ -61,6 +73,9 @@ main() {
   . "scripts/core/main.sh"
   . "scripts/scan.sh"
   . "scripts/link.sh"
+
+  # Check if we need help
+  doc::maybe_help "$@"
 
   # Check for arguments
   scanned_valid_modules=()

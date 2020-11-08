@@ -5,6 +5,7 @@ if ! ${DOT_MAIN_SOURCED:-false} ; then
    source "${DOTFILES}/scripts/core/log.sh"
    source "${DOTFILES}/scripts/core/filesystem.sh"
    source "${DOTFILES}/scripts/core/feedback.sh"
+   source "${DOTFILES}/scripts/core/doc.sh"
 
    # Requires platform, log
    source "${DOTFILES}/scripts/core/install.sh"
