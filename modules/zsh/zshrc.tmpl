@@ -33,9 +33,6 @@ done
 # Shell functions, freload unsets functions
 freload() { while (( $# )); do; unfunction $1 2> /dev/null; autoload -U $1; shift; done }
 
-# Where to look for autoloaded function definitions
-fpath=($fpath "$DOTFILES/functions")
-
 # Autoload all shell functions from all directories in $fpath (following
 # symlinks) that have the executable bit on (the executable bit is not
 # necessary, but gives you an easy way to stop the autoloading of a
@@ -67,3 +64,6 @@ bindkey "^[[B" down-line-or-beginning-search # Down
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 export FZF_COMPLETION_TRIGGER='~~'
+
+# Add bin to path
+export PATH=${PATH:+$PATH:}${DOTFILES}/bin

@@ -1,10 +1,16 @@
-#!/bin/sh
-#
-# Usage: extract <file>
-# Description: extracts archived files / mounts disk images
-# Note: .dmg/hdiutil is macOS-specific.
-#
+#!/usr/bin/env bash
+
 # credit: http://nparikh.org/notes/zshrc.txt
+# Note: .dmg/hdiutil is macOS-specific.
+
+##? Extracts archived files / mounts disk images
+##?
+##? USAGE:
+##?    extract <file>
+##? 
+##? ARGS:
+##?     <file>  the file to extract
+
 extract () {
     if [ -f $1 ]; then
         case $1 in
@@ -28,3 +34,9 @@ extract () {
         echo "'$1' is not a valid file"
     fi
 }
+
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
+extract "$@"

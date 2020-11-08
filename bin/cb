@@ -1,25 +1,33 @@
-#!/bin/sh
-#description: unify the copy and paste commands into one intelligent chainable command
-              #https://gist.github.com/RichardBronosky/56d8f614fab2bacdd8b048fb58d0c0c7
-              #https://github.com/javier-lopez/learn/master/sh/tools/cb
-#usage: `date | cb`, or `cb` or `date | cb | tee updates.log`
+#!/usr/bin/env bash
 
-#example:
-#$ date | cb #content is written to the system clipboard as well
-#Thu Jul  6 21:24:30 CDT 2017
+# credit: https://gist.github.com/RichardBronosky/56d8f614fab2bacdd8b048fb58d0c0c7
+# credit: https://github.com/javier-lopez/learn/master/sh/tools/cb
+
+##? Unifies the copy and paste commands into one 
+##? intelligent chainable command.
+##?
+##? USAGE:
+##?     cb [FLAG/OPTIONS] <clipboard>...
+##?
+##? FLAGS:
+##?     -a, --append
+##?         append to the given clipboard, do not overwrite.
+##?     -i, --ignore-interrupts  
+##?         ignore interrupt signals
+##?     -v, --version
+##?         display version
+##?     -h, --help
+##?         show this help
+##?
+##? ARGS:
+##?     <clipboard>  the file to extract
+##?
+##? EXAMPLES:
+##?     `date | cb`       copy current data to clipboard 
+##?     `cb`              paste current clipboard to stdout
+##?     `cb | tee d.log`  paste current clipboard to d.log and stdout.
 
 VERSION="2017.07.06-21:25"
-
-_usage() {
-    printf "%s\\n" "Usage: ${PROGNAME} [options]... [clipboard]..."
-    printf "%s\\n" "Unify the copy and paste commands into one intelligent chainable command."
-    printf "\\n"
-    printf "%s\\n" "  -a, --append              append to the given clipboard, do not overwrite"
-    printf "%s\\n" "  -i, --ignore-interrupts   ignore interrupt signals"
-    printf "\\n"
-    printf "%s\\n" "  -v, --version             display version"
-    printf "%s\\n" "  -h, --help                show this help message"
-}
 
 _basename() {
     [ -z "${1}" ] && return 1 || _basename__name="${1%%/}"
@@ -40,7 +48,7 @@ _basename() {
 
 _die() {
     [ -z "${1}" ] || printf "%s\\n" "${*}" >&2
-    _usage >&2;
+    doc::help_msg "$0" >&2;
 }
 
 _show_version() {
@@ -114,7 +122,6 @@ cb() {
 
   for arg in "${@}"; do #parse options
       case "${arg}" in
-          -h|--help) _usage; return ;;
           -v|--version) _show_version; return ;;
           -a|--append) append="1"; shift ;;
           -i|--ignore-interrupts) ignore_interrumpts="1"; shift ;;
@@ -130,4 +137,8 @@ cb() {
   fi
 }
 
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
 cb "$@"
