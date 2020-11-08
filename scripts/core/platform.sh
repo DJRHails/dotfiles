@@ -77,8 +77,8 @@ platform::is_supported() {
   declare -r MINIMUM_MACOS_VERSION="10.10"
   declare -r MINIMUM_UBUNTU_VERSION="18.04"
 
-  local os_name="$(platform::os)"
-  local os_version="$(platform::os_version)"
+  os_name="$(platform::os)"
+  os_version="$(platform::os_version)"
 
   # Check if the OS is `macOS` and
   # it's above the required version.
