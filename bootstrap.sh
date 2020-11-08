@@ -6,9 +6,10 @@
 ##?    ./bootstrap.sh [FLAGS] [<modules>...]
 ##? 
 ##? FLAGS:
-##?     -y, --yes  Skip any interactive questions asked during setup.
-##?     -A, --all  Run all modules found in $DOTFILES/modules.
-##?     -c, --cli  Install only cli modules, perfect for servers.
+##?     -y, --yes   Skip any interactive questions asked during setup.
+##?     -A, --all   Run all modules found in $DOTFILES/modules.
+##?     -c, --cli   Install only cli modules, perfect for servers.
+##?     -h, --help  Show this help
 ##?
 ##? ARGS:
 ##?     <modules>...  the modules to install (optional)
