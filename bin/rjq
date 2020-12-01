@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+##? Provides a repl for jq using fzf
+##?
+##? USAGE:
+##?    rjq <file>
+##?    cat file.json | rjq
+##?    cat file.json | rjq -
+##?
+##? ARGS:
+##?     <file>  the file to extract
+
+
+if [[ -z $1 ]] || [[ $1 == "-" ]]; then
+    input=$(mktemp)
+    trap "rm -f $input" EXIT
+    cat /dev/stdin > $input
+else
+    input=$1
+fi
+
+echo '' \
+    | fzf --phony \
+          --preview-window='up:90%' \
+          --print-query \
+          --preview "jq --color-output -r {q} $input"
