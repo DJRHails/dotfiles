@@ -15,3 +15,7 @@ alias gs='git status -sb' # upgrade your git if -sb breaks for you. it's fun.
 alias gac='git add -A && git commit -m'
 
 alias fbranch='git checkout `git branch | fzf | sed s:remotes/origin/::g`'
+
+ghopen() {
+  open "https://github.com/$1"
+}

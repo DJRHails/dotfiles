@@ -6,7 +6,7 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-alias open='xdg-open' # Shorten ubuntu's silly open name
+alias open='platform::open'
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
