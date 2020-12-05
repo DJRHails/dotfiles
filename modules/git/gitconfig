@@ -96,6 +96,16 @@
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+    # Reset permissions (common if changing filesystem).
+    #
+    # https://stackoverflow.com/a/4408378
+
+    reset-perms = "!f() { \
+        git diff -p -R --no-ext-diff --no-color | grep -E "^(diff|(old|new) mode)" --color=never | git apply; \
+    }; f"
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
     # Remove last commits (by default it removes the last commit).
 
     rlc = "!f() { \
