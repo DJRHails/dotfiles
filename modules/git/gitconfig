@@ -3,7 +3,7 @@
     a   = commit --amend
     br  = branch
     c   = commit
-    ca  = !git add -A && git commit             # Commit all changes.
+    ac  = !git add -A && git commit             # Commit all changes.
     co  = checkout
     cp  = cherry-pick
     d   = diff -- . ':!*package-lock.json' ':!*yarn.lock'
@@ -102,6 +102,16 @@
 
     reset-perms = "!f() { \
         git diff -p -R --no-ext-diff --no-color | grep -E "^(diff|(old|new) mode)" --color=never | git apply; \
+    }; f"
+
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    # Remove local branches that have been merged and deleted
+
+    prune-local = "!f() { \
+        git checkout -q master; \
+        git fetch -q --prune; \
+        git branch -vv | grep ': gone]' | cut -d' ' -f3 | xargs git branch -d; \
     }; f"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
