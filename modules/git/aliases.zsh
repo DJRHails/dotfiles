@@ -1,6 +1,6 @@
 alias g="git"
 
-# The rest of my fun git aliases
+alias gs='git status -sb' # upgrade your git if -sb breaks for you. it's fun.
 alias gl='git pull --prune'
 alias glog="git log --graph --pretty=format:'%Cred%h%Creset %an: %s - %Creset %C(yellow)%d%Creset %Cgreen(%cr)%Creset' --abbrev-commit --date=relative"
 alias gp='git push origin HEAD'
@@ -8,13 +8,8 @@ alias gp='git push origin HEAD'
 # Remove `+` and `-` from start of diff lines; just rely upon color.
 alias gd='git diff --color | sed "s/^\([^-+ ]*\)[-+ ]/\\1/" | less -r'
 
-alias gc='git commit -m'
-alias gca='git commit -a'
-alias gcb='git copy-branch-name'
-alias gs='git status -sb' # upgrade your git if -sb breaks for you. it's fun.
-alias gac='git add -A && git commit -m'
-
-alias fbranch='git checkout `git branch | fzf | sed s:remotes/origin/::g`'
+# Fuzzy search to checkout branches
+alias fb='git checkout `git branch | fzf | sed s:remotes/origin/::g`'
 
 ghopen() {
   open "https://github.com/$1"
