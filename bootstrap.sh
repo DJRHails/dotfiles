@@ -90,6 +90,13 @@ main() {
   # Verify OS
   log::header "Verify OS verion\n"
   platform::is_supported && log::success "$os_name with v$os_version is valid"
+  
+  # Verify Bash Version
+  log::header "Verify Bash Version\n"
+  [ "${BASH_VERSINFO:-0}" -ge 4 ] && log::success "$BASH_VERSINFO is supported (associative arrays required)"
+  # > macos is bad for this; 
+  # /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+  # brew install bash
 
   # Grab modules
   scan::find_valid_modules

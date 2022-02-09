@@ -22,5 +22,5 @@ install::snap() {
 }
 
 install::cask() {
-  install::with "brew cask" "$1" "$2" "$3"
+  install::with "brew" "$1" "$2" "$3" "--cask"
 }
