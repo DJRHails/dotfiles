@@ -50,15 +50,24 @@ log::execute() {
   local exitCode=0
   local cmdsPID=""
 
-  trap 'kill_all_subprocesses' EXIT 
+  trap 'kill_all_subprocesses' EXIT 2> "$TMP_FILE"
 
-  eval "$CMDS" &> /dev/null 2> "$TMP_FILE" &
+  echo "post trap"
+
+#   eval "$CMDS" >/dev/null 2> "$TMP_FILE" & disown
+  read < <(eval "$CMDS" > /dev/null 2> "$TMP_FILE" & echo $!)
   cmdsPID=$!
+
+  echo "post eval $cmdsPID"
 
   log::spinner "$cmdsPID" "$CMDS" "$MSG"
 
+  echo "post spin"
+
   wait "$cmdsPID" &> /dev/null
   exitCode=$?
+
+  echo "Status code $exitCode"
 
   log::result $exitCode "$MSG"
   if [ $exitCode -ne 0 ]; then
