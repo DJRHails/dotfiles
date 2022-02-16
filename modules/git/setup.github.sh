@@ -88,7 +88,7 @@ github::get_gpg_key_id() {
   gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG \
     | grep git-auto -B 2 \
     | grep sec \
-    | grep -o -P '(?<=/)[A-Z0-9]{16}')"
+    | perl -nle 'print && while m{(?<=/)[A-Z0-9]{16}}g')"
 }
 
 github::set_gpg_key() {

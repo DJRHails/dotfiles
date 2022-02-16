@@ -32,5 +32,7 @@ setup_gitconfig
 feedback::ask_for_confirmation "Do you want to setup github?"
 if feedback::answer_is_yes
 then
+  install::package "Github CLI" "gh"
+  install::package "GPG" "gpg"
   github::setup
 fi
