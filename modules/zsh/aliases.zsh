@@ -61,7 +61,11 @@ alias m="man"
 # dir1/content.txt
 # ...
 grab() {
-  { fd . $(echo ${1//:/ }); echo "${1//:/\n}" } | fzf -1 -q ${2:-""}
+  # Grab results order:
+  # Return given results first
+  # Then do MAX_DEPTH 4 pass to ensure we don't descend too far
+  # as fd is a DFS
+  { echo "${1//:/\n}"; fd . --max-depth 4 $(echo ${1//:/ }); fd . --min-depth 5 $(echo ${1//:/ }); } | fzf -1 -q ${2:-""}
 }
 
 # > jump $PROJECTS
