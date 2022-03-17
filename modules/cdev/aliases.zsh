@@ -1,0 +1,1 @@
+alias as31="wine /home/dh/d/github.com/DJRHails/6.115/software/as31/as31.exe"
