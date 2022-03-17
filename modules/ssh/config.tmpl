@@ -9,3 +9,9 @@ Host shell
 Host lab
   ProxyCommand ssh -q shell nc -q0 gpu03.doc.ic.ac.uk 22
   User djh17
+
+Host *.trycloudflare.com
+	HostName %h
+	User root
+	Port 22
+	ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
