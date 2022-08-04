@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+##? Provides a quick interface to ocr
+##?
+##? USAGE:
+##?    ocr
+##?
+
+# Dependencies: tesseract-ocr imagemagick gnome-screenshot
+
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
+
+SCR_IMG=`mktemp`
+trap "rm $SCR_IMG*" EXIT
+
+gnome-screenshot -af $SCR_IMG.png
+
+mogrify -modulate 100,0 -resize 400% $SCR_IMG.png 
+#should increase detection rate
+
+tesseract $SCR_IMG.png $SCR_IMG &> /dev/null
+cat $SCR_IMG.txt
+exit

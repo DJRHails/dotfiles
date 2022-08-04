@@ -31,8 +31,12 @@ set nofoldenable
 " Misc
 set autoread
 set backspace=indent,eol,start
-set backupdir=~/.cache/vim
-set dir=~/.cache/vim
+
+if empty(glob('~/.cache/vim'))
+    silent !mkdir -p ~/.cache/vim
+endif
+set backupdir=$HOME/.cache/vim
+set dir=$HOME/.cache/vim
 set history=1000
 set spell
 

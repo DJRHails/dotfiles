@@ -45,7 +45,9 @@ alias ll="ls -l"
 alias la="ls -la"
 alias m="man"
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+alias gs_recursive='find . -maxdepth 1 -mindepth 1 -type d -exec sh -c "echo {}; cd {}; git status -s; echo"  \;'
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 # TODO(DJRHails):
 # https://github.com/nikitavoloboev/dotfiles/blob/master/zsh/functions/fzf-functions.zsh
