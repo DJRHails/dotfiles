@@ -23,10 +23,12 @@ alias ...="cd ../.."
 alias ....="cd ../../.."
 alias cd..="cd .."
 
+mkcd() { [ -n "$1" ] && mkdir -p "$@" && cd "$1"; }
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 alias -s git="git clone"
-alias -s {md,txt}="atom"
+alias -s {md,txt}="code"
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -43,9 +45,16 @@ alias ch="history -c && > ~/.bash_history"
 alias path='printf "%b\n" "${PATH//:/\\n}"'
 alias ll="ls -l"
 alias la="ls -la"
-alias m="man"
+
+# alias dsstore-clean='find . -type f -name .DS_Store -print0 | xargs -0 rm'
 
 alias gs_recursive='find . -maxdepth 1 -mindepth 1 -type d -exec sh -c "echo {}; cd {}; git status -s; echo"  \;'
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+alias rg='rg --smart-case'
+alias rga='rg --smart-case --no-ignore --no-ignore-vcs --no-ignore-global'
+alias rgw='rg --smart-case -w --max-columns=100 --max-columns-preview'
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -125,6 +134,7 @@ alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
 
 # List of commands I use most often, these are candidates for aliases
 candidates() {
+  # alias profileme="history | awk '{print \$2}' | awk 'BEGIN{FS=\"|\"}{print \$1}' | sort | uniq -c | sort -n | tail -n 20 | sort -nr"
   history | \
     awk '{CMD[$2]++;count++;}END { for (a in CMD)print CMD[a] " " CMD[a]/count*100 "% " a;}' | \
     grep -v "./" | \
