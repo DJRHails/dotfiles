@@ -54,7 +54,11 @@ alias gs_recursive='find . -maxdepth 1 -mindepth 1 -type d -exec sh -c "echo {};
 
 alias rg='rg --smart-case'
 alias rga='rg --smart-case --no-ignore --no-ignore-vcs --no-ignore-global'
-alias rgw='rg --smart-case -w --max-columns=100 --max-columns-preview'
+
+rgw() {
+  local query="$@" # Need to pass all args as one string, so local is necessary to coerce output into a string
+  rg --smart-case -w --max-columns=100 --max-columns-preview "$query"
+}
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -107,22 +111,51 @@ boxchars() {
   echo "┌ ─ ┐ │ └ ─ ┘" | tr ' ' '\n' | fzf-down | cb
 }
 
-# Search in path
+# Get special characters
+specialchars() {
+  echo "$ ~ £ € \`" | tr ' ' '\n' | fzf-down | cb
+}
+
+fsearch() {
+  FZF_DEFAULT_COMMAND='rg --files --ignore-vcs --hidden' fzf-down | cb
+}
+
+# mnemonic: [F]uzzy [Path]
 fpath() {
-  echo "${PATH//:/\\n}" | fzf-down
+  # echo "${PATH//:/\\n}" | fzf-down
+  local loc=$(echo $PATH | sed -e $'s/:/\\\n/g' | eval "fzf-down ${FZF_DEFAULT_OPTS} --header='[find:path]'")
+
+  if [[ -d $loc ]]; then
+    echo "$(rg --files $loc | rev | cut -d"/" -f1 | rev)" | eval "fzf-down ${FZF_DEFAULT_OPTS} --header='[find:exe] => ${loc}' >/dev/null"
+    fpath
+  fi
 }
 
+# mnemonic: [F]uzzy [Env]var
 fenv() {
-  env | fzf-down
+  env | fzf-down --header='[find:envvar]'
 }
 
+# mnemonic: [F]uzzy [Kill]
 fkill() {
   local pid
-  pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+  pid=$(ps -ef | sed 1d | fzf -m --header '[kill:pid]' | awk '{print $2}')
 
   if [ "x$pid" != "x" ]
   then
     echo $pid | xargs kill -${1:-9}
+  fi
+}
+
+# mnemonic: [F]uzzy [Kill] [S]erver
+# show output of "lsof -Pwni tcp", use [tab] to select one or multiple entries
+fkills() {
+  local pid=$(lsof -Pwni tcp | sed 1d | eval "fzf ${FZF_DEFAULT_OPTS} -m --header='[kill:tcp]'" | awk '{print $2}')
+
+  if [ "x$pid" != "x" ]
+  then
+    echo $pid | xargs kill -${1:-9}
+    fkills
   fi
 }
 
