@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+##? Moves all files in the current directory to content-addressed structure
+##?
+##? USAGE:
+##?    hashify <src_dir>
+##? 
+##? ARGS:
+##?     <src_dir>  the folder to act on
+
+hashify () {
+  local src_dir="$1"
+
+  if [[ -d "$src_dir" ]]; then
+    for src_file in "$src_dir"/*; do
+      local src_hash=$(sha256sum "$src_file" | cut -d' ' -f1)
+      local src_ext=${src_file##*.}
+    #   local src_ext=$(file --mime-type "$src_file" | cut -d'/' -f2)
+      local src_dirname=$(dirname "$src_path")
+      local src_new_path="$src_dirname/$src_hash.$src_ext"
+
+      if [[ -f "$src_new_path" ]]; then
+        echo "File already exists: $src_new_path"
+      else
+        echo "Moving $src_file to $src_new_path"
+        mv "$src_file" "$src_new_path"
+      fi
+    done
+  else
+    echo "'$src_dir' is not a valid directory"
+  fi
+}
+
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
+hashify "$@"
