@@ -116,6 +116,20 @@ specialchars() {
   echo "$ ~ £ € \`" | tr ' ' '\n' | fzf-down | cb
 }
 
+emoji() {
+  # If /tmp/emoji.json doesn't exist fetch it from github
+  local EMOJI_PATH="/tmp/emoji.json"
+  if [ ! -f $EMOJI_PATH ]; then
+    curl -s https://raw.githubusercontent.com/omnidan/node-emoji/master/lib/emoji.json > $EMOJI_PATH
+  fi
+
+  LOOKUP_CMD="cat "$EMOJI_PATH" | jq -r '.[\"{}\"]'"
+  KEYNAME=$(cat "$EMOJI_PATH" | jq -r 'keys[]' | fzf-down --preview $LOOKUP_CMD --preview-window=down:5%:wrap)
+  # Extract emoji from JSON by keyname, trim newline and copy to clipboard
+  cat "$EMOJI_PATH" | jq -r ".[\"$KEYNAME\"]" | tr -d '\n' | cb
+  echo "\nCopied :$KEYNAME: to clipboard"
+}
+
 fsearch() {
   FZF_DEFAULT_COMMAND='rg --files --ignore-vcs --hidden' fzf-down | cb
 }
