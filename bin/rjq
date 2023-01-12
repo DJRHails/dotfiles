@@ -10,6 +10,11 @@
 ##? ARGS:
 ##?     <file>  the file to extract
 
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
+[[ $? == 1 ]] && exit
 
 if [[ -z $1 ]] || [[ $1 == "-" ]]; then
     input=$(mktemp)

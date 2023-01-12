@@ -8,7 +8,7 @@
 ##? ARGS:
 ##?     <src_dir>  the folder to act on
 
-hashify () {
+hashify::main () {
   local src_dir="$1"
 
   if [[ -d "$src_dir" ]]; then
@@ -35,4 +35,6 @@ hashify () {
 
 # Check if we need help
 doc::maybe_help "$@"
-hashify "$@"
+[[ $? == 1 ]] && exit
+
+hashify::main "$@"

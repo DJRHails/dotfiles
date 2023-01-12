@@ -27,9 +27,9 @@
 ##?     `cb`              paste current clipboard to stdout
 ##?     `cb | tee d.log`  paste current clipboard to d.log and stdout.
 
-VERSION="2017.07.06-21:25"
+VERSION="2023.01"
 
-_basename() {
+cb::basename() {
     [ -z "${1}" ] && return 1 || _basename__name="${1%%/}"
     [ -z "${2}" ] || _basename__suffix="${2}"
     case "${_basename__name}" in
@@ -46,33 +46,33 @@ _basename() {
     printf "%s\\n" "${_basename__name}"
 }
 
-_die() {
+cb::die() {
     [ -z "${1}" ] || printf "%s\\n" "${*}" >&2
     doc::help_msg "$0" >&2;
 }
 
-_show_version() {
+cb::show_version() {
     printf "%s\\n" "${PROGNAME} ${VERSION}"
 }
 
-_cb_copy() {
+cb::copy() {
     if command -v "xclip" >/dev/null 2>/dev/null; then
         #dumping xclip's stdout to the bitbucket works around xclip's
         #failure to properly daemonize: https://sourceforge.net/p/xclip/patches/9/
         if [ -n "${append}" ]; then
-            (_cb_paste 2>/dev/null; cat) | xclip -selection clipboard -i >/dev/null 2>&1
+            (cb::paste 2>/dev/null; cat) | xclip -selection clipboard -i >/dev/null 2>&1
         else
             cat | xclip -selection clipboard -i >/dev/null 2>&1
         fi
     elif command -v "xsel" >/dev/null 2>/dev/null; then
         if [ -n "${append}" ]; then
-            (_cb_paste 2>/dev/null; cat) | xsel --clipboard
+            (cb::paste 2>/dev/null; cat) | xsel --clipboard
         else
             cat | xsel --clipboard
         fi
     elif command -v "pbcopy" >/dev/null 2>/dev/null; then
         if [ -n "${append}" ]; then
-            (_cb_paste 2>/dev/null; cat) | pbcopy
+            (cb::paste 2>/dev/null; cat) | pbcopy
         else
             cat | pbcopy
         fi
@@ -83,11 +83,11 @@ _cb_copy() {
             cat > /dev/clipboard
         fi
     else
-        _die "${PROGNAME}: unrecognized clipboard system"
+        cb::die "${PROGNAME}: unrecognized clipboard system"
     fi
 }
 
-_cb_paste() {
+cb::paste() {
     if command -v "xclip" >/dev/null 2>/dev/null; then
         xclip -selection clipboard -o
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -97,48 +97,49 @@ _cb_paste() {
     elif [ -e /dev/clipboard ]; then
         cat /dev/clipboard
     else
-        _die "${PROGNAME}: unrecognized clipboard system"
+        cb::die "${PROGNAME}: unrecognized clipboard system"
     fi
 }
 
-_stdin_is_pipe(){
+cb::stdin_is_pipe(){
   [[ -p /dev/stdin ]]
 }
 
-_stdin_is_tty() {
+cb::stdin_is_tty() {
   [[ -t 0 ]]
 }
 
-_stdout_is_tty() {
+cb::stdout_is_tty() {
   [[ -t 1 ]]
 }
 
-_stdin_is_pipe_like(){
-    _stdin_is_pipe || ! _stdin_is_tty
+cb::stdin_is_pipe_like(){
+    cb::stdin_is_pipe || ! cb::stdin_is_tty
 }
 
-cb() {
-  PROGNAME="$(_basename "${0}")"
+cb::main() {
+  PROGNAME="$(cb::basename "${0}")"
 
   for arg in "${@}"; do #parse options
       case "${arg}" in
-          -v|--version) _show_version; return ;;
+          -v|--version) cb::show_version; return ;;
           -a|--append) append="1"; shift ;;
           -i|--ignore-interrupts) ignore_interrumpts="1"; shift ;;
-          -*) _die "${PROGNAME}: unrecognized option '${arg}'" ;;
+          -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
       esac
   done
 
-  if _stdin_is_pipe_like; then
-      _cb_copy
-      _cb_paste
+  if cb::stdin_is_pipe_like; then
+      cb::copy
+      cb::paste
   else
-      _cb_paste
+      cb::paste
   fi
 }
 
 . "$DOTFILES/scripts/core/main.sh"
 
-# Check if we need help
 doc::maybe_help "$@"
-cb "$@"
+[[ $? == 1 ]] && exit
+
+cb::main "$@"

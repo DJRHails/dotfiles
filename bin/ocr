@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-##? Provides a quick interface to ocr
+##? Provides a quick interface to ocr from a screenshot
 ##?
 ##? USAGE:
 ##?    ocr
@@ -12,6 +12,7 @@
 
 # Check if we need help
 doc::maybe_help "$@"
+[[ $? == 1 ]] && exit
 
 SCR_IMG=`mktemp`
 trap "rm $SCR_IMG*" EXIT
