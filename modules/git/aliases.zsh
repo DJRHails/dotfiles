@@ -14,3 +14,10 @@ alias fb='git checkout `git branch | fzf | sed s:remotes/origin/::g`'
 ghopen() {
   open "https://github.com/$1"
 }
+
+genignore() {
+  local language=$1
+
+  # fetch the gitignore file from gitignore.io
+  curl -L -s "https://www.gitignore.io/api/$language" >> .gitignore
+}
