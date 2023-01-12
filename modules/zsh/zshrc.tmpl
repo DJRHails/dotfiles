@@ -31,12 +31,14 @@ do
 done
 
 # Shell functions, freload unsets functions
-freload() { while (( $# )); do; unfunction $1 2> /dev/null; autoload -U $1; shift; done }
+freload() { while (( $# )); do; unfunction $1 2> /dev/null; autoload -Uz $1; shift; done }
 
 # Autoload all shell functions from all directories in $fpath (following
-# symlinks) that have the executable bit on (the executable bit is not
-# necessary, but gives you an easy way to stop the autoloading of a
-# particular shell function). $fpath should not be empty for this to work.
+# symlinks) that have:
+# - Are a file (N = not directory)
+# - The executable bit on
+# The executable bit is not necessary, but gives you an easy way to stop the autoloading of a particular shell function.
+# $fpath should not be empty for this to work.
 freload $^fpath/*(N-.x:t)
 
 # initialize autocomplete here, otherwise functions won't be loaded
