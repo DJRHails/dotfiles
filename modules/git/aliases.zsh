@@ -21,3 +21,7 @@ genignore() {
   # fetch the gitignore file from gitignore.io
   curl -L -s "https://www.gitignore.io/api/$language" >> .gitignore
 }
+
+# Specifies the clipboard output format is html
+# commonly used with cbh | 2md
+alias cbh='cb -t html'

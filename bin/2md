@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+##? Takes HTML from the stdin and converts it to markdown. 
+##?
+##? USAGE:
+##?     2md [FLAG/OPTIONS] ...
+##?
+##? FLAGS:
+##?     -h, --help
+##?         show this help
+##?
+##? EXAMPLES:
+##?     `cbh | 2md`            copy from the clipboard to markdown
+##?     `2md < index.html`     convert index.html to markdown
+
+escape() {
+    perl -CS -pe "s/[\u2018\u2019\u00b4]/'/g" \
+        # -e "s/[\u201c\u201d\u2033]/\"/g" \
+        # -e "s/[\u2212\u2022\u00b7\u25aa]/-/g" \
+        # -e "s/[\u2013\u2015]/--/g" \
+        # -e "s/\u2014/---/g" \
+        # -e "s/\u2026/.../g" \
+        # -e "s/[ ]+\n/\n/g" 
+        # -e "s/\s*\\\n/\\\n/g" \
+        # -e "s/\s*\\\n\s*\\\n/\n\n/g" \
+        # -e "s/\s*\\\n\n/\n\n/g" \
+        # -e "s/\n-\n/\n/g" \
+        # -e "s/\n\n\s*\\\n/\n\n/g" \
+        # -e "s/\n\n\n*/\n\n/g" \
+        # -e "s/[ ]+$//gm" \
+        # -e "s/^\s+|[\s\\]+$//g"
+}
+
+2md::main() {
+    # Use pandoc to convert HTML to markdown
+    # We need to turn off the following extensions:
+    # - raw_html: we don't want to convert HTML to markdown
+    # - native_divs: we don't want to convert divs to markdown
+    # - native_spans: we don't want to convert spans to markdown
+    # - fenced_divs: we don't want to convert divs to markdown
+    # - bracketed_spans: we don't want to convert spans to markdown
+
+    # Extensions are specified here: https://pandoc.org/MANUAL.html#raw-html
+
+    pandoc -f html \
+    -t markdown_strict-raw_html-native_divs-native_spans-fenced_divs-bracketed_spans-all_symbols_escapable+backtick_code_blocks
+}
+
+. "$DOTFILES/scripts/core/main.sh"
+
+doc::maybe_help "$@"
+[[ $? == 1 ]] && exit
+
+2md::main "$@"

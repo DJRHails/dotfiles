@@ -14,6 +14,8 @@
 ##?         append to the given clipboard, do not overwrite.
 ##?     -i, --ignore-interrupts  
 ##?         ignore interrupt signals
+##?     -t, --target
+##?         use given target instead of the default ones
 ##?     -v, --version
 ##?         display version
 ##?     -h, --help
@@ -26,6 +28,8 @@
 ##?     `date | cb`       copy current data to clipboard 
 ##?     `cb`              paste current clipboard to stdout
 ##?     `cb | tee d.log`  paste current clipboard to d.log and stdout.
+##?     `cb -a`           append current clipboard to the clipboard
+##?     `cb -t html`      output clipboard as html, not text
 
 VERSION="2023.01"
 
@@ -87,9 +91,22 @@ cb::copy() {
     fi
 }
 
+cb::target() {
+    # Check if target is not set
+    if [ -z "${target}" ]; then
+        # Do nothing
+        echo "TEXT"
+    elif command -v "xclip" >/dev/null 2>/dev/null; then
+        xclip -selection clipboard -out -target TARGETS | grep -i "${target:-text}" | head -n 1
+    else
+        cb::die "${PROGNAME}: clipboard target not supported"
+    fi
+
+}
+
 cb::paste() {
     if command -v "xclip" >/dev/null 2>/dev/null; then
-        xclip -selection clipboard -o
+        xclip -selection clipboard -out -target "$(cb::target)"
     elif command -v "xsel" >/dev/null 2>/dev/null; then
         xsel --clipboard
     elif command -v "pbpaste" >/dev/null 2>/dev/null; then
@@ -124,6 +141,7 @@ cb::main() {
       case "${arg}" in
           -v|--version) cb::show_version; return ;;
           -a|--append) append="1"; shift ;;
+          -t|--target) target="${2}"; shift 2 ;;
           -i|--ignore-interrupts) ignore_interrumpts="1"; shift ;;
           -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
       esac
