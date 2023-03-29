@@ -4,7 +4,7 @@
 ##?
 ##? USAGE:
 ##?    ocr
-##?
+##?    ocr -c preserve_interword_spaces=1
 
 # Dependencies: tesseract-ocr imagemagick gnome-screenshot
 
@@ -23,6 +23,6 @@ mogrify -modulate 100,0 -resize 400% $SCR_IMG.png
 #should increase detection rate
 
 # Perserve interword spaces helps with code block indents
-tesseract $SCR_IMG.png $SCR_IMG $@ &> /dev/null
+tesseract $@ $SCR_IMG.png $SCR_IMG &> /dev/null
 cat $SCR_IMG.txt
 exit
