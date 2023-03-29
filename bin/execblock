@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+##? Provides a quick interface to execblock
+##?
+##? USAGE:
+##?    execblock <file>
+##?    execblock -h|--help
+
+# Setup the venv if it doesn't exist
+if [[ ! -d "$DOTFILES/modules/execblock/.venv" ]]; then
+    echo "First execution, creating venv..."
+    python3 -m venv "$DOTFILES/modules/execblock/.venv"
+    "$DOTFILES/modules/execblock/.venv/bin/pip" install -r "$DOTFILES/modules/execblock/requirements.txt"
+fi
+
+# Activate the venv
+source "$DOTFILES/modules/execblock/.venv/bin/activate"
+
+# The location of this file is defined in the $DOTFILES variable
+# which is set in the .bashrc file.
+python3 "$DOTFILES/modules/execblock/execblock.py" "$@"
+
+# Deactivate the venv
+deactivate

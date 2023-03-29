@@ -19,7 +19,7 @@ genignore() {
   local language=$1
 
   # fetch the gitignore file from gitignore.io
-  curl -L -s "https://www.gitignore.io/api/$language" >> .gitignore
+  curl -L -s "https://www.gitignore.io/api/$language" | grep -v toptal >> .gitignore
 }
 
 # Specifies the clipboard output format is html
