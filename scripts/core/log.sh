@@ -102,6 +102,10 @@ log::blue() {
     log::color "$1" 6
 }
 
+log::gray() {
+    log::color "$1" 8
+}
+
 log::red() {
     log::color "$1" 1
 }
