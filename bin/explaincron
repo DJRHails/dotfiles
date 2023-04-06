@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+##? Provides a quick interface to explaincron
+##?
+##? USAGE:
+##?    explaincron <file>
+##?    explaincron -h|--help
+
+# Setup the venv if it doesn't exist
+if [[ ! -d "$DOTFILES/modules/explaincron/.venv" ]]; then
+    echo "First execution, creating venv..."
+    python3 -m venv "$DOTFILES/modules/explaincron/.venv"
+    "$DOTFILES/modules/explaincron/.venv/bin/pip" install -r "$DOTFILES/modules/explaincron/requirements.txt"
+fi
+
+# Activate the venv
+source "$DOTFILES/modules/explaincron/.venv/bin/activate"
+
+# The location of this file is defined in the $DOTFILES variable
+# which is set in the .bashrc file.
+python3 "$DOTFILES/modules/explaincron/explaincron.py" "$@"
+
+# Deactivate the venv
+deactivate
