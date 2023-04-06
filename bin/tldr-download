@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Download the TLDR pages from the official repository
+
+
+# Check if the query is provided as a command line argument
+if [ -z "$1" ]; then
+  echo "Usage: $0 <query>"
+  exit 1
+fi
+
+QUERY="$1"
+TLDR_REPO="https://raw.githubusercontent.com/tldr-pages/tldr/master/pages"
+PLATFORMS=("common" "linux" "osx" "sunos" "windows")
+
+found=false
+
+for platform in "${PLATFORMS[@]}"; do
+  FILE_URL="${TLDR_REPO}/${platform}/${QUERY}.md"
+  STATUS=$(curl -o /dev/null -Is -w "%{http_code}" "${FILE_URL}")
+
+  if [ $STATUS -eq 200 ]; then
+    echo "Downloading ${QUERY}.md for ${platform} platform..."
+    curl -LJ0 "$FILE_URL" -o "${QUERY}.md"
+    found=true
+    break
+  fi
+done
+
+if ! $found; then
+  echo "Could not find a TLDR markdown page for the given query: ${QUERY}"
+fi
