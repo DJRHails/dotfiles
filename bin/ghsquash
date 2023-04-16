@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+##? Performs a fake GitHub Squash Merge
+##?
+##? USAGE:
+##?    ghsquash <branch_name>
+##? 
+##? ARGS:
+##?     <branch_name>  the branch name with related PR
+
+# Grab the PR name and number from gh command
+ghsquash::get_name () {
+  local branch_name="$1"
+  local pr_name=$(gh pr view "$branch_name" --json title --jq '.title')
+  echo "$pr_name"
+}
+ghsquash::get_number () {
+  local branch_name="$1"
+  local pr_number=$(gh pr view "$branch_name" --json number --jq '.number')
+  echo "$pr_number"
+}
+
+# Provide autocomplete for branch names
+ghsquash::complete () {
+  local cur prev opts
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+  prev="${COMP_WORDS[COMP_CWORD-1]}"
+  opts=$(git branch --list | cut -d' ' -f2)
+
+  COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+  return 0
+}
+
+ghsquash::main() {
+  local branch_name="$1"
+  pr_name=$(ghsquash::get_name "$branch_name")
+  pr_number=$(ghsquash::get_number "$branch_name")
+
+  # Check if we are continuing a merge
+  if [[ -f ".git/MERGE_HEAD" ]]; then
+    echo "Continuing merge..."
+    git commit -m "$pr_name (#$pr_number)"
+    exit
+  fi
+
+  git merge --squash "$branch_name"
+  git commit -m "$pr_name (#$pr_number)"
+}
+
+complete -F ghsquash::complete ghsquash
+
+. "$DOTFILES/scripts/core/main.sh"
+
+# Check if we need help
+doc::maybe_help "$@"
+[[ $? == 1 ]] && exit
+
+# Check if we have a branch name
+if [[ -z "$1" ]]; then
+  echo "Please provide a branch name"
+  exit 1
+fi
+
+ghsquash::main "$@"
