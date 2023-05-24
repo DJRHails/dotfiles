@@ -5,12 +5,22 @@ alias ae='source .venv/bin/activate'
 alias de='deactivate'
 
 function aenv() {
-  local env_file=${1:-'.env'}
-  if [ -f $env_file ]; then
-    export $(echo $(cat $env_file | sed 's/#.*//g'| xargs) | envsubst)
-  else
-    echo "File '$env_file' not found"
-  fi
+  local env_file="${1:-'.env'}"
+  local env_files=("$env_file")
+  while [ "$env_file" != ".env" ]; do
+    env_file=$(echo "$env_file" | sed 's/\.[^.]*$//')
+    env_files+=("$env_file")
+  done
+  for (( i=${#env_files[@]}; i>=1; i-- )); do
+    local file=${env_files[i]}
+
+    if [[ -f "$file" ]]; then
+      export "$(cat "$file" | sed 's/#.*//g' | xargs)" | envsubst
+      echo "Sourced '$file'"
+    else
+      echo "File '$file' not found"
+    fi
+  done
 }
 
 function poetry() {
