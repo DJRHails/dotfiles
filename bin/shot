@@ -23,8 +23,8 @@ random_adj=${adjectives[$RANDOM % ${#adjectives[@]} ]}
 random_noun=${nouns[$RANDOM % ${#nouns[@]} ]}
 
 # Concatenate the adjective and noun to create the ID
-id="shot.$random_adj-$random_noun"
-file="${1:-$id}.png"
+id="${1:-'shot'}.$random_adj-$random_noun"
+file="${id}.png"
 
 gnome-screenshot -af ${file}
 
