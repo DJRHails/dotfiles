@@ -15,7 +15,7 @@ function aenv() {
     local file=${env_files[i]}
 
     if [[ -f "$file" ]]; then
-      export "$(cat "$file" | sed 's/#.*//g' | xargs)" | envsubst
+      export $(echo $(cat $file | sed 's/#.*//g'| xargs) | envsubst)
       echo "Sourced '$file'"
     else
       echo "File '$file' not found"
