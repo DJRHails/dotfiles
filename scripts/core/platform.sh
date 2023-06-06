@@ -142,6 +142,18 @@ platform::ask_for_sudo() {
   done &> /dev/null &
 }
 
+platform::screenshot() {
+    if platform::command_exists "screencapture"; then
+        screencapture -i "${1}"
+    elif platform::command_exists "gnome-screenshot"; then
+        gnome-screenshot -af "${1}"
+    else
+        log::red "Neither gnome-screenshot nor screencapture were found. Please install one of them.\n"
+        exit 1
+    fi
+}
+
+
 platform::main_package_manager() {
   if platform::is_osx; then
     echo "brew"

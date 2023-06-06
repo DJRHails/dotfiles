@@ -6,27 +6,28 @@
 ##?    shot
 ##?    shot file.png
 
-# Dependencies: gnome-screenshot
-
 . "$DOTFILES/scripts/core/main.sh"
 
 # Check if we need help
 doc::maybe_help "$@"
 [[ $? == 1 ]] && exit
 
-# Define arrays of adjectives and nouns
-adjectives=("happy" "funny" "crazy" "brave" "lucky" "silly" "bright" "clever" "cool" "fancy")
-nouns=("cat" "dog" "bird" "car" "book" "tree" "house" "sun" "moon" "star")
+random_id () {
+    # Define arrays of adjectives and nouns
+    adjectives=("happy" "funny" "crazy" "brave" "lucky" "silly" "bright" "clever" "cool" "fancy")
+    nouns=("cat" "dog" "bird" "car" "book" "tree" "house" "sun" "moon" "star")
 
-# Choose a random adjective and noun
-random_adj=${adjectives[$RANDOM % ${#adjectives[@]} ]}
-random_noun=${nouns[$RANDOM % ${#nouns[@]} ]}
+    # Choose a random adjective and noun
+    random_adj=${adjectives[$RANDOM % ${#adjectives[@]} ]}
+    random_noun=${nouns[$RANDOM % ${#nouns[@]} ]}
 
-# Concatenate the adjective and noun to create the ID
-id="${1:-'shot'}.$random_adj-$random_noun"
-file="${id}.png"
+    # Concatenate the adjective and noun to create the ID
+    echo "$random_adj-$random_noun"
+}
 
-gnome-screenshot -af ${file}
+id="${1:-shot}.$(random_id)"
+file="${id}.png" 
+platform::screenshot $file
 
 log::gray "Screenshot saved as "
 log::green "${file}\n"
