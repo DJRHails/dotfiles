@@ -13,8 +13,12 @@ install::with() {
   fi
 }
 
+install::package_manager() {
+  echo "$(platform::package_manager_prefix)$(platform::main_package_manager)"
+}
+
 install::package() {
-  install::with "$(platform::package_manager_prefix)$(platform::main_package_manager)" "$1" "$2" "$3"
+  install::with "$(install::package_manager)" "$1" "$2" "$3"
 }
 
 install::snap() {
