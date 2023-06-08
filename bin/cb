@@ -110,7 +110,11 @@ cb::paste() {
     elif command -v "xsel" >/dev/null 2>/dev/null; then
         xsel --clipboard
     elif command -v "pbpaste" >/dev/null 2>/dev/null; then
-        pbpaste
+        if [ -z "${target}" ]; then
+            pbpaste
+        elif [ "${target}" = "html" ]; then
+            pbpaste.swift
+        fi
     elif [ -e /dev/clipboard ]; then
         cat /dev/clipboard
     else
