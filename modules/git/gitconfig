@@ -132,6 +132,15 @@
         git reset --soft \"HEAD~$n\"; \
     }; f"
 
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    # Set the upstream branch based on the current branch
+
+    upstream = "!f() { \
+        branch=\"${1:-$(git rev-parse --abbrev-ref HEAD)}\"; \
+        git branch --set-upstream-to=origin/$branch $branch; \
+    }; f"
+
 [color "branch"]
 
     current = green bold
