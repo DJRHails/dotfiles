@@ -141,6 +141,16 @@
         git branch --set-upstream-to=origin/$branch $branch; \
     }; f"
 
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    # Recent branches (colourised and humanised)
+
+    branches = "!f() { \
+        git for-each-ref --sort=-committerdate refs/heads --format='%(refname:short) %(committerdate:relative)' \
+            | awk '{printf \"\\033[1;32m%-40s\\033[0m \\033[0;36m%s\\033[0m\\n\", $1, substr($0, index($0,$2))}' \
+            | tac; \
+    }; f"
+
 [color "branch"]
 
     current = green bold
