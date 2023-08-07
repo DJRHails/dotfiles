@@ -21,7 +21,7 @@ function aenv() {
     fi
 
     if [[ -f "$file" ]]; then
-      export $(echo $(cat $file | sed 's/#.*//g'| xargs) | envsubst)
+      export $(echo $(cat $file | sed 's/#[^'\''"]*$//g'| xargs) | envsubst)
       echo "Sourced '$file'"
     else
       echo "File '$file' not found"
