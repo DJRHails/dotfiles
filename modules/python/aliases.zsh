@@ -32,7 +32,8 @@ function aenv() {
           fi
 
           vars=$(echo "$line" | perl -nle 'print for m/\$\{[^}]+\}/g' | tr '\n' ' ') # extract variable names which match ${PWD}, ignore all $val
-          export "$(envsubst "$vars" <<< "$line")"
+          # xargs strips quotes
+          export $(envsubst "$vars" <<< "$line" | xargs)
       done < $file
 
       echo "Sourced '$file'"
