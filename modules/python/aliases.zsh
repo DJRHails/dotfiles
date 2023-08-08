@@ -31,7 +31,7 @@ function aenv() {
             continue
           fi
 
-          vars=$(echo "$line" | grep -oP '\$\{[^}]+\}' | tr '\n' ' ') # extract variable names which match ${PWD}, ignore all $val
+          vars=$(echo "$line" | perl -nle 'print for m/\$\{[^}]+\}/g' | tr '\n' ' ') # extract variable names which match ${PWD}, ignore all $val
           export "$(envsubst "$vars" <<< "$line")"
       done < $file
 
