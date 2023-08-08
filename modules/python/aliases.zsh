@@ -21,13 +21,38 @@ function aenv() {
     fi
 
     if [[ -f "$file" ]]; then
-      export $(echo $(cat $file | sed 's/#[^'\''"]*$//g'| xargs) | envsubst)
+
+      # [[ $line ]] ensures trailing newlines are not required
+      while IFS= read -r line || [[ $line ]]
+      do
+          line=$(echo "$line" | sed 's/#[^'\''"]*$//g')
+          
+          if [[ -z "$line" ]]; then
+            continue
+          fi
+
+          vars=$(echo "$line" | grep -oP '\$\{[^}]+\}' | tr '\n' ' ') # extract variable names which match ${PWD}, ignore all $val
+          export "$(envsubst "$vars" <<< "$line")"
+      done < $file
+
       echo "Sourced '$file'"
     else
       echo "File '$file' not found"
     fi
   done
 }
+
+# foo=$PWD
+# current=${PWD}
+# bar="$foo#" # foo
+# # Comment
+# somewhat=${current}
+
+# aenv of the above should yield:
+# foo="$PWD"
+# current="/home/.files"
+# bar="$foo#"
+# somewhat="/home/.files"
 
 function poetry() {
   # if POETRY_DONT_LOAD_ENV is *not* set, then load .env if it exists
