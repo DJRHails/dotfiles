@@ -25,6 +25,9 @@ function aenv() {
       # [[ $line ]] ensures trailing newlines are not required
       while IFS= read -r line || [[ $line ]]
       do
+          # If line starts with #, remove it and everything after it
+          line=$(echo "$line" | sed 's/^[[:space:]]*#.*$//g')
+        
           line=$(echo "$line" | sed 's/#[^'\''"]*$//g')
           
           if [[ -z "$line" ]]; then
