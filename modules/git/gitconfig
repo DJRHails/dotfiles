@@ -151,6 +151,12 @@
             | tac; \
     }; f"
 
+    # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+    # Fixup a commit
+
+    fixup = "!git log -n 50 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o git commit --fixup"
+
 [color "branch"]
 
     current = green bold
@@ -230,6 +236,21 @@
     # credentials (`name` / `email`), or things such as the `signingkey`
     # in this file, add them in `~/.gitconfig.local`!
 
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+[init]
+    defaultBranch = main
+
+[fetch]
+    prune = true
+
+[rebase]
+  autosquash = true
+
 [include]
 
     # Load local configs.
@@ -240,12 +261,3 @@
     #     by the local ones
 
     path = ~/.gitconfig.local
-
-[filter "lfs"]
-    clean = git-lfs clean -- %f
-    smudge = git-lfs smudge -- %f
-    process = git-lfs filter-process
-    required = true
-
-[init]
-    defaultBranch = main
