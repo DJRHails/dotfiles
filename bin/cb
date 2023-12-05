@@ -12,8 +12,6 @@
 ##? FLAGS:
 ##?     -a, --append
 ##?         append to the given clipboard, do not overwrite.
-##?     -i, --ignore-interrupts  
-##?         ignore interrupt signals
 ##?     -t, --target
 ##?         use given target instead of the default ones
 ##?     -v, --version
@@ -146,7 +144,6 @@ cb::main() {
           -v|--version) cb::show_version; return ;;
           -a|--append) append="1"; shift ;;
           -t|--target) target="${2}"; shift 2 ;;
-          -i|--ignore-interrupts) ignore_interrumpts="1"; shift ;;
           -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
       esac
   done
