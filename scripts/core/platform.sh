@@ -128,6 +128,9 @@ platform::relink() {
 }
 
 platform::ask_for_sudo() {
+  # Install `sudo` if it isn't available.
+  platform::command_exists "sudo" || platform::install "sudo"
+
   sudo -v &> /dev/null
 
   # Update existing `sudo` time stamp
