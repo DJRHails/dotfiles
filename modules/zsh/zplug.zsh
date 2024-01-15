@@ -23,4 +23,4 @@ fi
 zplug load
 
 # Apply theme hacks
-SPACESHIP_CHAR_SYMBOL='Δ '
+export SPACESHIP_CHAR_SYMBOL='Δ '
