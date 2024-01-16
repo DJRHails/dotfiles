@@ -178,7 +178,11 @@ platform::main_package_manager() {
 
 platform::package_manager_prefix() {
   if platform::is_linux; then
-    echo "sudo "
+    if [ "$EUID" -ne 0 ]; then
+      echo "sudo "
+    else
+      echo ""
+    fi
   else
     echo ""
   fi
