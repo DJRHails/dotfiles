@@ -14,6 +14,9 @@
 ```bash
 git clone https://github.com/DJRHails/dotfiles.git ~/.files
 cd ~/.files
+./bootstrap.sh --cli --yes
+
+# Custom config
 ./bootstrap.sh
 ```
 
