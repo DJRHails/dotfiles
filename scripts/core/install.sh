@@ -4,7 +4,7 @@ install::with() {
   local -r PACKAGE_MANAGER="$1"
   local -r PACKAGE_READABLE_NAME="$2"
   local -r PACKAGE="$3"
-  local -r EXTRA_ARGUMENTS="$4"
+  local EXTRA_ARGUMENTS="$4"
   
   # Inject extra arguments if not provided
   if [ -z "$EXTRA_ARGUMENTS" ]; then

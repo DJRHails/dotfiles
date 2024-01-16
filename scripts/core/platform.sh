@@ -189,7 +189,7 @@ platform::package_manager_prefix() {
 }
 
 platform::main_package_args() {
-  if [ "$(platform::main_package_manager)" == "apt"]; then
+  if [ "$(platform::main_package_manager)" == "apt" ]; then
     echo "--allow-unauthenticated -qqy"
   else
     echo ""
