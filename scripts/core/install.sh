@@ -6,6 +6,11 @@ install::with() {
   local -r PACKAGE="$3"
   local -r EXTRA_ARGUMENTS="$4"
   
+  # Inject extra arguments if not provided
+  if [ -z "$EXTRA_ARGUMENTS" ]; then
+    EXTRA_ARGUMENTS=$(platform::main_package_args)
+  fi
+
   if ! platform::command_exists "$PACKAGE"; then
     log::execute "$PACKAGE_MANAGER install $EXTRA_ARGUMENTS $PACKAGE" "$PACKAGE_READABLE_NAME"
   else

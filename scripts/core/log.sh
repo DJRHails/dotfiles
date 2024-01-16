@@ -42,17 +42,19 @@ kill_all_subprocesses() {
   done
 }
 
+
 log::execute() {
   local -r CMDS="$1"
   local -r MSG="${2:-$1}"
   local -r TMP_FILE="$(mktemp /tmp/err_XXXXX)"
+  local -r TMP_STDOUT_FILE="$(mktemp /tmp/std_XXXXX)"
 
   local exitCode=0
   local cmdsPID=""
 
   trap 'kill_all_subprocesses' EXIT 
 
-  eval "$CMDS" &> /dev/null 2> "$TMP_FILE" &
+  eval "$CMDS" &> "$TMP_STDOUT_FILE" 2> "$TMP_FILE" &
   cmdsPID=$!
 
   log::spinner "$cmdsPID" "$CMDS" "$MSG"
