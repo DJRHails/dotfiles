@@ -129,7 +129,7 @@ platform::relink() {
 
 platform::ask_for_sudo() {
   # Install `sudo` if it isn't available.
-  platform::command_exists "sudo" || platform::install "sudo"
+  platform::command_exists "sudo" || install::package "sudo"
 
   sudo -v &> /dev/null
 
