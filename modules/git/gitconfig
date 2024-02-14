@@ -156,6 +156,7 @@
     # Fixup a commit
 
     fixup = "!git log -n 50 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o git commit --fixup"
+	staash = stash --all
 
 [color "branch"]
 
@@ -250,6 +251,10 @@
 
 [rebase]
   autosquash = true
+
+[rerere]
+    # REuse REcorded REsolution: keep on disk the resolution of a merge conflict so you don't have to replay them
+	enabled = true
 
 [include]
 
