@@ -17,8 +17,8 @@
 ##?     -v, --version
 ##?         display version
 ##?     -e, --expose
-##?         expose the cliboard on port 2224/2225 for remote access (copy/paste), use with caution on internet accessible machines
-##?         setup SSH `RemoteForward 2224 localhost:2224` and `RemoteForward 2225 localhost:2225`
+##?         expose the cliboard on port 2230/2231 for remote access (copy/paste), use with caution on internet accessible machines
+##?         setup SSH `RemoteForward 2230 localhost:2230` and `RemoteForward 2231 localhost:2231` and AllowTcpForwarding in /etc/ssh/sshd_config should be yes
 ##?     -h, --help
 ##?         show this help
 ##?
@@ -35,8 +35,8 @@
 VERSION="2024.02"
 
 REMOTE_CP_HOST=localhost
-REMOTE_COPY_PORT=2224
-REMOTE_PASTE_PORT=2225
+REMOTE_COPY_PORT=2230
+REMOTE_PASTE_PORT=2231
 
 cb::basename() {
     [ -z "${1}" ] && return 1 || _basename__name="${1%%/}"
@@ -66,6 +66,10 @@ cb::show_version() {
 
 cb::expose() {
     trap 'kill 0' EXIT
+
+    echo "Exposing paste on $REMOTE_PASTE_PORT"
+    echo "Exposing copy on $REMOTE_COPY_PORT"
+
     mkfifo /tmp/nc_call_pid_pipe
     while true; do
         # on connection, output is the exposed system's clipboard
