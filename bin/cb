@@ -34,6 +34,7 @@
 
 VERSION="2024.02"
 
+REMOTE_CP_HOST=localhost
 REMOTE_COPY_PORT=2224
 REMOTE_PASTE_PORT=2225
 
@@ -69,39 +70,24 @@ cb::expose() {
     while true; do
         # on connection, output is the exposed system's clipboard
         {
-
-            echo "exposing on $REMOTE_PASTE_PORT"
-
-            cb::paste | nc -l $REMOTE_PASTE_PORT &
+            content=$(cb::paste)
+            echo -e ">>>local-to-remote\n$content\n>>>"
+            echo $content | nc -l $REMOTE_PASTE_PORT &
             nc_call_pid=$!
             echo $nc_call_pid > /tmp/nc_call_pid_pipe
-            
-            echo "Waiting for $nc_call_pid"
-            wait $nc_call_pid
-
-            echo "gave on $REMOTE_PASTE_PORT: $content"
-
-            # echo -e ">>>local-to-remote\n$content\n>>>"
+            wait $nc_call_pid 
         } &
-
-        
 
         # on connection, input is added to exposed system's clipboard
         {
             content=$(nc -l $REMOTE_COPY_PORT)
 
-            echo "got content on $REMOTE_COPY_PORT"
-
             echo $content | cb::copy
 
-            echo "sent to local clipboard"
-
-            # echo -e "<<<remote-to-local\n$content\n<<<"
+            echo -e "<<<remote-to-local\n$content\n<<<"
             read nc_call_pid < /tmp/nc_call_pid_pipe
             if [[ -n "$nc_call_pid" ]]; then
-                echo "Killing $nc_call_pid"
-
-                kill $nc_call_pid
+                kill $nc_call_pid >/dev/null 2>&1
             fi 
         } &
 
@@ -111,25 +97,11 @@ cb::expose() {
 }
 
 cb::copy() {
-    if [ -n "${remote}" ]; then
-        to_copy=$(cat)
-
-        echo "remotecopy:$REMOTE_COPY_PORT   local->remote: $to_copy" >&2
-        echo $to_copy | nc localhost $REMOTE_COPY_PORT 
-        # We sleep as remote copys need to flush out the pid
-        sleep 1
-        echo "postremotecopy:$REMOTE_COPY_PORT" >&2
-
-        if [ $? -ne 0 ]; then
-            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_COPY_PORT} not available for copy"
-        fi
-
-        return
-    fi
-
     local copy_command
 
-    if command -v "xclip" >/dev/null 2>/dev/null; then
+    if [ -n "${remote}" ]; then
+        copy_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_COPY_PORT")
+    elif command -v "xclip" >/dev/null 2>/dev/null; then
         copy_command=("xclip" "-selection" "clipboard" "-i")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
         copy_command=("xsel" "--clipboard")
@@ -144,9 +116,19 @@ cb::copy() {
     { [ -n "${append}" ] && cb::paste; cat; } | "${copy_command[@]}"
 
     if [ $? -ne 0 ]; then
-        cb::die "${PROGNAME}: local clipboard not available for copy"
+        if [ -n "${remote}" ]; then
+            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_COPY_PORT} not available for copy"
+        else
+            cb::die "${PROGNAME}: local clipboard not available for copy"
+        fi
+    fi
+
+    # We sleep as remote listener needs to flush out the old clipboard
+    if [ -n "${remote}" ]; then
+        sleep .1
     fi
 }
+
 cb::target() {
     # Check if target is not set
     if [ -z "${target}" ]; then
@@ -161,31 +143,34 @@ cb::target() {
 }
 
 cb::paste() {
+    local paste_command
 
     if [ -n "${remote}" ]; then
-        echo "remotepaste:$REMOTE_PASTE_PORT  remote->local" >&2
-
-        nc localhost $REMOTE_PASTE_PORT
-        if [ $? -ne 0 ]; then
-            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_PASTE_PORT} not available for paste"
-        fi
-        return
-    fi
-
-    if command -v "xclip" >/dev/null 2>/dev/null; then
-        xclip -selection clipboard -out -target "$(cb::target)"
+        paste_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_PASTE_PORT")
+    elif command -v "xclip" >/dev/null 2>/dev/null; then
+        paste_command=("xclip" "-selection" "clipboard" "-out" "-target" "$(cb::target)")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
-        xsel --clipboard
+        paste_command=("xsel" "--clipboard")
     elif command -v "pbpaste" >/dev/null 2>/dev/null; then
         if [ -z "${target}" ]; then
-            pbpaste
+            paste_command=("pbpaste")
         elif [ "${target}" = "html" ]; then
-            pbpaste.swift
+            paste_command=("pbpaste.swift")
         fi
     elif [ -e /dev/clipboard ]; then
-        cat /dev/clipboard
+        paste_command=("cat" "/dev/clipboard")
     else
         cb::die "${PROGNAME}: unrecognized clipboard system"
+    fi
+
+    "${paste_command[@]}"
+
+    if [ $? -ne 0 ]; then
+        if [ -n "${remote}" ]; then
+            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_PASTE_PORT} not available for paste"
+        else
+            cb::die "${PROGNAME}: local clipboard not available for paste"
+        fi
     fi
 }
 
