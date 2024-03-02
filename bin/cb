@@ -70,31 +70,31 @@ cb::expose() {
     echo "Exposing paste on $REMOTE_PASTE_PORT"
     echo "Exposing copy on $REMOTE_COPY_PORT"
 
-    mkfifo /tmp/nc_call_pid_pipe
     while true; do
         # on connection, output is the exposed system's clipboard
         {
             content=$(cb::paste)
             echo -e ">>>local-to-remote\n$content\n>>>"
-            echo $content | nc -l $REMOTE_PASTE_PORT &
-            nc_call_pid=$!
-            echo $nc_call_pid > /tmp/nc_call_pid_pipe
-            wait $nc_call_pid 
+            echo $content | socat - TCP-LISTEN:$REMOTE_PASTE_PORT,reuseaddr
         } &
-
+        paste_listen_pid=$!
         # on connection, input is added to exposed system's clipboard
         {
-            content=$(nc -l $REMOTE_COPY_PORT)
-
+            content=$(socat - TCP-LISTEN:$REMOTE_COPY_PORT,reuseaddr)
             echo $content | cb::copy
-
             echo -e "<<<remote-to-local\n$content\n<<<"
-            read nc_call_pid < /tmp/nc_call_pid_pipe
-            if [[ -n "$nc_call_pid" ]]; then
-                kill $nc_call_pid >/dev/null 2>&1
+            if [[ -n "$paste_listen_pid" ]]; then
+                kill $paste_listen_pid >/dev/null 2>&1
             fi 
         } &
+        copy_listen_pid=$!
 
+        # Add a 5s timeout to the listeners
+        {
+            sleep 5
+            kill $paste_listen_pid >/dev/null 2>&1
+            kill $copy_listen_pid >/dev/null 2>&1
+        } &
 
         wait
     done
@@ -103,8 +103,8 @@ cb::expose() {
 cb::copy() {
     local copy_command
 
-    if [ -n "${remote}" ]; then
-        copy_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_COPY_PORT")
+    if [ -n "${remote}" ] && command -v "socat" >/dev/null 2>/dev/null; then
+        copy_command=("socat" "-" "TCP:${REMOTE_CP_HOST}:${REMOTE_COPY_PORT}")
     elif command -v "xclip" >/dev/null 2>/dev/null; then
         copy_command=("xclip" "-selection" "clipboard" "-i")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -114,7 +114,7 @@ cb::copy() {
     elif [ -e /dev/clipboard ]; then
         copy_command=("cat" "/dev/clipboard")
     else
-        cb::die "${PROGNAME}: unrecognized clipboard system"
+        cb::die "${PROGNAME}: unrecognized clipboard system: socat (when remote), xclip, xsel, pbcopy, /dev/clipboard"
     fi
 
     { [ -n "${append}" ] && cb::paste; cat; } | "${copy_command[@]}"
@@ -149,8 +149,8 @@ cb::target() {
 cb::paste() {
     local paste_command
 
-    if [ -n "${remote}" ]; then
-        paste_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_PASTE_PORT")
+    if [ -n "${remote}" ] && command -v "socat" >/dev/null 2>/dev/null; then
+        paste_command=("socat" "TCP:${REMOTE_CP_HOST}:${REMOTE_PASTE_PORT}" "-")
     elif command -v "xclip" >/dev/null 2>/dev/null; then
         paste_command=("xclip" "-selection" "clipboard" "-out" "-target" "$(cb::target)")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -164,7 +164,7 @@ cb::paste() {
     elif [ -e /dev/clipboard ]; then
         paste_command=("cat" "/dev/clipboard")
     else
-        cb::die "${PROGNAME}: unrecognized clipboard system"
+        cb::die "${PROGNAME}: unrecognized clipboard system: socat (when remote), xclip, xsel, pbcopy, /dev/clipboard"
     fi
 
     "${paste_command[@]}"
