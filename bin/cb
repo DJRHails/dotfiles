@@ -3,7 +3,7 @@
 # credit: https://gist.github.com/RichardBronosky/56d8f614fab2bacdd8b048fb58d0c0c7
 # credit: https://github.com/javier-lopez/learn/master/sh/tools/cb
 
-##? Unifies the copy and paste commands into one 
+##? Unifies the copy and paste commands into one
 ##? intelligent chainable command.
 ##?
 ##? USAGE:
@@ -16,6 +16,9 @@
 ##?         use given target instead of the default ones
 ##?     -v, --version
 ##?         display version
+##?     -e, --expose
+##?         expose the cliboard on port 2224/2225 for remote access (copy/paste), use with caution on internet accessible machines
+##?         setup SSH `RemoteForward 2224 localhost:2224` and `RemoteForward 2225 localhost:2225`
 ##?     -h, --help
 ##?         show this help
 ##?
@@ -23,24 +26,27 @@
 ##?     <clipboard>  the file to extract
 ##?
 ##? EXAMPLES:
-##?     `date | cb`       copy current data to clipboard 
+##?     `date | cb`       copy current data to clipboard
 ##?     `cb`              paste current clipboard to stdout
 ##?     `cb | tee d.log`  paste current clipboard to d.log and stdout.
 ##?     `cb -a`           append current clipboard to the clipboard
 ##?     `cb -t html`      output clipboard as html, not text
 
-VERSION="2023.01"
+VERSION="2024.02"
+
+REMOTE_COPY_PORT=2224
+REMOTE_PASTE_PORT=2225
 
 cb::basename() {
     [ -z "${1}" ] && return 1 || _basename__name="${1%%/}"
     [ -z "${2}" ] || _basename__suffix="${2}"
     case "${_basename__name}" in
-        /*|*/*) _basename__name="$(expr "${_basename__name}" : '.*/\([^/]*\)')" ;;
+    /* | */*) _basename__name="$(expr "${_basename__name}" : '.*/\([^/]*\)')" ;;
     esac
 
     if [ -n "${_basename__suffix}" ] && [ "${#_basename__name}" -gt "${#2}" ]; then
         if [ X"$(printf "%s\\n" "${_basename__name}" | cut -c"$((${#_basename__name} - ${#_basename__suffix} + 1))"-"${#_basename__name}")" \
-           = X"$(printf "%s\\n" "${_basename__suffix}")" ]; then
+            = X"$(printf "%s\\n" "${_basename__suffix}")" ]; then
             _basename__name="$(printf "%s\\n" "${_basename__name}" | cut -c1-"$((${#_basename__name} - ${#_basename__suffix}))")"
         fi
     fi
@@ -50,45 +56,97 @@ cb::basename() {
 
 cb::die() {
     [ -z "${1}" ] || printf "%s\\n" "${*}" >&2
-    doc::help_msg "$0" >&2;
+    # doc::help_msg "$0" >&2;
 }
 
 cb::show_version() {
     printf "%s\\n" "${PROGNAME} ${VERSION}"
 }
 
+cb::expose() {
+    trap 'kill 0' EXIT
+    mkfifo /tmp/nc_call_pid_pipe
+    while true; do
+        # on connection, output is the exposed system's clipboard
+        {
+
+            echo "exposing on $REMOTE_PASTE_PORT"
+
+            cb::paste | nc -l $REMOTE_PASTE_PORT &
+            nc_call_pid=$!
+            echo $nc_call_pid > /tmp/nc_call_pid_pipe
+            
+            echo "Waiting for $nc_call_pid"
+            wait $nc_call_pid
+
+            echo "gave on $REMOTE_PASTE_PORT: $content"
+
+            # echo -e ">>>local-to-remote\n$content\n>>>"
+        } &
+
+        
+
+        # on connection, input is added to exposed system's clipboard
+        {
+            content=$(nc -l $REMOTE_COPY_PORT)
+
+            echo "got content on $REMOTE_COPY_PORT"
+
+            echo $content | cb::copy
+
+            echo "sent to local clipboard"
+
+            # echo -e "<<<remote-to-local\n$content\n<<<"
+            read nc_call_pid < /tmp/nc_call_pid_pipe
+            if [[ -n "$nc_call_pid" ]]; then
+                echo "Killing $nc_call_pid"
+
+                kill $nc_call_pid
+            fi 
+        } &
+
+
+        wait
+    done
+}
+
 cb::copy() {
+    if [ -n "${remote}" ]; then
+        to_copy=$(cat)
+
+        echo "remotecopy:$REMOTE_COPY_PORT   local->remote: $to_copy" >&2
+        echo $to_copy | nc localhost $REMOTE_COPY_PORT 
+        # We sleep as remote copys need to flush out the pid
+        sleep 1
+        echo "postremotecopy:$REMOTE_COPY_PORT" >&2
+
+        if [ $? -ne 0 ]; then
+            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_COPY_PORT} not available for copy"
+        fi
+
+        return
+    fi
+
+    local copy_command
+
     if command -v "xclip" >/dev/null 2>/dev/null; then
-        #dumping xclip's stdout to the bitbucket works around xclip's
-        #failure to properly daemonize: https://sourceforge.net/p/xclip/patches/9/
-        if [ -n "${append}" ]; then
-            (cb::paste 2>/dev/null; cat) | xclip -selection clipboard -i >/dev/null 2>&1
-        else
-            cat | xclip -selection clipboard -i >/dev/null 2>&1
-        fi
+        copy_command=("xclip" "-selection" "clipboard" "-i")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
-        if [ -n "${append}" ]; then
-            (cb::paste 2>/dev/null; cat) | xsel --clipboard
-        else
-            cat | xsel --clipboard
-        fi
+        copy_command=("xsel" "--clipboard")
     elif command -v "pbcopy" >/dev/null 2>/dev/null; then
-        if [ -n "${append}" ]; then
-            (cb::paste 2>/dev/null; cat) | pbcopy
-        else
-            cat | pbcopy
-        fi
+        copy_command=("pbcopy")
     elif [ -e /dev/clipboard ]; then
-        if [ -n "${append}" ]; then
-            (cat /dev/clipboard 2>/dev/null; cat) > /dev/clipboard
-        else
-            cat > /dev/clipboard
-        fi
+        copy_command=("cat" "/dev/clipboard")
     else
         cb::die "${PROGNAME}: unrecognized clipboard system"
     fi
-}
 
+    { [ -n "${append}" ] && cb::paste; cat; } | "${copy_command[@]}"
+
+    if [ $? -ne 0 ]; then
+        cb::die "${PROGNAME}: local clipboard not available for copy"
+    fi
+}
 cb::target() {
     # Check if target is not set
     if [ -z "${target}" ]; then
@@ -103,6 +161,17 @@ cb::target() {
 }
 
 cb::paste() {
+
+    if [ -n "${remote}" ]; then
+        echo "remotepaste:$REMOTE_PASTE_PORT  remote->local" >&2
+
+        nc localhost $REMOTE_PASTE_PORT
+        if [ $? -ne 0 ]; then
+            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_PASTE_PORT} not available for paste"
+        fi
+        return
+    fi
+
     if command -v "xclip" >/dev/null 2>/dev/null; then
         xclip -selection clipboard -out -target "$(cb::target)"
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -120,40 +189,57 @@ cb::paste() {
     fi
 }
 
-cb::stdin_is_pipe(){
-  [[ -p /dev/stdin ]]
+cb::stdin_is_pipe() {
+    [[ -p /dev/stdin ]]
 }
 
 cb::stdin_is_tty() {
-  [[ -t 0 ]]
+    [[ -t 0 ]]
 }
 
 cb::stdout_is_tty() {
-  [[ -t 1 ]]
+    [[ -t 1 ]]
 }
 
-cb::stdin_is_pipe_like(){
+cb::stdin_is_pipe_like() {
     cb::stdin_is_pipe || ! cb::stdin_is_tty
 }
 
 cb::main() {
-  PROGNAME="$(cb::basename "${0}")"
+    PROGNAME="$(cb::basename "${0}")"
 
-  for arg in "${@}"; do #parse options
-      case "${arg}" in
-          -v|--version) cb::show_version; return ;;
-          -a|--append) append="1"; shift ;;
-          -t|--target) target="${2}"; shift 2 ;;
-          -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
-      esac
-  done
+    for arg in "${@}"; do #parse options
+        case "${arg}" in
+        -v | --version)
+            cb::show_version
+            return
+            ;;
+        -a | --append)
+            append="1"
+            shift
+            ;;
+        -t | --target)
+            target="${2}"
+            shift 2
+            ;;
+        -r | --remote)
+            remote="1"
+            shift
+            ;;
+        -e | --expose)
+            cb::expose
+            return
+            ;;
+        -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
+        esac
+    done
 
-  if cb::stdin_is_pipe_like; then
-      cb::copy
-      cb::paste
-  else
-      cb::paste
-  fi
+    if cb::stdin_is_pipe_like; then
+        cb::copy
+        cb::paste
+    else
+        cb::paste
+    fi
 }
 
 . "$DOTFILES/scripts/core/main.sh"

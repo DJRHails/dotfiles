@@ -158,6 +158,9 @@
     fixup = "!git log -n 50 --pretty=format:'%h %s' --no-merges | fzf | cut -c -7 | xargs -o git commit --fixup"
 	staash = stash --all
 
+[branch]
+    sort = "-comitterdate"
+
 [color "branch"]
 
     current = green bold
@@ -266,3 +269,7 @@
     #     by the local ones
 
     path = ~/.gitconfig.local
+
+[maintenance]
+	repo = /Users/dh/Projects/github.com/DJRHails/kb
+	repo = /Users/dh/.files
