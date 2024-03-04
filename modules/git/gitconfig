@@ -159,7 +159,7 @@
 	staash = stash --all
 
 [branch]
-    sort = "-comitterdate"
+    sort = "-committerdate"
 
 [color "branch"]
 
