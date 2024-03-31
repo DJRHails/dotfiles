@@ -177,7 +177,8 @@ fkillport() {
 
 
 # Gets the current ip address
-alias ip="dig +short myip.opendns.com @resolver1.opendns.com"
+alias ip="dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
+alias ipv6="dig -6 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 
 # List of commands I use most often, these are candidates for aliases
 candidates() {
