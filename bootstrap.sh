@@ -33,7 +33,7 @@ parse_args() {
             allModules=true
           ;;
           -c|--cli)
-            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git")
+            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/piknik")
           ;;
           *)
             scanned_valid_modules+=("$DOTFILES/modules/$1")
