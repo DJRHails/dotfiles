@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+##? Provides a quick interface to askllm
+##?
+##? USAGE:
+##?    askllm <file>
+##?    askllm -h|--help
+
+# Setup the venv if it doesn't exist
+if [[ ! -d "$DOTFILES/modules/askllm/.venv" ]]; then
+    echo "First execution, creating venv..."
+    python3 -m venv "$DOTFILES/modules/askllm/.venv"
+    "$DOTFILES/modules/askllm/.venv/bin/pip" install -r "$DOTFILES/modules/askllm/requirements.txt"
+fi
+
+# Activate the venv
+source "$DOTFILES/modules/askllm/.venv/bin/activate"
+
+# The location of this file is defined in the $DOTFILES variable
+# which is set in the .bashrc file.
+
+cd "$DOTFILES/modules/askllm"
+python3 -m askllm "$@"
+
+# Deactivate the venv
+deactivate

@@ -1,3 +1,6 @@
 [submodule "modules/execblock"]
 	path = modules/execblock
 	url = https://github.com/DJRHails/execblock.git
+[submodule "modules/askllm"]
+	path = modules/askllm
+	url = git@github.com:DJRHails/askllm.git
