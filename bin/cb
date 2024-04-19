@@ -16,9 +16,6 @@
 ##?         use given target instead of the default ones
 ##?     -v, --version
 ##?         display version
-##?     -e, --expose
-##?         expose the cliboard on port 2230/2231 for remote access (copy/paste), use with caution on internet accessible machines
-##?         setup SSH `RemoteForward 2230 localhost:2230` and `RemoteForward 2231 localhost:2231` and AllowTcpForwarding in /etc/ssh/sshd_config should be yes
 ##?     -h, --help
 ##?         show this help
 ##?
@@ -33,10 +30,6 @@
 ##?     `cb -t html`      output clipboard as html, not text
 
 VERSION="2024.02"
-
-REMOTE_CP_HOST=localhost
-REMOTE_COPY_PORT=2230
-REMOTE_PASTE_PORT=2231
 
 cb::basename() {
     [ -z "${1}" ] && return 1 || _basename__name="${1%%/}"
@@ -64,47 +57,11 @@ cb::show_version() {
     printf "%s\\n" "${PROGNAME} ${VERSION}"
 }
 
-cb::expose() {
-    trap 'kill 0' EXIT
-
-    echo "Exposing paste on $REMOTE_PASTE_PORT"
-    echo "Exposing copy on $REMOTE_COPY_PORT"
-
-    mkfifo /tmp/nc_call_pid_pipe
-    while true; do
-        # on connection, output is the exposed system's clipboard
-        {
-            content=$(cb::paste)
-            echo -e ">>>local-to-remote\n$content\n>>>"
-            echo $content | nc -l $REMOTE_PASTE_PORT &
-            nc_call_pid=$!
-            echo $nc_call_pid > /tmp/nc_call_pid_pipe
-            wait $nc_call_pid 
-        } &
-
-        # on connection, input is added to exposed system's clipboard
-        {
-            content=$(nc -l $REMOTE_COPY_PORT)
-
-            echo $content | cb::copy
-
-            echo -e "<<<remote-to-local\n$content\n<<<"
-            read nc_call_pid < /tmp/nc_call_pid_pipe
-            if [[ -n "$nc_call_pid" ]]; then
-                kill $nc_call_pid >/dev/null 2>&1
-            fi 
-        } &
-
-
-        wait
-    done
-}
-
 cb::copy() {
     local copy_command
 
-    if [ -n "${remote}" ]; then
-        copy_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_COPY_PORT")
+    if command -v "piknik" >/dev/null 2>/dev/null; then
+        copy_command=("piknik" "-copy")
     elif command -v "xclip" >/dev/null 2>/dev/null; then
         copy_command=("xclip" "-selection" "clipboard" "-i")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -120,16 +77,7 @@ cb::copy() {
     { [ -n "${append}" ] && cb::paste; cat; } | "${copy_command[@]}"
 
     if [ $? -ne 0 ]; then
-        if [ -n "${remote}" ]; then
-            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_COPY_PORT} not available for copy"
-        else
-            cb::die "${PROGNAME}: local clipboard not available for copy"
-        fi
-    fi
-
-    # We sleep as remote listener needs to flush out the old clipboard
-    if [ -n "${remote}" ]; then
-        sleep .1
+        cb::die "${PROGNAME}: clipboard not available for copy"
     fi
 }
 
@@ -149,8 +97,8 @@ cb::target() {
 cb::paste() {
     local paste_command
 
-    if [ -n "${remote}" ]; then
-        paste_command=("nc" "$REMOTE_CP_HOST" "$REMOTE_PASTE_PORT")
+    if command -v "piknik" >/dev/null 2>/dev/null; then
+        paste_command=("piknik" "-paste")
     elif command -v "xclip" >/dev/null 2>/dev/null; then
         paste_command=("xclip" "-selection" "clipboard" "-out" "-target" "$(cb::target)")
     elif command -v "xsel" >/dev/null 2>/dev/null; then
@@ -170,11 +118,7 @@ cb::paste() {
     "${paste_command[@]}"
 
     if [ $? -ne 0 ]; then
-        if [ -n "${remote}" ]; then
-            cb::die "${PROGNAME}: remote clipboard at ${REMOTE_PASTE_PORT} not available for paste"
-        else
-            cb::die "${PROGNAME}: local clipboard not available for paste"
-        fi
+        cb::die "${PROGNAME}: clipboard not available for paste"
     fi
 }
 
@@ -210,14 +154,6 @@ cb::main() {
         -t | --target)
             target="${2}"
             shift 2
-            ;;
-        -r | --remote)
-            remote="1"
-            shift
-            ;;
-        -e | --expose)
-            cb::expose
-            return
             ;;
         -*) cb::die "${PROGNAME}" "${PROGNAME}: unrecognized option '${arg}'" ;;
         esac
