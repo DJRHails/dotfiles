@@ -180,14 +180,61 @@ fkillport() {
 alias ip="dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 alias ipv6="dig -6 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 
-# List of commands I use most often, these are candidates for aliases
+# List of commands used most often, these are candidates for aliases
+# List of commands used most often in the last month, these are candidates for aliases
 candidates() {
-  # alias profileme="history | awk '{print \$2}' | awk 'BEGIN{FS=\"|\"}{print \$1}' | sort | uniq -c | sort -n | tail -n 20 | sort -nr"
-  history | \
-    awk '{CMD[$2]++;count++;}END { for (a in CMD)print CMD[a] " " CMD[a]/count*100 "% " a;}' | \
-    grep -v "./" | \
-    column -c3 -s " " -t | \
-    sort -nr | nl |  head -n 20
+  local history_files=("$HOME/.zsh_history" "$HOME/.bash_history")
+  local num_commands=20
+  local min_length=10
+
+  # Calculate timestamp for one month ago in a portable way
+  local current_time=$(date +%s)
+  local seconds_per_day=86400
+  local days_in_month=30
+  local last_month=$((current_time - days_in_month * seconds_per_day))
+
+  {
+    history
+    for file in "${history_files[@]}"; do
+      if [ -f "$file" ]; then
+        cat "$file" 2>/dev/null || true
+      fi
+    done
+  } | \
+    LC_ALL=C sed 's/[^[:print:]]/~/g' | \
+    awk -v min_length="$min_length" -v last_month="$last_month" '
+      BEGIN {
+        FS = ";"
+        IGNORECASE = 1
+      }
+      {
+        if (NF > 1) {
+          timestamp = $1
+          cmd = $2
+          gsub(/^: /, "", timestamp)
+        } else {
+          timestamp = ""
+          cmd = $0
+        }
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", cmd)  # Trim whitespace
+        gsub(/[[:space:]]+/, " ", cmd)  # Replace multiple spaces with single space
+        if (length(cmd) >= min_length && cmd !~ /^[[:space:]]*$/) {
+          gsub(/~/, "", cmd)  # Remove placeholder for non-printable characters
+          if (timestamp == "" || timestamp > last_month) {
+            CMD[cmd]++
+            count++
+          }
+        }
+      }
+      END {
+        for (a in CMD)
+          printf "%d\t%.2f%%\t%s\n", CMD[a], (CMD[a]/count)*100, a
+      }
+    ' | \
+    sort -nr | \
+    head -n "$num_commands" | \
+    nl | \
+    column -t -s $'\t'
 }
 
 # Capture takes over the std ouput of a process
