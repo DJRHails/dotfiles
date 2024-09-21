@@ -209,13 +209,13 @@ ppsql() {
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" --dbname postgres "$@"
 }
 
-to_plist() {
+to_list_py() {
     awk 'BEGIN {printf "["} 
          {printf "%s\"%s\"", (NR==1?"":", "), $0} 
          END {print "]"}'
 }
 
-to_sqllist() {
+to_list_sql() {
     awk 'BEGIN {printf "("} 
          {gsub("'\''", "'\'''\''"); printf "%s'\''%s'\''", (NR==1?"":","), $0}  
          END {print ")"}'
