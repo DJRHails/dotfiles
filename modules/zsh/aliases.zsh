@@ -185,14 +185,15 @@ alias ipv6="dig -6 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 candidates() {
   local history_files=("$HOME/.zsh_history" "$HOME/.bash_history")
   local num_commands=20
-  local min_length=10
+  local min_length=4
+  local num_words=3  # Number of words to consider for grouping
 
   # Calculate timestamp for one month ago in a portable way
   local current_time=$(date +%s)
   local seconds_per_day=86400
   local days_in_month=30
   local last_month=$((current_time - days_in_month * seconds_per_day))
-
+  
   {
     history
     for file in "${history_files[@]}"; do
@@ -202,10 +203,22 @@ candidates() {
     done
   } | \
     LC_ALL=C sed 's/[^[:print:]]/~/g' | \
-    awk -v min_length="$min_length" -v last_month="$last_month" '
+    awk -v min_length="$min_length" -v last_month="$last_month" -v num_words="$num_words" '
       BEGIN {
         FS = ";"
         IGNORECASE = 1
+      }
+      function get_first_n_words(str, n) {
+        result = ""
+        count = 0
+        for (i = 1; i <= length(str); i++) {
+          if (substr(str, i, 1) == " ") {
+            count++
+            if (count == n) break
+          }
+          result = result substr(str, i, 1)
+        }
+        return result
       }
       {
         if (NF > 1) {
@@ -220,8 +233,9 @@ candidates() {
         gsub(/[[:space:]]+/, " ", cmd)  # Replace multiple spaces with single space
         if (length(cmd) >= min_length && cmd !~ /^[[:space:]]*$/) {
           gsub(/~/, "", cmd)  # Remove placeholder for non-printable characters
+          cmd_group = get_first_n_words(cmd, num_words)
           if (timestamp == "" || timestamp > last_month) {
-            CMD[cmd]++
+            CMD[cmd_group]++
             count++
           }
         }
