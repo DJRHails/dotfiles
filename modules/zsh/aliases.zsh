@@ -209,13 +209,20 @@ ppsql() {
     PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" --dbname postgres "$@"
 }
 
+# Function to convert input lines to a Python list representation
 to_list_py() {
+    # Usage: echo -e "apple\nbanana\ncherry" | to_list_py
+    # Output: ["apple", "banana", "cherry"]
+    # xclip -o | to_list_py | xclip -selection clipboard
     awk 'BEGIN {printf "["} 
          {printf "%s\"%s\"", (NR==1?"":", "), $0} 
          END {print "]"}'
 }
 
+# Function to convert input lines to a SQL list representation
 to_list_sql() {
+    # Usage: echo -e "apple's\nbanana\ncherry" | to_list_sql
+    # Output: ('apple''s','banana','cherry')
     awk 'BEGIN {printf "("} 
          {gsub("'\''", "'\'''\''"); printf "%s'\''%s'\''", (NR==1?"":","), $0}  
          END {print ")"}'
