@@ -256,7 +256,7 @@
 
 [rebase]
   autosquash = true
-  autoStash = true
+  autostash = true
 
 [rerere]
     # REuse REcorded REsolution: keep on disk the resolution of a merge conflict so you don't have to replay them

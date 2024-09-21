@@ -199,3 +199,24 @@ capture() {
         }
     '
 }
+
+
+ppython() {
+    PYTHONPATH="$PWD:$PYTHONPATH" python "$@"
+}
+
+ppsql() {
+    PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" --dbname postgres "$@"
+}
+
+to_plist() {
+    awk 'BEGIN {printf "["} 
+         {printf "%s\"%s\"", (NR==1?"":", "), $0} 
+         END {print "]"}' | sed 's/"/\\"/g'
+}
+
+to_sqllist() {
+    awk 'BEGIN {printf "("} 
+         {printf "%s%s%s%s", (NR==1?"":","), "'\''", $0, "'\''"}  
+         END {print ")"}' | sed "s/'/''/g"
+}
