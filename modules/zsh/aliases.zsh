@@ -212,11 +212,11 @@ ppsql() {
 to_plist() {
     awk 'BEGIN {printf "["} 
          {printf "%s\"%s\"", (NR==1?"":", "), $0} 
-         END {print "]"}' | sed 's/"/\\"/g'
+         END {print "]"}'
 }
 
 to_sqllist() {
     awk 'BEGIN {printf "("} 
-         {printf "%s%s%s%s", (NR==1?"":","), "'\''", $0, "'\''"}  
-         END {print ")"}' | sed "s/'/''/g"
+         {gsub("'\''", "'\'''\''"); printf "%s'\''%s'\''", (NR==1?"":","), $0}  
+         END {print ")"}'
 }
