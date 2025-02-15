@@ -180,12 +180,11 @@ fkillport() {
 alias ip="dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 alias ipv6="dig -6 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 
-# List of commands used most often, these are candidates for aliases
-# List of commands used most often in the last month, these are candidates for aliases
+# List of commands used most often in the last month, grouped by the first N words
 candidates() {
   local history_files=("$HOME/.zsh_history" "$HOME/.bash_history")
-  local num_commands=20
-  local min_length=4
+  local num_commands=50
+  local min_length=5
   local num_words=3  # Number of words to consider for grouping
 
   # Calculate timestamp for one month ago in a portable way
@@ -193,7 +192,7 @@ candidates() {
   local seconds_per_day=86400
   local days_in_month=30
   local last_month=$((current_time - days_in_month * seconds_per_day))
-  
+
   {
     history
     for file in "${history_files[@]}"; do
@@ -233,9 +232,13 @@ candidates() {
         gsub(/[[:space:]]+/, " ", cmd)  # Replace multiple spaces with single space
         if (length(cmd) >= min_length && cmd !~ /^[[:space:]]*$/) {
           gsub(/~/, "", cmd)  # Remove placeholder for non-printable characters
-          cmd_group = get_first_n_words(cmd, num_words)
           if (timestamp == "" || timestamp > last_month) {
-            CMD[cmd_group]++
+            for (i = 1; i <= num_words; i++) {
+              cmd_group = get_first_n_words(cmd, i)
+              if (length(cmd_group) >= min_length) {
+                CMD[cmd_group]++
+              }
+            }
             count++
           }
         }
@@ -287,4 +290,32 @@ to_list_sql() {
     awk 'BEGIN {printf "("} 
          {gsub("'\''", "'\'''\''"); printf "%s'\''%s'\''", (NR==1?"":","), $0}  
          END {print ")"}'
+}
+
+# Function to convert input lines to a Markdown list representation
+to_list_md () {
+        awk 'BEGIN {print ""} 
+         {printf "- %s\n", $0} 
+         END {print ""}'
+}
+
+# Function to convert Python list to newline-delimited entries
+from_list_py() {
+    # Usage: echo '["apple", "banana", "cherry"]' | from_list_py
+    # Output: apple\nbanana\ncherry
+    sed 's/\[//;s/\]//;s/, */\n/g;s/"//g;s/'\''//g'
+}
+
+# Function to convert SQL list to newline-delimited entries
+from_list_sql() {
+    # Usage: echo "('apple''s','banana','cherry')" | from_list_sql
+    # Output: apple's\nbanana\ncherry
+    sed 's/^(\(.*\))$/\1/;s/,/\n/g;s/'\'''\''/'\''/g;s/^'\''//;s/'\''$//'
+}
+
+# Function to convert Markdown list to newline-delimited entries
+from_list_md() {
+    # Usage: echo -e "- apple\n- banana\n- cherry" | from_list_md
+    # Output: apple\nbanana\ncherry
+    sed 's/^- *//'
 }
