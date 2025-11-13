@@ -1,10 +1,58 @@
 #!/usr/bin/env bash
 
-##? Provides a quick interface to askllm
+##? Provides a quick interface to OpenAI language models
 ##?
 ##? USAGE:
-##?    askllm <file>
+##?    askllm [OPTIONS] [PROMPT...]
+##?    echo "prompt" | askllm [OPTIONS]
+##?    askllm estimate
 ##?    askllm -h|--help
+##?
+##? OPTIONS:
+##?    --system <template>    System prompt template(s) to use (comma-separated)
+##?    --model <name>         Model to use (default: gpt-5-mini)
+##?    -s, --smart            Use recommended fastest model (gpt-5)
+##?    -o, --no-stream        Don't stream output
+##?    --max-tokens <n>       Max tokens to generate (default: 1024)
+##?
+##? AVAILABLE MODELS:
+##?    GPT-5 series:    gpt-5, gpt-5-mini, gpt-5-nano, gpt-5-pro
+##?    GPT-4.1 series:  gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
+##?    GPT-4o series:   gpt-4o, gpt-4o-mini
+##?    Reasoning:       o3, o3-mini, o4-mini
+##?    Legacy:          gpt-4
+##?
+##? BUILT-IN SYSTEM TEMPLATES:
+##?    code     Generate code with no explanation, only comments
+##?    ocr      Correct OCR-induced errors in text
+##?    2md      Reformat text as markdown
+##?
+##? EXAMPLES:
+##?    # Use default model (gpt-5-mini)
+##?    askllm "Explain recursion"
+##?
+##?    # Use recommended fastest model for complex tasks
+##?    askllm -s "Explain quantum computing in detail"
+##?
+##?    # Generate code using the code template
+##?    askllm --system code "Write a Python function to calculate fibonacci"
+##?
+##?    # Chain templates: correct OCR, then convert to markdown
+##?    cat scan.txt | askllm --system ocr,2md
+##?
+##?    # Use a specific model
+##?    askllm --model gpt-5-nano "Simple query, save money"
+##?    askllm --model gpt-4.1 "Need 1M+ context window"
+##?
+##?    # Estimate token usage
+##?    echo "long prompt here" | askllm estimate
+##?
+##? COST COMPARISON (per 1M tokens, input/output):
+##?    gpt-5-mini:  $0.25 / $2.00  (default)
+##?    gpt-5-nano:  $0.05 / $0.40  (cheapest)
+##?    gpt-5:       $1.25 / $10.00 (use with -s flag)
+##?    gpt-4.1:     $2.00 / $8.00
+##?    gpt-4o:      $2.50 / $10.00
 
 # Setup the venv if it doesn't exist
 if [[ ! -d "$DOTFILES/modules/askllm/.venv" ]]; then
