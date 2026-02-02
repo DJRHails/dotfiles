@@ -1,0 +1,2 @@
+# Transcrypt encryption for sensitive skills
+modules/claude/skills/web-animation-design/** filter=crypt diff=crypt merge=crypt
