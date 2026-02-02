@@ -135,17 +135,19 @@ tmux send-keys -t proc $'asyncio.run(page.screenshot(path="debug.png"))\n'
 
 ## Sending Longer Scripts
 
-For multi-line scripts, use literal newlines in quotes:
+Always pass multiline commands with HEREDOC:
 
 ```bash
-tmux send-keys -t proc 'def greet(name):
+tmux send-keys -t proc "$(cat <<'EOF'
+def greet(name):
     return f"Hello, {name}!"
 
 greet("world")
-'
+EOF
+)"
 ```
 
-Use single quotes to avoid escaping. The literal newlines are sent directly to the process.
+HEREDOC preserves formatting and avoids escaping issues. Use `<<'EOF'` (quoted) to prevent variable expansion.
 
 ## Tips
 
