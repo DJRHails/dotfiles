@@ -4,14 +4,6 @@ Host chocolate
   RemoteForward 2224 localhost:2224
   RemoteForward 2225 localhost:2225
 
-Host shell
-  HostName shell3.doc.ic.ac.uk
-  User djh17
-
-Host lab
-  ProxyCommand ssh -q shell nc -q0 gpu03.doc.ic.ac.uk 22
-  User djh17
-
 Host *.trycloudflare.com
 	HostName %h
 	User root
