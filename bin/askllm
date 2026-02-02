@@ -68,7 +68,8 @@ source "$DOTFILES/modules/askllm/.venv/bin/activate"
 # which is set in the .bashrc file.
 
 cd "$DOTFILES/modules/askllm"
-python3 -m askllm "$@"
+# Run with unbuffered output for real-time streaming
+PYTHONUNBUFFERED=1 python3 -u -m askllm "$@"
 
 # Deactivate the venv
 deactivate

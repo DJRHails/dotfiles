@@ -6,3 +6,5 @@ for i in ${fpath[@]}; do
         fpath=(${fpath[@]#$i})
     fi
 done
+
+. "$HOME/.cargo/env"
