@@ -69,17 +69,11 @@ link::file () {
 }
 
 link::extract_and_link() {
-  declare -A links
   local sep=' -> '
-  while read line
+  while read -r line || [[ -n "$line" ]]
   do
-    src=${line%%$sep*}
-    dst=${line#*$sep}
-    links[$src]=$dst
-  done < $1
-
-  for src in ${!links[*]}
-  do
-    link::file "$(dirname $1)/$src" "${links[$src]/#\~/$HOME}"
-  done
+    local src=${line%%$sep*}
+    local dst=${line#*$sep}
+    link::file "$(dirname "$1")/$src" "${dst/#\~/$HOME}"
+  done < "$1"
 }
