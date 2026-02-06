@@ -1,0 +1,5 @@
+# State files (tracks active pods)
+.state/
+
+# Local config (has API keys and account-specific IDs)
+config.sh
