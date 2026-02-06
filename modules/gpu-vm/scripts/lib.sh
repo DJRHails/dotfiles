@@ -22,7 +22,7 @@ runpod_gql() {
     check_api_key || return 1
     curl -s -X POST "https://api.runpod.io/graphql" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+        -H "api-key: ${RUNPOD_API_KEY}" \
         -d "{\"query\": \"$query\"}"
 }
 

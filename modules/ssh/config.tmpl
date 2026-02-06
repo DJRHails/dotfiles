@@ -12,49 +12,49 @@ Host *.trycloudflare.com
 
 # GPU VMs via bonbon relay (on-demand RunPod pods)
 Host gpu
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh 4090
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh 4090'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-4090
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh 4090
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh 4090'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-3090
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh 3090
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh 3090'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-a40
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh a40
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh a40'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-a100
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh a100
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh a100'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-h100
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh h100
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh h100'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 
 Host gpu-b200
-  ProxyCommand ssh -q bonbon ~/.files/modules/gpu-vm/scripts/connect.sh b200
+  ProxyCommand ssh -q bonbon '$HOME/.files/modules/gpu-vm/scripts/connect.sh b200'
   User root
   IdentityFile ~/.ssh/id_ed25519_runpod
   StrictHostKeyChecking no
