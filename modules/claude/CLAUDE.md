@@ -39,3 +39,7 @@ mdstruct auto path/to/file            # splits .md file or joins folder
 - Creates a README.md with the top-level content
 - Original file is backed up to `/tmp/mdstruct/`
 - **Parallel sub-agents**: Split a file, spawn sub-agents to work on individual sections concurrently, then join back
+
+## Git Hygiene
+
+- **Always gitignore `.claude/settings.local.json`** - If you see this file in `git status` or `git diff`, add it to `.gitignore` before committing. This file contains local Claude Code permissions and should never be tracked.

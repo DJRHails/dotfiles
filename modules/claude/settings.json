@@ -1,45 +1,31 @@
 {
-    "$schema": "https://json.schemastore.org/claude-code-settings.json",
-    "model": "opus",
-    "attribution": {
-        "commit": "",
-        "pr": ""
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "defaultMode": "acceptEdits",
+  "mcpServers": {
+    "playwriter": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "playwriter"
+      ]
     },
-    "defaultMode": "acceptEdits",
-    "hooks": {
-        "PreToolUse": [
-            {
-                "matcher": "Bash",
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "\"$HOME/.files/modules/claude/hooks/check-encryption.sh\"",
-                        "timeout": 30
-                    }
-                ]
-            }
-        ]
+    "figma-dev-mode-mcp-server": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
     },
-    "mcpServers": {
-        "playwriter": {
-            "type": "stdio",
-            "command": "npx",
-            "args": [
-                "playwriter"
-            ]
-        },
-        "figma-dev-mode-mcp-server": {
-            "type": "http",
-            "url": "https://mcp.figma.com/mcp"
-        },
-        "context7": {
-            "type": "stdio",
-            "command": "npx",
-            "args": [
-                "-y",
-                "@upstash/context7-mcp"
-            ],
-            "env": {}
-        }
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {}
     }
+  },
+  "model": "opus"
 }
