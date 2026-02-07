@@ -7,6 +7,9 @@ source "${SCRIPT_DIR}/config.sh"
 # Ensure state directory exists
 mkdir -p "$STATE_DIR"
 
+# REST API base URL
+RUNPOD_API_URL="https://rest.runpod.io/v1"
+
 # Check if API key is set
 check_api_key() {
     if [ -z "$RUNPOD_API_KEY" ]; then
@@ -16,31 +19,40 @@ check_api_key() {
     fi
 }
 
-# Execute a GraphQL query against the RunPod API
-runpod_gql() {
-    local query="$1"
+# Execute a REST API call
+runpod_api() {
+    local method="$1"
+    local endpoint="$2"
+    local data="$3"
     check_api_key || return 1
-    curl -s -X POST "https://api.runpod.io/graphql" \
-        -H "Content-Type: application/json" \
-        -H "api-key: ${RUNPOD_API_KEY}" \
-        -d "{\"query\": \"$query\"}"
+
+    if [ -n "$data" ]; then
+        curl -s -X "$method" "${RUNPOD_API_URL}${endpoint}" \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$data"
+    else
+        curl -s -X "$method" "${RUNPOD_API_URL}${endpoint}" \
+            -H "Authorization: Bearer ${RUNPOD_API_KEY}"
+    fi
 }
 
 # Get pod status and connection info
 get_pod_status() {
     local pod_id="$1"
-    runpod_gql "{ pod(input: {podId: \\\"${pod_id}\\\"}) { id desiredStatus runtime { ports { ip isIpPublic privatePort publicPort type } } } }" \
-        | jq -r '.data.pod'
+    runpod_api GET "/pods/${pod_id}"
 }
 
 # Get SSH connection details (ip:port)
 get_pod_ssh() {
     local pod_id="$1"
     get_pod_status "$pod_id" | jq -r '
-        .runtime.ports[]?
-        | select(.privatePort == 22 and .isIpPublic == true)
-        | "\(.ip):\(.publicPort)"
-    ' 2>/dev/null | head -1
+        if .publicIp and .portMappings["22"] then
+            "\(.publicIp):\(.portMappings["22"])"
+        else
+            empty
+        end
+    ' 2>/dev/null
 }
 
 # Create a new pod with the specified GPU type
@@ -56,15 +68,33 @@ create_pod() {
 
     local name="gpu-${gpu}-$(date +%s)"
 
-    # Create pod with network volume
+    # Create pod with SSH support using REST API
+    # Note: Network volume locks to US-TX-3 which is often congested, so we skip it
+    local pub_key
+    pub_key=$(cat ~/.ssh/id_ed25519_runpod.pub 2>/dev/null || echo '')
+
     local result
-    result=$(runpod_gql "mutation { podFindAndDeployOnDemand(input: { name: \\\"${name}\\\", templateId: \\\"${TEMPLATE_ID}\\\", gpuTypeId: \\\"${gpu_type}\\\", volumeInGb: 0, containerDiskInGb: 20, networkVolumeId: \\\"${NETWORK_VOLUME_ID}\\\", gpuCount: 1, minVcpuCount: 4, minMemoryInGb: 16 }) { id } }")
+    result=$(runpod_api POST "/pods" "{
+        \"name\": \"${name}\",
+        \"imageName\": \"runpod/pytorch:2.2.0-py3.10-cuda12.1.1-devel-ubuntu22.04\",
+        \"gpuTypeIds\": [\"${gpu_type}\"],
+        \"containerDiskInGb\": 50,
+        \"volumeInGb\": 50,
+        \"gpuCount\": 1,
+        \"supportPublicIp\": true,
+        \"ports\": [\"22/tcp\"],
+        \"env\": {
+            \"PUBLIC_KEY\": \"${pub_key}\"
+        }
+    }")
 
     local pod_id
-    pod_id=$(echo "$result" | jq -r '.data.podFindAndDeployOnDemand.id // empty')
+    pod_id=$(echo "$result" | jq -r '.id // empty')
 
     if [ -z "$pod_id" ]; then
-        echo "[gpu-vm] Failed to create pod: $(echo "$result" | jq -r '.errors[0].message // "Unknown error"')" >&2
+        local error_msg
+        error_msg=$(echo "$result" | jq -r '.error // "Unknown error"')
+        echo "[gpu-vm] Failed to create pod: ${error_msg}" >&2
         return 1
     fi
 
@@ -74,7 +104,7 @@ create_pod() {
 # Terminate a pod
 terminate_pod() {
     local pod_id="$1"
-    runpod_gql "mutation { podTerminate(input: {podId: \\\"${pod_id}\\\"}) }"
+    runpod_api DELETE "/pods/${pod_id}"
 }
 
 # Get the active pod for a GPU type (if any)
@@ -159,8 +189,8 @@ get_or_create_pod() {
             # Verify SSH is actually responding
             if ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
                    -i ~/.ssh/id_ed25519_runpod -p "$port" "root@${ip}" true 2>/dev/null; then
-                echo "$ip $port"
                 echo "[gpu-vm] Pod ready in ${elapsed}s" >&2
+                echo "$ip $port"
                 return 0
             fi
         fi
