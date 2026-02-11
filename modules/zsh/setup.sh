@@ -12,13 +12,11 @@ setup_zshrc () {
     local project_dir="$HOME/projects"
     local sites_dir="$HOME/sites"
 
-    if [ "$skipQuestions" != true ]; then
-      feedback::ask " - Where are you going to store your projects? ($project_dir)"
-      [[ -n "$(feedback::get_answer)" ]] && project_dir="$(feedback::get_answer)"
+    feedback::ask " - Where are you going to store your projects?" "$project_dir"
+    project_dir="$(feedback::get_answer)"
 
-      feedback::ask " - Where are you going to store your sites? ($sites_dir)"
-      [[ -n "$(feedback::get_answer)" ]] && sites_dir="$(feedback::get_answer)"
-    fi
+    feedback::ask " - Where are you going to store your sites?" "$sites_dir"
+    sites_dir="$(feedback::get_answer)"
 
     sed -e "s+PROJECT_ROOT+$project_dir+g;s+SITES_ROOT+$sites_dir+g" \
       $LOCAL_ZSHRC.tmpl > $LOCAL_ZSHRC
