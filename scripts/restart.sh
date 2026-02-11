@@ -12,7 +12,7 @@ main() {
     printf "\n"
 
     if feedback::answer_is_yes; then
-        sudo shutdown -r now &> /dev/null
+        platform::sudo shutdown -r now &> /dev/null
     fi
 
  }

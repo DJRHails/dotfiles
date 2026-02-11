@@ -121,7 +121,7 @@ platform::relink() {
   local readonly original_path="$(which $1)"
   local readonly new_path="$(dirname "$original_path")/$2"
 
-  sudo ln -fsn "$original_path" "$new_path"
+  platform::sudo ln -fsn "$original_path" "$new_path"
   #        |||
   #override┘||
   #symbolic-┘|
@@ -176,7 +176,15 @@ platform::main_package_manager() {
   fi
 }
 
-platform::package_manager_prefix() {
+platform::sudo() {
+  if [ "$EUID" -ne 0 ]; then
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
+platform::sudo_prefix() {
   if platform::is_linux; then
     if [ "$EUID" -ne 0 ]; then
       echo "sudo "

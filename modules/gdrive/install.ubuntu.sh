@@ -1,6 +1,6 @@
 . "$DOTFILES/scripts/core/main.sh"
 
-sudo add-apt-repository ppa:alessandro-strada/ppa
+platform::sudo add-apt-repository ppa:alessandro-strada/ppa
 install::package "Google Drive OcamlFuse" "google-drive-ocamlfuse"
 
 # Setup auth token

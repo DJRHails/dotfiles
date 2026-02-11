@@ -13,13 +13,13 @@ ZSH_SHELL_LOC=$(which zsh)
 # http://www.linuxfromscratch.org/blfs/view/7.4/postlfs/etcshells.html
 if ! grep "$ZSH_SHELL_LOC" < /etc/shells &> /dev/null; then
     log::execute \
-        "printf '%s\n' '$ZSH_SHELL_LOC' | sudo tee -a /etc/shells" \
+        "printf '%s\n' '$ZSH_SHELL_LOC' | $(platform::sudo_prefix)tee -a /etc/shells" \
         "ZSH (add '$ZSH_SHELL_LOC' in '/etc/shells')"
 fi
 
 if [ "$SHELL" != "$ZSH_SHELL_LOC" ]
 then
-  sudo chsh -s "$ZSH_SHELL_LOC" "$(whoami)" 2>/dev/null \
+  platform::sudo chsh -s "$ZSH_SHELL_LOC" "$(whoami)" 2>/dev/null \
     || chsh -s "$ZSH_SHELL_LOC" 2>/dev/null
   log::result $? "ZSH (use installed version)"
 fi
