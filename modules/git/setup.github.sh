@@ -88,10 +88,10 @@ github::set_ssh_key() {
 }
 
 github::get_gpg_key_id() {
-  gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG \
+  gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG 2>/dev/null \
     | grep git-auto -B 2 \
     | grep sec \
-    | perl -nle 'print && while m{(?<=/)[A-Z0-9]{16}}g')"
+    | perl -nle 'print $1 while m{/([A-Z0-9]{16})}g')"
 }
 
 github::set_gpg_key() {

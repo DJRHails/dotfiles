@@ -33,6 +33,7 @@ parse_args() {
             allModules=true
           ;;
           -c|--cli)
+            skipQuestions=true
             scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/claude")
           ;;
           *)
