@@ -105,6 +105,11 @@ main() {
 
   platform::ask_for_sudo
 
+  # Refresh package cache on Linux (stale on containers like RunPod)
+  if platform::is_linux && platform::command_exists apt; then
+    platform::sudo apt update -qq
+  fi
+
   for idx in "${!scanned_valid_modules[@]}"
   do
     local module_dir="${scanned_valid_modules[$idx]}"
