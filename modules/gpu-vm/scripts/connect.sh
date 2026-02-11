@@ -28,4 +28,4 @@ if [ -z "$IP" ] || [ -z "$PORT" ]; then
 fi
 
 # Proxy the SSH connection via netcat
-exec nc -w 10 "$IP" "$PORT"
+exec nc "$IP" "$PORT"
