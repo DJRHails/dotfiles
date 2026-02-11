@@ -1,6 +1,6 @@
 ---
 name: interactive-cli
-description: Control interactive CLI processes (pdb, repl, etc.) across multiple turns using tmux. Use when debugging with pdb, running a REPL, or any interactive terminal program.
+description: Control interactive CLI processes across multiple turns using tmux. Use when a command requires interactive input (y/n prompts, confirmations, menu selection, pdb, REPL, etc.) — any program that reads from stdin and cannot be run non-interactively. If a command fails with EOFError or hangs waiting for input, use this skill.
 argument-hint: <command>
 allowed-tools:
   - Bash(tmux *)

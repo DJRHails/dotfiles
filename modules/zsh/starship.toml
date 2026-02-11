@@ -1,3 +1,5 @@
+command_timeout = 500
+
 [character]
 success_symbol = "[Δ](bold green)"
 error_symbol = "[Δ](bold red)"
