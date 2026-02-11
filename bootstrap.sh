@@ -36,7 +36,11 @@ parse_args() {
             scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/claude")
           ;;
           *)
-            scanned_valid_modules+=("$DOTFILES/modules/$1")
+            if [ -d "$DOTFILES/modules/$1" ]; then
+              scanned_valid_modules+=("$DOTFILES/modules/$1")
+            else
+              echo "[bootstrap] Warning: module '$1' not found in $DOTFILES/modules/" >&2
+            fi
           ;;
         esac
         shift

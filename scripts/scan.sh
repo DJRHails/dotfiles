@@ -34,9 +34,9 @@ scan::find_valid_modules() {
     return
   fi
 
-  if [ "$skipQuestions" = true ]
+  if [ "$skipQuestions" = true ] || [ ${#scanned_valid_modules[@]} -gt 0 ]
   then
-    # Here we don't add anything, as modules wanted are already set.
+    # Modules already specified via args (--cli, explicit list, etc.)
     return
   fi
 
