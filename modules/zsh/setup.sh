@@ -9,7 +9,7 @@ setup_zshrc () {
   local LOCAL_ZSHRC=modules/zsh/zshrc.local
   if ! [ -f $LOCAL_ZSHRC ]
   then
-    local project_dir="$HOME/projects"
+    local project_dir="$( [ -d /workspace ] && echo /workspace || echo "$HOME/projects" )"
     local sites_dir="$HOME/sites"
 
     feedback::ask " - Where are you going to store your projects?" "$project_dir"
