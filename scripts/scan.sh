@@ -30,7 +30,7 @@ scan::find_valid_modules() {
   if [ "$allModules" = true ]
   then
     scan::find_modules
-    scanned_valid_modules = scanned_modules
+    scanned_valid_modules=("${scanned_modules[@]}")
     return
   fi
 

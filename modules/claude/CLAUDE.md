@@ -4,11 +4,11 @@
 
 ## Project Organisation
 
-- **Use Go-style folder structure for repositories in ~/projects**
-- Organise repositories using the pattern: `~/projects/domain.com/organisation/repository`
+- **Use Go-style folder structure for repositories in $PROJECTS/**
+- Organise repositories using the pattern: `$PROJECTS/domain.com/organisation/repository`
 - Examples:
-  - `~/projects/github.com/TypeCellOS/BlockNote`
-  - `~/projects/registry.tiptap.dev/@tiptap-pro/extension-ai`
+  - `$PROJECTS/github.com/TypeCellOS/BlockNote`
+  - `$PROJECTS/registry.tiptap.dev/@tiptap-pro/extension-ai`
 
 ## Session Insights & Memory
 

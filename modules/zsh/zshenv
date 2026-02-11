@@ -1,5 +1,8 @@
 skip_global_compinit=1
 
+# Ensure ~/.local/bin is on PATH (sheldon, starship, etc.)
+[[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
+
 # Remove fpath elements with .files in, this will be loaded selectively later
 for i in ${fpath[@]}; do
     if [[ $i =~ $HOME/.files* ]]; then
@@ -7,4 +10,4 @@ for i in ${fpath[@]}; do
     fi
 done
 
-. "$HOME/.cargo/env"
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"

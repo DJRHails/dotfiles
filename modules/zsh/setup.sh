@@ -9,18 +9,21 @@ setup_zshrc () {
   local LOCAL_ZSHRC=modules/zsh/zshrc.local
   if ! [ -f $LOCAL_ZSHRC ]
   then
-    feedback::ask " - Where are you going to store your projects? ($HOME/projects)"
-    local project_dir="$(feedback::get_answer)"
-    project_dir=${project_dir:-"$HOME/projects"}
+    local project_dir="$HOME/projects"
+    local sites_dir="$HOME/sites"
 
-    feedback::ask " - Where are you going to store your sites? ($HOME/sites)"
-    local sites_dir="$(feedback::get_answer)"
-    sites_dir=${sites_dir:-"$HOME/sites"}
+    if [ "$skipQuestions" != true ]; then
+      feedback::ask " - Where are you going to store your projects? ($project_dir)"
+      [[ -n "$(feedback::get_answer)" ]] && project_dir="$(feedback::get_answer)"
+
+      feedback::ask " - Where are you going to store your sites? ($sites_dir)"
+      [[ -n "$(feedback::get_answer)" ]] && sites_dir="$(feedback::get_answer)"
+    fi
 
     sed -e "s+PROJECT_ROOT+$project_dir+g;s+SITES_ROOT+$sites_dir+g" \
       $LOCAL_ZSHRC.tmpl > $LOCAL_ZSHRC
 
-    log::result $? 'generated modules/zsh/zshrc'
+    log::result $? 'generated modules/zsh/zshrc.local'
   fi
 }
 

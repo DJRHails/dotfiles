@@ -3,6 +3,11 @@
 main() {
     log::header "Restart\n"
 
+    if [ "$skipQuestions" = true ]; then
+        log::success "skipped restart (non-interactive mode)"
+        return
+    fi
+
     feedback::ask_for_confirmation "Do you want to restart?"
     printf "\n"
 

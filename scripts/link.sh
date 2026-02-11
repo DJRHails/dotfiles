@@ -63,6 +63,7 @@ link::file () {
 
   if [ "$skip" != "true" ]  # "false" or empty
   then
+    mkdir -p "$(dirname "$2")"
     ln -s "$1" "$2"
     log::success "linked $1 to $2"
   fi
