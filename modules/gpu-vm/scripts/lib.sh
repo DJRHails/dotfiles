@@ -186,9 +186,8 @@ get_or_create_pod() {
             local ip port
             ip=$(echo "$ssh_addr" | cut -d: -f1)
             port=$(echo "$ssh_addr" | cut -d: -f2)
-            # Verify SSH is actually responding
-            if ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-                   -i ~/.ssh/id_ed25519_runpod -p "$port" "root@${ip}" true 2>/dev/null; then
+            # Verify SSH banner is valid (not proxy/init noise)
+            if ssh-keyscan -p "$port" -T 3 "$ip" 2>/dev/null | grep -q ssh; then
                 echo "[gpu-vm] Pod ready in ${elapsed}s" >&2
                 echo "$ip $port"
                 return 0
