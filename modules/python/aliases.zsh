@@ -71,5 +71,8 @@ function poetry() {
 }
 
 export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-(( $+commands[pyenv] )) && eval "$(pyenv init -)"
+if [[ -d $PYENV_ROOT ]]; then
+  [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+fi
