@@ -25,6 +25,9 @@ github::copy_public_key_to_clipboard () {
 
     else
         log::warning "Please copy the public key ($1) to clipboard"
+        printf "\n"
+        cat "$1"
+        printf "\n"
     fi
 
 }
