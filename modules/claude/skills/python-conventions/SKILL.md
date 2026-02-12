@@ -7,6 +7,14 @@ description: Python coding conventions and best practices. Apply when writing or
 
 Coding conventions for Python projects. Apply these when writing or reviewing Python code.
 
+## Toolchain
+
+- **Package Manager**: [uv](https://docs.astral.sh/uv/) for project setup, dependency management, and virtual environments
+- **Formatting**: [Ruff](https://docs.astral.sh/ruff/) for formatting and linting
+- **Type Checking**: [ty](https://github.com/astral-sh/ty) for type checking
+- **Testing**: [pytest](https://docs.pytest.org/) as the test runner
+- **Logging**: [Loguru](https://github.com/Delgan/loguru) for logging
+
 ## Core Principles
 
 1. **Correctness above all else** - Code must work reliably in production
@@ -83,7 +91,13 @@ for item_id in item_ids:
 - **Protocols**: Preferred over ABCs for interface definitions
 - **TypedDict**: Use when dictionary keys are known and static
 - **BaseModel (Pydantic)**: Use for external API data
-- **Dataclass**: Use sparingly for internal structures
+- **Dataclass**: Use sparingly for internal structures; prefer `kw_only=True` and `frozen=True` when appropriate:
+  ```python
+  @dataclass(kw_only=True, frozen=True)
+  class Config:
+      host: str
+      port: int = 8080
+  ```
 
 ## Code Structure
 
@@ -244,6 +258,7 @@ from myproject.models import MyModel
 
 ## Testing Conventions
 
+- **Runner**: pytest
 - **Parametrized Tests**: Heavy use of `@pytest.mark.parametrize`
 - **Test Organization**: Tests mirror source structure in `tests/` directories
 - **Fixtures**: Defined in `conftest.py` files at appropriate levels
