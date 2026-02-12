@@ -29,11 +29,14 @@ setup_gitconfig () {
 . "$DOTFILES/modules/git/setup.github.sh"
 setup_gitconfig
 
+install::package "Git LFS" "git-lfs"
+install::package "Transcrypt" "transcrypt"
+install::package "Github CLI" "gh"
+
 if [ "$skipQuestions" != true ]; then
   feedback::ask_for_confirmation "Do you want to setup github?"
   if feedback::answer_is_yes
   then
-    install::package "Github CLI" "gh"
     install::package "GPG" "gpg"
     github::setup
   fi
