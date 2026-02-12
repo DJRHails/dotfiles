@@ -1,5 +1,13 @@
 . "$DOTFILES/scripts/core/main.sh"
 install::package "Python (3)" "python3"
+
+if ! cmd_exists uv; then
+  log::info "Installing uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  log::result $? "uv installed"
+else
+  log::success "uv already installed"
+fi
 install::with "pip3" "setuptools (upgrade latest)" "setuptools" "--upgrade"
 install::with "pip3" "pip (upgrade latest)" "pip" "--upgrade"
 
