@@ -18,3 +18,8 @@ install::with "pip3" "Package (matplotlib)" "matplotlib" "--user"
 install::with "pip3" "Package (ipython)" "ipython" "--user"
 install::with "pip3" "Package (jupyter)" "jupyter" "--user"
 install::with "pip3" "Package (pandas)" "pandas" "--user"
+
+# UV tools
+install::with "uv tool" "ruff" "ruff" ""
+install::with "uv tool" "ty" "ty" ""
+install::with "uv tool" "pip-audit" "pip-audit" ""

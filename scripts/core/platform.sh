@@ -157,6 +157,19 @@ platform::screenshot() {
 }
 
 
+platform::notify() {
+  local title="${1:-Notification}"
+  local message="${2:-}"
+
+  if platform::is_osx; then
+    osascript -e "display notification \"$message\" with title \"$title\""
+  elif platform::command_exists "notify-send"; then
+    notify-send "$title" "$message"
+  else
+    log::warning "$title: $message"
+  fi
+}
+
 platform::main_package_manager() {
   if platform::is_osx; then
     echo "brew"
