@@ -1,5 +1,2 @@
 # Local settings may contain sensitive permissions
 settings.local.json
-
-# Global config contains user-specific state and sensitive data
-claude.json

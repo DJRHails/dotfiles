@@ -19,14 +19,4 @@ fi
 # Ensure .claude directory exists (symlinks will populate it)
 mkdir -p ~/.claude
 
-# Copy global config template if local copy doesn't exist
-local_claude_config="$module_dir/claude.json"
-if [ ! -f "$local_claude_config" ]; then
-  log::info "Creating $local_claude_config from template..."
-  cp "$module_dir/claude.json.tmpl" "$local_claude_config"
-  log::result $? "Created $local_claude_config"
-else
-  log::success "Local config already exists: $local_claude_config"
-fi
-
 log::success "Claude Code setup complete"
