@@ -78,6 +78,8 @@ Prefer `ast-grep` over ripgrep when searching for code structure (function calls
 
 **Always use uv, ruff, and ty** over pip/poetry, black/pylint/flake8, and mypy/pyright. Supply chain: `pip-audit` before deploying, pin exact versions (`==` not `>=`) with `uv pip install --require-hashes`.
 
+**IDs:** Prefer UUIDv7 for primary keys. Expose prefixed Base62 IDs in APIs (`usr_...`, `thrd_...`), not raw UUIDs.
+
 ### Node/TypeScript
 
 **Runtime:** Node 22 LTS, ESM only (`"type": "module"`)

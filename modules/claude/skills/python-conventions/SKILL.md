@@ -347,6 +347,8 @@ def get_status(item: Item) -> Status:
 - **Nullable Datetimes over Booleans**: Prefer `deleted_at: datetime | None` over `is_deleted: bool` in database schemas - you get both the flag and the timestamp
 - **UTC Only**: All database datetime fields must be UTC
 - **Indexes**: Over-indexing is acceptable, missing indexes is unacceptable
+- **UUIDv7 Primary Keys**: Use UUIDv7 for all primary keys (time-ordered, better indexing than UUIDv4)
+- **Prefixed Public IDs**: Never expose raw UUIDs in APIs. Use `{entity}_{base62(uuid)}` format (e.g. `usr_2Jh5XQ...`, `thrd_7Km9...`). Implement as Pydantic `Annotated` types with `BeforeValidator` (deserialize) and `PlainSerializer` (serialize) so route handlers work with raw UUIDs internally while APIs always show prefixed IDs
 
 ## Performance Requirements
 
