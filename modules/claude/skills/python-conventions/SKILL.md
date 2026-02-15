@@ -1,19 +1,181 @@
 ---
 name: python-conventions
-description: Python coding conventions and best practices. Apply when writing or reviewing Python code. Covers type hints, code structure, async patterns, testing, naming, and error handling.
+description: Python coding conventions, modern tooling, and project setup. Apply when writing or reviewing Python code, creating projects, writing scripts, or migrating from legacy tools. Covers uv, ruff, ty, type hints, code structure, async, testing, and project configuration.
+source:
+  - https://github.com/trailofbits/skills/tree/main/plugins/modern-python
 ---
 
 # Python Conventions
 
-Coding conventions for Python projects. Apply these when writing or reviewing Python code.
+Coding conventions and modern tooling for Python projects. Apply when writing or reviewing Python code, setting up new projects, or migrating from legacy tools.
+
+## Decision Tree
+
+```
+What are you doing?
+|
++- Single-file script with dependencies?
+|   -> Use PEP 723 inline metadata (./references/pep723-scripts.md)
+|
++- New multi-file project (not distributed)?
+|   -> Minimal uv setup (see Project Setup below)
+|
++- New reusable package/library?
+|   -> Full project setup (see Project Setup below)
+|
++- Migrating existing project?
+|   -> See Migration Guide below
+|
++- Writing or reviewing code?
+    -> See conventions below
+```
 
 ## Toolchain
 
-- **Package Manager**: [uv](https://docs.astral.sh/uv/) for project setup, dependency management, and virtual environments
-- **Formatting**: [Ruff](https://docs.astral.sh/ruff/) for formatting and linting
-- **Type Checking**: [ty](https://github.com/astral-sh/ty) for type checking
-- **Testing**: [pytest](https://docs.pytest.org/) as the test runner
-- **Logging**: [Loguru](https://github.com/Delgan/loguru) for logging
+| Tool | Purpose | Replaces |
+|------|---------|----------|
+| [uv](https://docs.astral.sh/uv/) | Package/dependency management | pip, virtualenv, pip-tools, pipx, pyenv |
+| [ruff](https://docs.astral.sh/ruff/) | Linting and formatting | flake8, black, isort, pyupgrade, pydocstyle |
+| [ty](https://github.com/astral-sh/ty) | Type checking | mypy, pyright |
+| [pytest](https://docs.pytest.org/) | Testing with coverage | unittest |
+| [prek](https://github.com/jdx/prek) | Pre-commit hooks | pre-commit (faster, Rust-native) |
+| `uv_build` | Build backend | hatchling, setuptools |
+| [Loguru](https://github.com/Delgan/loguru) | Logging | stdlib logging |
+
+### Security Tools
+
+| Tool | Purpose | When |
+|------|---------|------|
+| shellcheck | Shell script linting | pre-commit |
+| detect-secrets | Secret detection | pre-commit |
+| actionlint | Workflow syntax validation | pre-commit, CI |
+| zizmor | Workflow security audit | pre-commit, CI |
+| pip-audit | Dependency vulnerability scanning | CI, manual |
+| Dependabot | Automated dependency updates | scheduled |
+
+See [security-setup.md](./references/security-setup.md) for configuration.
+
+### Legacy Tool Migration
+
+| Avoid | Use Instead |
+|-------|-------------|
+| `pip install` / `pip freeze` | `uv add` / `uv export` |
+| `python -m venv` / `source .venv/bin/activate` | `uv sync` / `uv run <cmd>` |
+| `pipx install` | `uv tool install` |
+| `requirements.txt` | `pyproject.toml` (projects) or PEP 723 (scripts) |
+| `[project.optional-dependencies]` for dev tools | `[dependency-groups]` (PEP 735) |
+| `[tool.ty]` python-version | `[tool.ty.environment]` python-version |
+| `uv pip install` | `uv add` and `uv sync` |
+| Poetry | uv |
+| black / isort / flake8 / pylint | ruff |
+| mypy / pyright | ty |
+| pre-commit | prek |
+| hatchling | uv_build |
+
+**Key rules:**
+- Always use `uv add` / `uv remove` to manage dependencies — never edit pyproject.toml deps by hand
+- Never manually activate venvs — use `uv run` for all commands
+- Use `[dependency-groups]` for dev/test/docs deps, not `[project.optional-dependencies]`
+- Use `uv run --with <pkg>` for one-off commands needing packages not in your project
+
+## Project Setup
+
+### Minimal Project
+
+```bash
+uv init myproject && cd myproject
+uv add requests rich
+uv add --group dev pytest ruff ty
+uv run python src/myproject/main.py
+```
+
+### Full Package
+
+Bootstrap with the Trail of Bits template (preconfigured tooling):
+
+```bash
+uvx cookiecutter gh:trailofbits/cookiecutter-python
+```
+
+Or manually:
+
+```bash
+uv init --package myproject && cd myproject
+```
+
+Configure pyproject.toml (see [pyproject.md](./references/pyproject.md) for complete reference):
+
+```toml
+[project]
+name = "myproject"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [{include-group = "lint"}, {include-group = "test"}, {include-group = "audit"}]
+lint = ["ruff", "ty"]
+test = ["pytest", "pytest-cov"]
+audit = ["pip-audit"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D", "COM812", "ISC001"]
+
+[tool.pytest]
+addopts = ["--cov=myproject", "--cov-fail-under=80"]
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+unused-ignore-comment = "warn"
+```
+
+Install: `uv sync --all-groups`
+
+### Makefile
+
+```makefile
+.PHONY: dev lint format test build
+
+dev:
+	uv sync --all-groups
+
+lint:
+	uv run ruff format --check && uv run ruff check && uv run ty check src/
+
+format:
+	uv run ruff format .
+
+test:
+	uv run pytest
+
+build:
+	uv build
+```
+
+### uv Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `uv init` / `uv init --package` | Create project / distributable package |
+| `uv add <pkg>` / `uv add --group dev <pkg>` | Add dependency / dev dependency |
+| `uv remove <pkg>` | Remove dependency |
+| `uv sync` / `uv sync --all-groups` | Install deps / all groups |
+| `uv run <cmd>` | Run command in venv |
+| `uv run --with <pkg> <cmd>` | Run with temporary dependency |
+| `uv build` / `uv publish` | Build / publish package |
+
+See [uv-commands.md](./references/uv-commands.md) for complete reference.
 
 ## Core Principles
 
@@ -51,7 +213,7 @@ Don't extract when it's just:
 ### Example
 
 ```python
-# ❌ Over-abstracted - too many tiny functions
+# Over-abstracted - too many tiny functions
 def get_item_to_name_mapping():
     return {item.id: item.name for item in items}
 
@@ -63,7 +225,7 @@ def get_item_to_detail_mapping():
     detail_mapping = get_name_to_detail_mapping()
     return combine_mappings(name_mapping, detail_mapping)
 
-# ✅ Clear, flat approach
+# Clear, flat approach
 item_id_to_name = {item.id: item.name for item in items}
 name_to_detail = {name: detail for name, detail in name_details}
 
@@ -99,11 +261,32 @@ for item_id in item_ids:
       port: int = 8080
   ```
 
+## Project Structure
+
+- **`src/` layout** for packages: `src/myproject/` not `myproject/`
+- **`uv.lock` in git** for applications (reproducible deploys), `.gitignore` for libraries
+- **PEP 723** for standalone scripts with dependencies:
+  ```python
+  # /// script
+  # requires-python = ">=3.11"
+  # dependencies = ["requests>=2.28", "rich"]
+  # ///
+  ```
+  Run with `uv run script.py` — deps auto-installed, no project needed. See [pep723-scripts.md](./references/pep723-scripts.md).
+- **Dependency groups** (PEP 735) for dev tooling:
+  ```toml
+  [dependency-groups]
+  dev = [{include-group = "lint"}, {include-group = "test"}]
+  lint = ["ruff", "ty"]
+  test = ["pytest", "pytest-cov"]
+  ```
+- **Coverage enforcement**: `--cov-fail-under=80` in pytest config
+
 ## Code Structure
 
 - **Flat is Better**: Follow the "flat first" approach
 - **Function Parameters**: Force named parameters with `*` when >3 parameters
-- **Imports**: Order as standard library → third-party → local, separated by blank lines
+- **Imports**: Order as standard library -> third-party -> local, separated by blank lines
 - **Reduce Cyclomatic Complexity**: Minimize through guard clauses and early returns
 - **Linear Flow**: Keep related operations together instead of extracting tiny helpers
 
@@ -112,7 +295,7 @@ for item_id in item_ids:
 Prefer guard clauses with early returns over nested conditionals:
 
 ```python
-# ✅ Guard clauses reduce nesting and complexity
+# Guard clauses reduce nesting and complexity
 def process_item(item: Item | None) -> Result:
     if not item:
         return Result.empty()
@@ -126,26 +309,11 @@ def process_item(item: Item | None) -> Result:
 
     # Main logic at base indentation level
     return execute(item)
-
-# ❌ Nested conditionals increase complexity
-def process_item(item: Item | None) -> Result:
-    if item:
-        if item.is_active:
-            if item.data:
-                return execute(item)
-            else:
-                raise ValueError(f"Item {item.id} has no data")
-        else:
-            logger.warning(f"Item {item.id} is not active")
-            return Result.skipped()
-    else:
-        return Result.empty()
 ```
 
 Use `continue` for guard clauses in loops:
 
 ```python
-# ✅ Guards with continue
 for contact in contacts:
     if not contact.email:
         continue
@@ -156,10 +324,9 @@ for contact in contacts:
 
 ### Avoid Long If-Else Blocks
 
-When `if` and `else` are separated by many lines, it becomes hard to understand what condition triggers the `else`. Use guards and let the end of the function be the implicit "else":
+Use guards and let the end of the function be the implicit "else":
 
 ```python
-# ✅ Guards handle edge cases, default case falls through
 def get_status(item: Item) -> Status:
     if item.is_cancelled:
         return Status.CANCELLED
@@ -168,17 +335,6 @@ def get_status(item: Item) -> Status:
     if not item.started_at:
         return Status.PENDING
     return Status.IN_PROGRESS
-
-# ❌ else is far from if, hard to follow
-def get_status(item: Item) -> Status:
-    if item.is_cancelled:
-        return Status.CANCELLED
-    elif item.is_completed:
-        return Status.COMPLETED
-    elif not item.started_at:
-        return Status.PENDING
-    else:
-        return Status.IN_PROGRESS
 ```
 
 ## Database Patterns
@@ -258,25 +414,25 @@ from myproject.models import MyModel
 
 ## Testing Conventions
 
-- **Runner**: pytest
+- **Runner**: pytest (see [testing.md](./references/testing.md))
 - **Parametrized Tests**: Heavy use of `@pytest.mark.parametrize`
 - **Test Organization**: Tests mirror source structure in `tests/` directories
 - **Fixtures**: Defined in `conftest.py` files at appropriate levels
 - **Async Tests**: Use `pytest-asyncio` for async test functions
 - **No Mock Theater**: Don't test interactions between mocked objects - test real behavior
 - **Test Naming**: `test_{function_name}_{scenario}` pattern
-- **Test Structure**: Unit tests (no DB) → Integration tests (mocked deps) → E2E tests
+- **Test Structure**: Unit tests (no DB) -> Integration tests (mocked deps) -> E2E tests
 
 ### Factory Pattern with Relationships
 
 When using `factory_boy` with `SubFactory` relationships, always pass the relationship object, not the ID:
 
 ```python
-# ❌ Wrong - LazyAttribute will override the ID
+# Wrong - LazyAttribute will override the ID
 parent = ParentFactory.create()
 child = ChildFactory.create(parent_id=parent.id)
 
-# ✅ Correct - Pass the object itself
+# Correct - Pass the object itself
 parent = ParentFactory.create()
 child = ChildFactory.create(parent=parent)
 ```
@@ -296,6 +452,45 @@ class Settings(BaseSettings):
     )
 ```
 
+## Migration Guide
+
+When migrating from legacy tooling, see [migration-checklist.md](./references/migration-checklist.md) for comprehensive steps.
+
+### From requirements.txt + pip
+
+**For standalone scripts**: Convert to PEP 723 inline metadata (see [pep723-scripts.md](./references/pep723-scripts.md))
+
+**For projects**:
+```bash
+uv init --bare
+# Add each dependency with uv (not by editing pyproject.toml)
+uv add requests rich
+uv sync
+```
+
+Then delete `requirements.txt`, `requirements-dev.txt`, and old virtualenvs.
+
+### From setup.py / setup.cfg
+
+1. `uv init --bare` to create pyproject.toml
+2. `uv add` each dependency from `install_requires`
+3. `uv add --group dev` for dev dependencies
+4. Copy non-dependency metadata to `[project]`
+5. Delete `setup.py`, `setup.cfg`, `MANIFEST.in`
+
+### From flake8 + black + isort
+
+1. Remove old tools, add ruff: `uv add --group dev ruff`
+2. Delete `.flake8`, `[tool.black]`, `[tool.isort]` configs
+3. Add ruff configuration (see [ruff-config.md](./references/ruff-config.md))
+4. Run `uv run ruff check --fix . && uv run ruff format .`
+
+### From mypy / pyright
+
+1. Remove old tools, add ty: `uv add --group dev ty`
+2. Delete `mypy.ini`, `pyrightconfig.json`, or `[tool.mypy]`/`[tool.pyright]` sections
+3. Run `uv run ty check src/`
+
 ## Anti-Patterns to Avoid
 
 - **Over-Abstraction**: Don't create tiny functions for simple operations
@@ -311,8 +506,22 @@ class Settings(BaseSettings):
 - **Docstring Overuse**: Let types and names document the code
 - **Race Conditions**: Ensure atomic operations for critical data
 - **Inconsistent Async/Sync**: Don't mark functions `async` unless they `await`
+- **Manual virtualenv activation**: Use `uv run` instead
+- **Editing pyproject.toml deps by hand**: Use `uv add` / `uv remove`
 
 ## Shared Code
 
 - **Threshold**: Extract to shared modules after 3 usages
 - **Location**: Use a `shared/` or `common/` directory for cross-module utilities
+
+## Reference Docs
+
+- [pyproject.md](./references/pyproject.md) - Complete pyproject.toml reference
+- [uv-commands.md](./references/uv-commands.md) - uv command reference
+- [ruff-config.md](./references/ruff-config.md) - Ruff linting/formatting configuration
+- [testing.md](./references/testing.md) - pytest and coverage setup
+- [pep723-scripts.md](./references/pep723-scripts.md) - PEP 723 inline script metadata
+- [prek.md](./references/prek.md) - Fast pre-commit hooks with prek
+- [security-setup.md](./references/security-setup.md) - Security hooks and dependency scanning
+- [dependabot.md](./references/dependabot.md) - Automated dependency updates
+- [migration-checklist.md](./references/migration-checklist.md) - Step-by-step migration cleanup
