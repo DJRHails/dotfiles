@@ -70,10 +70,6 @@
                     },
                     {
                         "type": "command",
-                        "command": "bash ~/.files/modules/claude/hooks/block-push-main.sh"
-                    },
-                    {
-                        "type": "command",
                         "command": "bash ~/.files/modules/claude/hooks/enforce-package-manager.sh"
                     }
                 ]

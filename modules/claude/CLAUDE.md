@@ -133,6 +133,8 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 
 **Commits:** Imperative mood, ≤72 char subject line, one logical change per commit. Never push directly to main — use feature branches and PRs. Never commit secrets.
 
+**Merging:** Prefer squash merges to keep the main branch history linear and readable. Use `gh pr merge --squash`.
+
 ## Project Organisation
 
 - **Use Go-style folder structure for repositories in $PROJECTS/**
