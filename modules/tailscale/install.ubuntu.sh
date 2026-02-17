@@ -16,3 +16,9 @@ if ! grep -q "net.ipv4.ip_forward = 1" /etc/sysctl.d/99-tailscale.conf 2>/dev/nu
 else
   log::success "IP forwarding already configured"
 fi
+
+# Enable and start the tailscale daemon
+if platform::command_exists systemctl; then
+  platform::sudo systemctl enable --now tailscaled
+  log::result $? "tailscaled service started"
+fi

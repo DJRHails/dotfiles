@@ -1,6 +1,11 @@
 . "$DOTFILES/scripts/core/main.sh"
 
-install::cask "Tailscale" "tailscale"
+if [ -d "/Applications/Tailscale.app" ]; then
+  log::success "Tailscale"
+else
+  brew install --cask tailscale
+  log::result $? "Tailscale"
+fi
 
 # Enable IP forwarding for exit node capability
 if ! sysctl -n net.inet.ip.forwarding 2>/dev/null | grep -q "1"; then
@@ -11,4 +16,14 @@ if ! sysctl -n net.inet.ip.forwarding 2>/dev/null | grep -q "1"; then
   log::result $? "IP forwarding enabled for exit node"
 else
   log::success "IP forwarding already configured"
+fi
+
+# Launch Tailscale daemon
+if ! tailscale status &>/dev/null; then
+  open /Applications/Tailscale.app
+  log::info "Launched Tailscale.app, waiting for daemon..."
+  for i in $(seq 1 10); do
+    tailscale status &>/dev/null && break
+    sleep 1
+  done
 fi
