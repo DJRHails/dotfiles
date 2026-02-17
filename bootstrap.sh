@@ -95,12 +95,18 @@ main() {
   log::header "Verify OS verion\n"
   platform::is_supported && log::success "$os_name with v$os_version is valid"
   
-  # Verify Bash Version
+  # Platform-specific bootstrap (Homebrew, Bash upgrade, apt, etc.)
+  BOOTSTRAP_ARGS=("$@")
+  run "$DOTFILES/scripts" "bootstrap.$(platform::os).sh"
+
+  # Verify Bash 4+ (platform bootstrap should have installed it)
   log::header "Verify Bash Version\n"
-  [ "${BASH_VERSINFO:-0}" -ge 4 ] && log::success "$BASH_VERSINFO is supported (associative arrays required)"
-  # > macos is bad for this; 
-  # /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-  # brew install bash
+  if [ "${BASH_VERSINFO:-0}" -ge 4 ]; then
+    log::success "Bash ${BASH_VERSINFO} (associative arrays supported)"
+  else
+    log::error "Bash ${BASH_VERSINFO:-unknown} is too old (need 4+)"
+    exit 1
+  fi
 
   # Grab modules
   scan::find_valid_modules
@@ -108,11 +114,6 @@ main() {
   log::header "Installing $(log::bold "${#scanned_valid_modules[@]} modules")"
 
   platform::ask_for_sudo
-
-  # Refresh package cache on Linux (stale on containers like RunPod)
-  if platform::is_linux && platform::command_exists apt; then
-    platform::sudo apt update -qq
-  fi
 
   for idx in "${!scanned_valid_modules[@]}"
   do
