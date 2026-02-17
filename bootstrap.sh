@@ -120,10 +120,11 @@ main() {
     local module_dir="${scanned_valid_modules[$idx]}"
     if [[ ! -z $module_dir ]]; then
       log::header "$((idx+1)). Running '${module_dir##*/}'"
-      run "$module_dir" "setup.sh"
       create_links "$module_dir"
       run "$module_dir" "install.sh"
       run "$module_dir" "install.$(platform::os).sh"
+      run "$module_dir" "setup.sh"
+      run "$module_dir" "setup.$(platform::os).sh"
       if [[ ! -f "$module_dir/install.sh" && ! -f "$module_dir/install.$(platform::os).sh" ]]; then
         log::warning "No installer found for '${module_dir##*/}' on $(platform::os)"
       fi
