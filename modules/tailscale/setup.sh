@@ -1,5 +1,10 @@
 . "$DOTFILES/scripts/core/main.sh"
 
+if ! cmd_exists tailscale; then
+  log::warning "Tailscale not installed — skipping setup"
+  return 0
+fi
+
 # Ensure tailscale daemon is running
 if ! tailscale status &>/dev/null; then
   if platform::is_osx; then
