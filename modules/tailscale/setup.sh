@@ -3,7 +3,7 @@
 # Ensure tailscale daemon is running
 if ! tailscale status &>/dev/null; then
   if platform::is_osx; then
-    open -a Tailscale
+    open /Applications/Tailscale.app
     log::info "Launched Tailscale.app, waiting for daemon..."
     for i in $(seq 1 10); do
       tailscale status &>/dev/null && break
