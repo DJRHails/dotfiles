@@ -124,6 +124,9 @@ main() {
       create_links "$module_dir"
       run "$module_dir" "install.sh"
       run "$module_dir" "install.$(platform::os).sh"
+      if [[ ! -f "$module_dir/install.sh" && ! -f "$module_dir/install.$(platform::os).sh" ]]; then
+        log::warning "No installer found for '${module_dir##*/}' on $(platform::os)"
+      fi
       export ${module_dir##*/}=installed
     fi
   done
