@@ -3,14 +3,24 @@
 # Sourced by bootstrap.sh — runs BEFORE the Bash 4+ gate.
 # Must avoid Bash 4+ features (associative arrays, etc.)
 
-# Install Xcode Command Line Tools if missing
+# Install Xcode Command Line Tools if missing.
+# Avoid xcode-select --install which opens a GUI dialog and hangs
+# over SSH. Use softwareupdate for headless installs instead.
 if ! xcode-select -p &>/dev/null; then
   log::info "Installing Xcode Command Line Tools..."
-  xcode-select --install
-  log::info "Waiting for Xcode CLT installation to complete..."
-  until xcode-select -p &>/dev/null; do
-    sleep 5
-  done
+  touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+  CLT_LABEL=$(softwareupdate -l 2>/dev/null \
+    | grep -o 'Label: Command Line Tools.*' \
+    | head -1 \
+    | sed 's/^Label: //')
+  if [ -n "$CLT_LABEL" ]; then
+    softwareupdate -i "$CLT_LABEL"
+  else
+    log::warning "No CLT package found via softwareupdate, trying xcode-select"
+    xcode-select --install
+    until xcode-select -p &>/dev/null; do sleep 5; done
+  fi
+  rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
   log::success "Xcode Command Line Tools installed"
 else
   log::success "Xcode Command Line Tools already installed"
