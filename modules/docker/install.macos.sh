@@ -19,3 +19,18 @@ if ! command -v docker &>/dev/null; then
 else
   log::success "Docker CLI"
 fi
+
+# Ensure Docker Compose plugin is available
+# Docker Desktop bundles compose but only symlinks it on first launch.
+# If Docker Desktop hasn't been started, the plugin is missing.
+plugins_src="/Applications/Docker.app/Contents/Resources/cli-plugins"
+plugins_dst="$HOME/.docker/cli-plugins"
+if docker compose version &>/dev/null; then
+  log::success "Docker Compose"
+elif [ -f "$plugins_src/docker-compose" ]; then
+  mkdir -p "$plugins_dst"
+  ln -sf "$plugins_src/docker-compose" "$plugins_dst/docker-compose"
+  log::result $? "Docker Compose (symlinked)"
+else
+  log::warn "Docker Compose plugin not found"
+fi

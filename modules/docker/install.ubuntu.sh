@@ -17,7 +17,7 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | platform::sudo gpg --d
 
 platform::sudo apt-get update
 
-platform::sudo apt-get install docker-ce docker-ce-cli containerd.io
+platform::sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 platform::sudo groupadd docker
 platform::sudo usermod -aG docker $USER
