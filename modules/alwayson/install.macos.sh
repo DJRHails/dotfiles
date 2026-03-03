@@ -1,6 +1,6 @@
 . "$DOTFILES/scripts/core/main.sh"
 
-BACKUP_DIR="$DOTFILES/modules/always-on/.backup"
+BACKUP_DIR="$DOTFILES/modules/alwayson/.backup"
 
 # -- Backup existing settings ----------------------------------------------
 if [ ! -f "$BACKUP_DIR/pmset.txt" ]; then
@@ -36,12 +36,12 @@ log::result $? "Network always on"
 # -- Auto Recovery ---------------------------------------------------------
 platform::sudo pmset -a autorestart 1
 platform::sudo pmset -a panicrestart 30
-platform::sudo pmset repeat wakeorpoweron MTWRFSU 00:00:00
+platform::sudo pmset repeat wakeorpoweron MTWRFSU 00:00:00 2>/dev/null || true
 platform::sudo sysctl -w kern.watchdog=1 2>/dev/null || true
 log::result $? "Auto recovery"
 
 # -- Boot & Login ----------------------------------------------------------
-platform::sudo systemsetup -setremotelogin on
+platform::sudo systemsetup -setremotelogin on 2>&1 | grep -v "already" || true
 platform::sudo nvram AutoBoot=%03 2>/dev/null || true
 log::result $? "Boot & login"
 
