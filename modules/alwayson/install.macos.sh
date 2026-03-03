@@ -1,5 +1,22 @@
 . "$DOTFILES/scripts/core/main.sh"
 
+BACKUP_DIR="$DOTFILES/modules/always-on/.backup"
+
+# -- Backup existing settings ----------------------------------------------
+if [ ! -f "$BACKUP_DIR/pmset.txt" ]; then
+  mkdir -p "$BACKUP_DIR"
+  pmset -g custom > "$BACKUP_DIR/pmset.txt"
+  systemsetup -getremotelogin > "$BACKUP_DIR/systemsetup.txt" 2>/dev/null || true
+  nvram AutoBoot > "$BACKUP_DIR/nvram.txt" 2>/dev/null || true
+  sysctl kern.watchdog > "$BACKUP_DIR/sysctl.txt" 2>/dev/null || true
+  if [ -f /etc/ssh/sshd_config ]; then
+    cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config"
+  fi
+  log::result $? "Backed up existing settings to $BACKUP_DIR"
+else
+  log::success "Backup already exists at $BACKUP_DIR"
+fi
+
 # -- Prevent Sleep --------------------------------------------------------
 platform::sudo pmset -a sleep 0
 platform::sudo pmset -a disksleep 0
@@ -20,12 +37,12 @@ log::result $? "Network always on"
 platform::sudo pmset -a autorestart 1
 platform::sudo pmset -a panicrestart 30
 platform::sudo pmset repeat wakeorpoweron MTWRFSU 00:00:00
-platform::sudo sysctl -w kern.watchdog=1
+platform::sudo sysctl -w kern.watchdog=1 2>/dev/null || true
 log::result $? "Auto recovery"
 
 # -- Boot & Login ----------------------------------------------------------
 platform::sudo systemsetup -setremotelogin on
-platform::sudo nvram AutoBoot=%03
+platform::sudo nvram AutoBoot=%03 2>/dev/null || true
 log::result $? "Boot & login"
 
 # -- SSH Keep-Alive --------------------------------------------------------
