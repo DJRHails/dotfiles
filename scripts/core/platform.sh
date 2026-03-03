@@ -128,21 +128,22 @@ platform::relink() {
 }
 
 platform::ask_for_sudo() {
-  # Install `sudo` if it isn't available.
   platform::command_exists "sudo" || install::package "sudo"
 
-  sudo -v &> /dev/null
+  # Only prompt if credentials aren't already cached
+  if ! sudo -n true 2>/dev/null; then
+    sudo -v &>/dev/null
+  fi
 
-  # Update existing `sudo` time stamp
-  # until this script has finished.
-  #
-  # https://gist.github.com/cowboy/3118588
-
-  while true; do
+  # Keep credentials alive (one background process)
+  if [ -z "${_SUDO_KEEPALIVE_PID:-}" ] \
+    || ! kill -0 "$_SUDO_KEEPALIVE_PID" 2>/dev/null; then
+    (while kill -0 "$$" 2>/dev/null; do
       sudo -n true
       sleep 60
-      kill -0 "$$" || exit
-  done &> /dev/null &
+    done) &>/dev/null &
+    _SUDO_KEEPALIVE_PID=$!
+  fi
 }
 
 platform::screenshot() {

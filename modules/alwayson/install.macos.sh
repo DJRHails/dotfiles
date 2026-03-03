@@ -6,7 +6,7 @@ BACKUP_DIR="$DOTFILES/modules/alwayson/.backup"
 if [ ! -f "$BACKUP_DIR/pmset.txt" ]; then
   mkdir -p "$BACKUP_DIR"
   pmset -g custom > "$BACKUP_DIR/pmset.txt"
-  systemsetup -getremotelogin > "$BACKUP_DIR/systemsetup.txt" 2>/dev/null || true
+  launchctl print system/com.openssh.sshd > "$BACKUP_DIR/sshd-launchctl.txt" 2>/dev/null || true
   nvram AutoBoot > "$BACKUP_DIR/nvram.txt" 2>/dev/null || true
   sysctl kern.watchdog > "$BACKUP_DIR/sysctl.txt" 2>/dev/null || true
   if [ -f /etc/ssh/sshd_config ]; then
@@ -41,7 +41,8 @@ platform::sudo sysctl -w kern.watchdog=1 2>/dev/null || true
 log::result $? "Auto recovery"
 
 # -- Boot & Login ----------------------------------------------------------
-platform::sudo systemsetup -setremotelogin on 2>&1 | grep -v "already" || true
+platform::sudo launchctl enable system/com.openssh.sshd
+platform::sudo launchctl bootstrap system /System/Library/LaunchDaemons/ssh.plist 2>/dev/null || true
 platform::sudo nvram AutoBoot=%03 2>/dev/null || true
 log::result $? "Boot & login"
 
