@@ -135,13 +135,17 @@ platform::ask_for_sudo() {
     sudo -v &>/dev/null
   fi
 
-  # Keep credentials alive (one background process)
+  # Keep credentials alive (one background process).
+  # Do NOT redirect the subshell's stderr globally — macOS
+  # tty_tickets uses ttyname(stderr) to identify the ticket.
+  # Redirecting stderr to /dev/null causes the keepalive to
+  # refresh a different ticket than the foreground shell.
   if [ -z "${_SUDO_KEEPALIVE_PID:-}" ] \
     || ! kill -0 "$_SUDO_KEEPALIVE_PID" 2>/dev/null; then
     (while kill -0 "$$" 2>/dev/null; do
-      sudo -n true
+      sudo -n true 2>/dev/null
       sleep 60
-    done) &>/dev/null &
+    done) &
     _SUDO_KEEPALIVE_PID=$!
   fi
 }

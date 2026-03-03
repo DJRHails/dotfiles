@@ -22,9 +22,11 @@ else
   echo 'net.inet6.ip6.forwarding=1' | platform::sudo tee -a /etc/sysctl.conf > /dev/null
   log::result $? "IP forwarding configured in /etc/sysctl.conf"
 fi
-# Apply at runtime regardless (may have been lost on reboot)
-platform::sudo sysctl -w net.inet.ip.forwarding=1 2>/dev/null
-platform::sudo sysctl -w net.inet6.ip6.forwarding=1 2>/dev/null
+# Apply at runtime if not already active
+if [ "$(sysctl -n net.inet.ip.forwarding 2>/dev/null)" != "1" ]; then
+  platform::sudo sysctl -w net.inet.ip.forwarding=1 2>/dev/null
+  platform::sudo sysctl -w net.inet6.ip6.forwarding=1 2>/dev/null
+fi
 
 # Launch Tailscale daemon
 if ! tailscale status &>/dev/null; then
