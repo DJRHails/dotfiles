@@ -57,8 +57,11 @@ link::file () {
 
     if [ "$backup" == "true" ]
     then
-      # Remove stale backup so mv doesn't try to move dst INTO it
-      rm -rf "${dst}.backup"
+      # Rename existing backup with timestamp so mv doesn't try to
+      # move dst INTO an existing backup directory.
+      if [ -e "${dst}.backup" ]; then
+        mv "${dst}.backup" "${dst}.backup.$(date +%Y%m%d%H%M%S)"
+      fi
       mv "$dst" "${dst}.backup"
       log::success "moved $dst to ${dst}.backup"
     fi
