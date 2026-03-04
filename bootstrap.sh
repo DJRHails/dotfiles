@@ -94,7 +94,11 @@ main() {
   # Verify OS
   log::header "Verify OS verion\n"
   platform::is_supported && log::success "$os_name with v$os_version is valid"
-  
+
+  # Cache sudo credentials early — before platform bootstrap or
+  # interactive module selection can introduce delays that expire them.
+  platform::ask_for_sudo
+
   # Platform-specific bootstrap (Homebrew, Bash upgrade, apt, etc.)
   BOOTSTRAP_ARGS=("$@")
   run "$DOTFILES/scripts" "bootstrap.$(platform::os).sh"
@@ -112,8 +116,6 @@ main() {
   scan::find_valid_modules
 
   log::header "Installing $(log::bold "${#scanned_valid_modules[@]} modules")"
-
-  platform::ask_for_sudo
 
   for idx in "${!scanned_valid_modules[@]}"
   do

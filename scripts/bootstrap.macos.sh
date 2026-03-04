@@ -29,9 +29,7 @@ fi
 # Install Homebrew if missing
 if ! platform::command_exists brew; then
   log::info "Homebrew not found, installing..."
-  # Homebrew needs sudo to create /opt/homebrew. Prompt now so the
-  # NONINTERACTIVE installer can use the cached credential.
-  platform::ask_for_sudo
+  # Sudo credentials already cached by bootstrap.sh (platform::ask_for_sudo)
   NONINTERACTIVE=1 /bin/bash -c \
     "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   log::success "Homebrew installed"
