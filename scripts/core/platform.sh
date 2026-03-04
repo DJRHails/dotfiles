@@ -130,9 +130,12 @@ platform::relink() {
 platform::ask_for_sudo() {
   platform::command_exists "sudo" || install::package "sudo"
 
-  # Only prompt if credentials aren't already cached
+  # Only prompt if credentials aren't already cached.
+  # Do NOT redirect stderr — on macOS, tty_tickets keys the credential
+  # cache on ttyname(stderr).  Redirecting to /dev/null stores the
+  # ticket under the wrong key, so later sudo calls re-prompt.
   if ! sudo -n true 2>/dev/null; then
-    sudo -v &>/dev/null
+    sudo -v
   fi
 
   # Keep credentials alive (one background process).

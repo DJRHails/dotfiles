@@ -9,7 +9,13 @@ link::file () {
 
   if [ -f "$dst" -o -d "$dst" -o -L "$dst" ]
   then
-    if [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
+    # Already linked to the correct target — skip unconditionally.
+    # This must run before the overwrite/backup/skip-all check,
+    # otherwise --yes (backup_all=true) bypasses it and mv fails
+    # with "are identical" when the backup dir already exists.
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" == "$src" ]; then
+      skip=true
+    elif [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
     then
       local currentSrc="$(readlink $dst)"
 
@@ -51,6 +57,8 @@ link::file () {
 
     if [ "$backup" == "true" ]
     then
+      # Remove stale backup so mv doesn't try to move dst INTO it
+      rm -rf "${dst}.backup"
       mv "$dst" "${dst}.backup"
       log::success "moved $dst to ${dst}.backup"
     fi
