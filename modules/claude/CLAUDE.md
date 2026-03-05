@@ -23,6 +23,36 @@ Global instructions for all projects. Project-specific CLAUDE.md files override 
 3. 100-char line length
 4. Absolute imports only — no relative (`..`) paths
 5. Google-style docstrings on non-trivial public APIs
+6. Multi-line raw strings with `(?ixm)` mode for all regexes — verbose mode is mandatory for readability
+7. Use `jaxtyping` for numpy array type annotations (e.g. `Float[np.ndarray, "batch features"]`)
+
+### Regex convention
+
+All regex patterns must use verbose (`x`) mode via multi-line raw strings. Include inline comments for each component:
+
+```python
+_PATTERN = re.compile(
+    r"""(?ix)        # case-insensitive, verbose
+    \b               # word boundary
+    (?:foo | bar)    # match foo or bar
+    \b               # word boundary
+    """
+)
+```
+
+Never use compact single-line regex for anything beyond trivial patterns. Prefer named groups (`(?P<name>...)`) over numbered groups for any capturing group.
+
+### Array & DataFrame typing
+
+Use `jaxtyping` for shape/dtype annotations on numpy arrays. No JAX dependency required — it supports numpy, torch, etc.:
+
+```python
+from jaxtyping import Float, Int
+import numpy as np
+
+def normalize(x: Float[np.ndarray, "batch features"]) -> Float[np.ndarray, "batch features"]:
+    ...
+```
 
 ### Zero warnings policy
 
