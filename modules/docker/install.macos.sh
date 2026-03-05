@@ -1,36 +1,29 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
-if [ -d "/Applications/Docker.app" ]; then
-  log::success "Docker Desktop"
+# Colima — lightweight container runtime (replaces Docker Desktop)
+if command -v colima &>/dev/null; then
+  log::success "Colima"
 else
-  brew install --cask docker-desktop
-  log::result $? "Docker Desktop"
+  log::execute "brew install colima" "Colima"
 fi
 
-# Ensure Docker CLI is accessible
-if ! command -v docker &>/dev/null; then
-  log::info "Launching Docker.app to register CLI tools..."
-  open -a Docker
-  for _ in $(seq 1 15); do
-    command -v docker &>/dev/null && break
-    sleep 2
-  done
-  log::result $? "Docker CLI available"
-else
+# Docker CLI + Compose plugin (no Docker Desktop)
+if command -v docker &>/dev/null; then
   log::success "Docker CLI"
+else
+  log::execute "brew install docker" "Docker CLI"
 fi
 
-# Ensure Docker Compose plugin is available
-# Docker Desktop bundles compose but only symlinks it on first launch.
-# If Docker Desktop hasn't been started, the plugin is missing.
-plugins_src="/Applications/Docker.app/Contents/Resources/cli-plugins"
-plugins_dst="$HOME/.docker/cli-plugins"
 if docker compose version &>/dev/null; then
   log::success "Docker Compose"
-elif [ -f "$plugins_src/docker-compose" ]; then
-  mkdir -p "$plugins_dst"
-  ln -sf "$plugins_src/docker-compose" "$plugins_dst/docker-compose"
-  log::result $? "Docker Compose (symlinked)"
 else
-  log::warn "Docker Compose plugin not found"
+  log::execute "brew install docker-compose" "Docker Compose plugin"
+fi
+
+# Docker credential helper for macOS keychain
+if command -v docker-credential-osxkeychain &>/dev/null; then
+  log::success "Docker credential helper"
+else
+  log::execute "brew install docker-credential-helper" "Docker credential helper"
 fi
