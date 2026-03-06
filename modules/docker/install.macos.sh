@@ -19,6 +19,10 @@ if docker compose version &>/dev/null; then
   log::success "Docker Compose"
 else
   log::execute "brew install docker-compose" "Docker Compose plugin"
+  # Brew installs the binary but Docker only finds it as a CLI plugin
+  mkdir -p "$HOME/.docker/cli-plugins"
+  ln -sf "/opt/homebrew/opt/docker-compose/bin/docker-compose" \
+    "$HOME/.docker/cli-plugins/docker-compose"
 fi
 
 # Docker credential helper for macOS keychain
