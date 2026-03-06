@@ -10,9 +10,10 @@ Global instructions for all projects. Project-specific CLAUDE.md files override 
 - **Justify new dependencies** - Each dependency is attack surface and maintenance burden
 - **Replace, don't deprecate** - When a new implementation replaces an old one, remove the old one entirely. No backward-compatible shims, dual config formats, or migration paths. Proactively flag dead code.
 - **Verify at every level** - Set up automated guardrails (linters, type checkers, pre-commit hooks, tests) as the first step, not an afterthought. Prefer structure-aware tools (ast-grep, LSPs, compilers) over text pattern matching.
-- **Bias toward action** - Decide and move for anything easily reversed; state your assumption so the reasoning is visible. Ask before committing to interfaces, data models, architecture, or destructive operations.
+- **Bias toward action** - Decide and move for anything easily reversed; state your assumption so the reasoning is visible. Ask before committing to interfaces, data models, architecture, or destructive operations. When given a bug report, just fix it — don't ask for hand-holding. Point at logs, errors, failing tests, then resolve them. Zero context switching required from the user.
 - **Finish the job** - Handle the edge cases you can see. Clean up what you touched. If something is broken adjacent to your change, flag it. But don't invent new scope.
 - **Falsify, first** - When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
+- **Prove it works** - Never mark a task complete without demonstrating correctness. Run tests, check logs, diff behavior. Ask: "Would a staff engineer approve this?"
 
 ## Code Quality
 
@@ -155,6 +156,13 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 
 ## Workflow
 
+### Subagent strategy
+
+- Use subagents liberally to keep the main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- One tack per subagent for focused execution
+- For complex problems, throw more compute at it via subagents
+
 **Before committing:**
 
 1. Re-read your changes for unnecessary complexity, redundant code, and unclear naming
@@ -176,6 +184,7 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 ## Session Insights & Memory
 
 - After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to CLAUDE.md
+- After ANY correction from the user: capture the pattern and write a rule that prevents the same mistake. Ruthlessly iterate on these rules until mistake rate drops.
 
 ## Markdown Structure (mdstruct)
 
