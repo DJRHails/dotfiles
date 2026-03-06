@@ -9,12 +9,12 @@ link::file () {
 
   if [ -f "$dst" -o -d "$dst" -o -L "$dst" ]
   then
-    # Already linked to the correct target — skip unconditionally.
-    # This must run before the overwrite/backup/skip-all check,
-    # otherwise --yes (backup_all=true) bypasses it and mv fails
-    # with "are identical" when the backup dir already exists.
+    # Already linked to the correct target — return immediately.
+    # Must return before the backup_all fallthrough which would
+    # mv the correct symlink to .backup then skip re-creation.
     if [ -L "$dst" ] && [ "$(readlink "$dst")" == "$src" ]; then
-      skip=true
+      log::success "skipped $src (already linked)"
+      return
     elif [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
     then
       local currentSrc="$(readlink $dst)"
