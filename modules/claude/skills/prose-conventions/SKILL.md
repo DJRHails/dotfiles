@@ -48,6 +48,9 @@ Write like you speak.
 - **Long sentences**: Split sentences over 40 words
 - **Repeated words**: Watch for repeated "twist", "however", etc. in the same section
 - **Vague 'this'**: Always clarify what "this" refers to
+- **Filler phrases**: "In order to" -> "To"; "Due to the fact that" -> "Because"; "It is important to note that" -> cut entirely
+- **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y"
+- **Sycophantic tone**: "Great question!", "You're absolutely right!", "I hope this helps!" -- chatbot residue; delete on sight
 
 ## AI Writing Patterns to Avoid
 
@@ -62,6 +65,7 @@ These patterns signal machine-generated text. Never use them.
 - **"An X with Y and Z"** — dismissive constructions
 - **Mid-sentence self-questioning** — "And honestly? That's amazing."
 - **doesn't just** — "doesn't just" is a cliche
+- **Copula avoidance** — "serves as", "stands as", "marks", "represents", "boasts", "features", "offers" instead of "is"/"are"/"has". Use the copula.
 
 ### Banned Vocabulary
 
@@ -69,7 +73,7 @@ These patterns signal machine-generated text. Never use them.
 |-----------|-----|
 | `delve` | 2,700% spike post-ChatGPT |
 | `tapestry`, `woven` | False complexity signals |
-| `intricate` | Same |
+| `intricate`, `interplay` | Same |
 | `underscore`, `highlight`, `showcase` | AI emphasis verbs |
 | `meticulous`, `adept`, `swift` | Precision/speed cliches |
 | `navigate` (metaphorical) | "Navigate challenges" |
@@ -79,6 +83,17 @@ These patterns signal machine-generated text. Never use them.
 | `nuanced` | Usually isn't |
 | `consult` | Corporate AI-speak |
 | `shaped by`, `shaped this` | Corporate AI-speak |
+| `additionally` | AI's favourite conjunction |
+| `crucial`, `pivotal`, `vital` | Inflated importance |
+| `enduring`, `lasting` | Legacy puffery |
+| `foster`, `cultivate` | AI growth verbs |
+| `enhance` | Vague improvement |
+| `garner` | AI synonym for "get" |
+| `vibrant`, `rich` (figurative) | Promotional tone |
+| `nestled`, `breathtaking`, `stunning` | Travel-brochure AI |
+| `testament` | "stands as a testament to" |
+| `align with` | Corporate AI-speak |
+| `profound` | Almost never earned |
 
 ### Banned Atmospheric Words
 
@@ -93,6 +108,15 @@ These patterns signal machine-generated text. Never use them.
 - **Empty profundity** — "carve your code into my core, etched like prophecy"
 - **Mixed metaphors** — piling concepts until collapse
 - **Sensory abstractions** — attaching physical senses to abstract concepts
+- **Synonym cycling** — calling the same thing "the protagonist", "the main character", "the central figure", "the hero" across consecutive sentences. Pick one name and stick with it.
+- **False ranges** — "from X to Y, from A to B" where X/Y aren't on a meaningful scale. "From the Big Bang to dark matter" is not a range.
+
+### Content Inflation Patterns
+
+- **Significance puffery** — "marking a pivotal moment in the evolution of...", "underscoring its vital role in..." Strip these. State what happened; let the reader judge importance.
+- **Vague attribution** — "Experts believe", "Industry observers note", "Several sources suggest". Name the source or cut the claim.
+- **Formulaic challenges sections** — "Despite challenges... continues to thrive." State the specific problem and what was done about it.
+- **Generic positive conclusions** — "The future looks bright", "Exciting times lie ahead." End with a concrete fact, not optimism.
 
 ## Essay Style
 
@@ -128,6 +152,8 @@ This guide contains internal tensions. "Theme or rheme" is jargon in a guide tha
 
 Style guides are heuristics, not laws. Break any rule when following it would make the writing worse — Orwell's sixth rule applies to the whole document. The point is awareness: know when you're breaking a rule and why.
 
+When editing AI-generated or AI-assisted text, do a final pass: ask "What still reads as obviously machine-generated?" Fix those tells, then check once more.
+
 When editing, preserve the author's voice. Do not:
 
 - **Standardise punctuation that carries tone** — a casual hyphen-dash or exclamation mark often signals self-aware humour. "even if I know a few!" is wry; "even if I know a few." is flat.
@@ -137,3 +163,7 @@ When editing, preserve the author's voice. Do not:
 The author has a penchant for semi-colons; leave them be.
 
 Ask: does this change make the writing better, or just more uniform?
+
+## References
+
+- [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) — comprehensive catalogue of AI text patterns, maintained by WikiProject AI Cleanup
