@@ -1,6 +1,6 @@
 # Global Development Standards
 
-Global instructions for all projects. Project-specific CLAUDE.md files override these defaults.
+Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) files override these defaults.
 
 ## Philosophy
 
@@ -183,7 +183,7 @@ Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  #
 
 ## Session Insights & Memory
 
-- After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to CLAUDE.md
+- After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to AGENTS.md
 - After ANY correction from the user: capture the pattern and write a rule that prevents the same mistake. Ruthlessly iterate on these rules until mistake rate drops.
 
 ## Markdown Structure (mdstruct)
@@ -217,7 +217,7 @@ mdstruct auto path/to/file            # splits .md file or joins folder
 
 ## Git Hygiene
 
-- **Always gitignore `.claude/settings.local.json`** - If you see this file in `git status` or `git diff`, add it to `.gitignore` before committing. This file contains local Claude Code permissions and should never be tracked.
+- **Always gitignore `.agents/settings.local.json`** (and `.claude/settings.local.json`) - If you see these files in `git status` or `git diff`, add them to `.gitignore` before committing. These files contain local permissions and should never be tracked.
 
 ## References
 

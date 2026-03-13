@@ -63,7 +63,7 @@ never left uncommitted on main.
 ## 4. Implement
 
 Implement the plan across all necessary files. Follow the
-project's CLAUDE.md standards. Keep changes minimal and focused
+project's AGENTS.md (or CLAUDE.md) standards. Keep changes minimal and focused
 on the issue requirements — no speculative features.
 
 Add tests for the changed behavior as part of implementation —
@@ -89,7 +89,7 @@ the fallback tables below.
    - Docs/site build commands (e.g. `make site`, `mkdocs build`)
 2. **Read the Makefile** (if present). Cross-reference targets
    used in CI — these are the ones that matter.
-3. **Read CLAUDE.md** (if present at repo root or `.claude/`).
+3. **Read AGENTS.md or CLAUDE.md** (if present at repo root or `.agents/`/`.claude/`).
    It may define project-specific quality gates.
 
 Store the discovered commands. They override the fallback table

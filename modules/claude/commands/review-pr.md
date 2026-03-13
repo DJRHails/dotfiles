@@ -69,11 +69,11 @@ git diff <upstream-remote>/<base-branch>...HEAD > /tmp/pr-review-diff.txt
 # Build prompt file (avoids heredoc shell expansion issues)
 {
   echo "Review this diff for code quality, bugs, and improvements."
-  if [ -f CLAUDE.md ] || [ -f .claude/CLAUDE.md ]; then
+  if [ -f AGENTS.md ] || [ -f CLAUDE.md ] || [ -f .agents/AGENTS.md ] || [ -f .claude/CLAUDE.md ]; then
     echo ""
     echo "Project conventions:"
     echo "---"
-    cat CLAUDE.md .claude/CLAUDE.md 2>/dev/null
+    cat AGENTS.md CLAUDE.md .agents/AGENTS.md .claude/CLAUDE.md 2>/dev/null
     echo "---"
   fi
   echo ""
@@ -145,7 +145,7 @@ the fallback tables below.
    - Docs/site build commands (e.g. `make site`, `mkdocs build`)
 2. **Read the Makefile** (if present). Cross-reference targets
    used in CI — these are the ones that matter.
-3. **Read CLAUDE.md** (if present at repo root or `.claude/`).
+3. **Read AGENTS.md or CLAUDE.md** (if present at repo root or `.agents/`/`.claude/`).
    It may define project-specific quality gates.
 
 Store the discovered commands. They override the fallback table

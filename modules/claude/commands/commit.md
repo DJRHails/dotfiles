@@ -5,10 +5,10 @@
 ## Steps
 
 1. Run `git status` and `git diff --stat` to understand all changes.
-2. Check the current branch. If the repo's CLAUDE.md says not to commit to main, create a feature branch (`<github-username>/<feature-name>` format) first.
+2. Check the current branch. If the repo's AGENTS.md (or CLAUDE.md) says not to commit to main, create a feature branch (`<github-username>/<feature-name>` format) first.
 3. Review the diff (`git diff` for unstaged, `git diff --cached` for staged) to understand what changed and why.
 4. Skip files that contain secrets (`.env`, credentials, tokens). Warn if any are present.
-5. Skip `.claude/settings.local.json` — add it to `.gitignore` if not already ignored.
+5. Skip `.agents/settings.local.json` (and `.claude/settings.local.json`) — add to `.gitignore` if not already ignored.
 6. Group related changes into logical commits — one concern per commit. If all changes are related, use a single commit.
 7. For each commit:
    - Stage the relevant files by name (not `git add -A`)
