@@ -21,7 +21,7 @@ def finalize(
 
     Title stack (top to bottom)::
 
-        ----        short red rule
+        ────        short red rule
         Title       IBM Plex Sans Bold
         Descriptor  IBM Plex Sans Regular
 
@@ -47,7 +47,7 @@ def finalize(
         ax.spines["right"].set_linewidth(0)
         ax.spines["left"].set_visible(False)
 
-    ax.yaxis.set_tick_params(pad=-2, labelsize=9)
+    ax.yaxis.set_tick_params(pad=4, labelsize=9)
     ax.spines["bottom"].set_color(C_SPINE)
     ax.spines["bottom"].set_linewidth(1.0)
 
@@ -89,8 +89,8 @@ def finalize(
         )
         y_cursor += 0.040 + rule_gap
 
-    # Short red rule at the top (~40 px wide)
-    rule_w = 40 / (fig.get_figwidth() * fig.dpi)
+    # Short red rule at the top (~80 px wide)
+    rule_w = 80 / (fig.get_figwidth() * fig.dpi)
     fig.add_artist(
         plt.Line2D(
             [tx, tx + rule_w],
