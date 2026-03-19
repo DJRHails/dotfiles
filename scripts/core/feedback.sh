@@ -1,6 +1,16 @@
 feedback::ask() {
-  log::question "$1 "
-  read -r
+  local default="$2"
+  if [ -n "$default" ]; then
+    log::question "$1 [$default] "
+  else
+    log::question "$1 "
+  fi
+  if [ "$skipQuestions" = true ] && [ -n "$default" ]; then
+    REPLY="$default"
+  else
+    read -r
+  fi
+  REPLY="${REPLY:-$default}"
 }
 
 feedback::ask_for_letter() {

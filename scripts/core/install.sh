@@ -19,7 +19,7 @@ install::with() {
 }
 
 install::package_manager() {
-  echo "$(platform::package_manager_prefix)$(platform::main_package_manager)"
+  echo "$(platform::sudo_prefix)$(platform::main_package_manager)"
 }
 
 install::package() {
@@ -27,7 +27,7 @@ install::package() {
 }
 
 install::snap() {
-  install::with "sudo snap" "$1" "$2" "$3"
+  install::with "$(platform::sudo_prefix)snap" "$1" "$2" "$3"
 }
 
 install::cask() {

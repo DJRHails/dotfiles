@@ -156,3 +156,7 @@ log::success() {
 log::warning() {
     log::yellow "   [!] $1\n"
 }
+
+log::info() {
+    log::blue "   [i] $1\n"
+}

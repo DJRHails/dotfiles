@@ -8,15 +8,15 @@ install_keybase() {
 
   local tmp_deb="/tmp/keybase_amd64.deb"
   curl -fsSL https://prerelease.keybase.io/keybase_amd64.deb -o "$tmp_deb"
-  sudo dpkg -i "$tmp_deb" || sudo apt-get install -f -y
+  platform::sudo dpkg -i "$tmp_deb" || platform::sudo apt-get install -f -y
   rm -f "$tmp_deb"
   log::result $? "Keybase installed"
 }
 
 setup_keybase_mount() {
   # Enable redirector for /keybase mount
-  sudo mkdir -p /keybase
-  sudo chown $USER:$USER /keybase
+  platform::sudo mkdir -p /keybase
+  platform::sudo chown $USER:$USER /keybase
 
   # Configure keybase for headless operation
   keybase config set mountdirdefault /keybase 2>/dev/null || true

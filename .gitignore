@@ -1,1 +1,4 @@
 .env*
+*.bak
+.agents/settings.local.json
+.agents/worktrees/

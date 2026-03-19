@@ -33,10 +33,14 @@ parse_args() {
             allModules=true
           ;;
           -c|--cli)
-            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale")
+            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/python" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/cloudflared" "$DOTFILES/modules/claude")
           ;;
           *)
-            scanned_valid_modules+=("$DOTFILES/modules/$1")
+            if [ -d "$DOTFILES/modules/$1" ]; then
+              scanned_valid_modules+=("$DOTFILES/modules/$1")
+            else
+              echo "[bootstrap] Warning: module '$1' not found in $DOTFILES/modules/" >&2
+            fi
           ;;
         esac
         shift
@@ -90,30 +94,42 @@ main() {
   # Verify OS
   log::header "Verify OS verion\n"
   platform::is_supported && log::success "$os_name with v$os_version is valid"
-  
-  # Verify Bash Version
+
+  # Cache sudo credentials early — before platform bootstrap or
+  # interactive module selection can introduce delays that expire them.
+  platform::ask_for_sudo
+
+  # Platform-specific bootstrap (Homebrew, Bash upgrade, apt, etc.)
+  BOOTSTRAP_ARGS=("$@")
+  run "$DOTFILES/scripts" "bootstrap.$(platform::os).sh"
+
+  # Verify Bash 4+ (platform bootstrap should have installed it)
   log::header "Verify Bash Version\n"
-  [ "${BASH_VERSINFO:-0}" -ge 4 ] && log::success "$BASH_VERSINFO is supported (associative arrays required)"
-  # > macos is bad for this; 
-  # /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-  # brew install bash
+  if [ "${BASH_VERSINFO:-0}" -ge 4 ]; then
+    log::success "Bash ${BASH_VERSINFO} (associative arrays supported)"
+  else
+    log::error "Bash ${BASH_VERSINFO:-unknown} is too old (need 4+)"
+    exit 1
+  fi
 
   # Grab modules
   scan::find_valid_modules
 
   log::header "Installing $(log::bold "${#scanned_valid_modules[@]} modules")"
 
-  platform::ask_for_sudo
-
   for idx in "${!scanned_valid_modules[@]}"
   do
     local module_dir="${scanned_valid_modules[$idx]}"
     if [[ ! -z $module_dir ]]; then
       log::header "$((idx+1)). Running '${module_dir##*/}'"
-      run "$module_dir" "setup.sh"
       create_links "$module_dir"
       run "$module_dir" "install.sh"
       run "$module_dir" "install.$(platform::os).sh"
+      run "$module_dir" "setup.sh"
+      run "$module_dir" "setup.$(platform::os).sh"
+      if [[ ! -f "$module_dir/install.sh" && ! -f "$module_dir/install.$(platform::os).sh" ]]; then
+        log::warning "No installer found for '${module_dir##*/}' on $(platform::os)"
+      fi
       export ${module_dir##*/}=installed
     fi
   done

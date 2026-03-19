@@ -83,6 +83,7 @@ For each PDF in `research/dump/`:
    ```bash
    ./bin/bibify.py
    ```
+   If the output contains `Missing notes for`, run bibify a second time — newly uploaded papers need a second pass to generate their note stubs.
 
 ## Important Notes
 

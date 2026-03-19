@@ -25,6 +25,9 @@ github::copy_public_key_to_clipboard () {
 
     else
         log::warning "Please copy the public key ($1) to clipboard"
+        printf "\n"
+        cat "$1"
+        printf "\n"
     fi
 
 }
@@ -85,7 +88,7 @@ github::set_ssh_key() {
 }
 
 github::get_gpg_key_id() {
-  gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG \
+  gpgKeyId="$(gpg --list-secret-keys --keyid-format LONG 2>/dev/null \
     | grep git-auto -B 2 \
     | grep sec \
     | perl -nle 'print $& while m{(?<=/)[A-Z0-9]{16}}g')"

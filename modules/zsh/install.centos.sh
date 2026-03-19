@@ -10,7 +10,7 @@ git clone https://github.com/zsh-users/zsh.git /tmp/zsh
 cd /tmp/zsh
 ./Util/preconfig
 ./configure
-sudo make -j 20 install
+platform::sudo make -j 20 install
 
 # Cargo
 install::package "Cargo & Rust" "cargo"

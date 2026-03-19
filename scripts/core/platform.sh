@@ -121,28 +121,36 @@ platform::relink() {
   local readonly original_path="$(which $1)"
   local readonly new_path="$(dirname "$original_path")/$2"
 
-  sudo ln -fsn "$original_path" "$new_path"
+  platform::sudo ln -fsn "$original_path" "$new_path"
   #        |||
   #override┘||
   #symbolic-┘|
 }
 
 platform::ask_for_sudo() {
-  # Install `sudo` if it isn't available.
   platform::command_exists "sudo" || install::package "sudo"
 
-  sudo -v &> /dev/null
+  # Only prompt if credentials aren't already cached.
+  # Do NOT redirect stderr — on macOS, tty_tickets keys the credential
+  # cache on ttyname(stderr).  Redirecting to /dev/null stores the
+  # ticket under the wrong key, so later sudo calls re-prompt.
+  if ! sudo -n true 2>/dev/null; then
+    sudo -v
+  fi
 
-  # Update existing `sudo` time stamp
-  # until this script has finished.
-  #
-  # https://gist.github.com/cowboy/3118588
-
-  while true; do
-      sudo -n true
+  # Keep credentials alive (one background process).
+  # Do NOT redirect the subshell's stderr globally — macOS
+  # tty_tickets uses ttyname(stderr) to identify the ticket.
+  # Redirecting stderr to /dev/null causes the keepalive to
+  # refresh a different ticket than the foreground shell.
+  if [ -z "${_SUDO_KEEPALIVE_PID:-}" ] \
+    || ! kill -0 "$_SUDO_KEEPALIVE_PID" 2>/dev/null; then
+    (while kill -0 "$$" 2>/dev/null; do
+      sudo -n true 2>/dev/null
       sleep 60
-      kill -0 "$$" || exit
-  done &> /dev/null &
+    done) &
+    _SUDO_KEEPALIVE_PID=$!
+  fi
 }
 
 platform::screenshot() {
@@ -156,6 +164,19 @@ platform::screenshot() {
     fi
 }
 
+
+platform::notify() {
+  local title="${1:-Notification}"
+  local message="${2:-}"
+
+  if platform::is_osx; then
+    osascript -e "display notification \"$message\" with title \"$title\""
+  elif platform::command_exists "notify-send"; then
+    notify-send "$title" "$message"
+  else
+    log::warning "$title: $message"
+  fi
+}
 
 platform::main_package_manager() {
   if platform::is_osx; then
@@ -176,7 +197,15 @@ platform::main_package_manager() {
   fi
 }
 
-platform::package_manager_prefix() {
+platform::sudo() {
+  if [ "$EUID" -ne 0 ]; then
+    sudo "$@"
+  else
+    "$@"
+  fi
+}
+
+platform::sudo_prefix() {
   if platform::is_linux; then
     if [ "$EUID" -ne 0 ]; then
       echo "sudo "

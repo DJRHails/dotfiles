@@ -2,14 +2,14 @@
 
 prompt::author_name() {
   if [[ -z $GIT_AUTHOR_NAME ]]; then
-    feedback::ask ' - What is your github author username?'
+    feedback::ask " - What is your github author username?" "DJRHails"
     GIT_AUTHOR_NAME=$(feedback::get_answer)
   fi
 }
 
 prompt::author_email() {
   if [[ -z $GIT_AUTHOR_EMAIL ]]; then
-    feedback::ask ' - What is your github author email?'
+    feedback::ask " - What is your github author email?" "hello@hails.info"
     GIT_AUTHOR_EMAIL=$(feedback::get_answer)
   fi
 }

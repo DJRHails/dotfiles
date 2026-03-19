@@ -9,7 +9,13 @@ link::file () {
 
   if [ -f "$dst" -o -d "$dst" -o -L "$dst" ]
   then
-    if [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
+    # Already linked to the correct target — return immediately.
+    # Must return before the backup_all fallthrough which would
+    # mv the correct symlink to .backup then skip re-creation.
+    if [ -L "$dst" ] && [ "$(readlink "$dst")" == "$src" ]; then
+      log::success "skipped $src (already linked)"
+      return
+    elif [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
     then
       local currentSrc="$(readlink $dst)"
 
@@ -51,6 +57,11 @@ link::file () {
 
     if [ "$backup" == "true" ]
     then
+      # Rename existing backup with timestamp so mv doesn't try to
+      # move dst INTO an existing backup directory.
+      if [ -e "${dst}.backup" ]; then
+        mv "${dst}.backup" "${dst}.backup.$(date +%Y%m%d%H%M%S)"
+      fi
       mv "$dst" "${dst}.backup"
       log::success "moved $dst to ${dst}.backup"
     fi
@@ -63,6 +74,7 @@ link::file () {
 
   if [ "$skip" != "true" ]  # "false" or empty
   then
+    mkdir -p "$(dirname "$2")"
     ln -s "$1" "$2"
     log::success "linked $1 to $2"
   fi

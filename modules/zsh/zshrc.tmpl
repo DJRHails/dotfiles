@@ -3,7 +3,6 @@ if [[ -z $DOTFILES ]]
 then
   export DOTFILES=DOTFILES_
 fi
-export ZPLUG_HOME=~/.zplug
 
 # Stash any private elements in ~/.zshrc.local. This means they'll stay out
 # of your main dotfiles repository (which may be public, like this one), but
@@ -68,3 +67,6 @@ export FZF_COMPLETION_TRIGGER='~~'
 
 # Add bin to path
 export PATH=${PATH:+$PATH:}${DOTFILES}/bin
+
+# Starship prompt
+(( $+commands[starship] )) && eval "$(starship init zsh)"

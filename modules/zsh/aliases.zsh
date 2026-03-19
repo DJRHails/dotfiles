@@ -8,6 +8,10 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 alias open='platform::open'
 
+if [[ "$(uname -s)" == "Linux" ]] && (( $+commands[trash-put] )); then
+  alias trash='trash-put'
+fi
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 alias -g G="| grep" # Grep pipe shortcut

@@ -32,7 +32,7 @@ cd ~/.files
 | ---------------------- | -----------
 | `atom`                 | Setup atom text editor with packages & keymap.
 | `code`                 | Setup VSCode text editor with sane settings.
-| :construction: `docker`| Install docker.
+| `docker`               | Docker runtime via Colima (macOS) or Docker Engine (Linux).
 | `flutter`              | Install flutter and setup PATH.
 | :sparkle: `git`        | Adds git aliases, auto-complete, sets up user-level config and link this machines ssh to github.
 | `hyper`                | Install hyper terminal editor and config.
