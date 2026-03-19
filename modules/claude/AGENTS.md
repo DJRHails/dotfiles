@@ -147,7 +147,7 @@ All scripts must start with `set -euo pipefail`. Lint: `shellcheck script.sh && 
 
 ### GitHub Actions
 
-Pin actions to SHA hashes with version comments: `actions/checkout@<full-sha>  # vX.Y.Z` (use `persist-credentials: false`). Scan workflows with `zizmor` before committing.
+Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: false`). Scan workflows with `zizmor` before committing.
 
 ### Docker
 

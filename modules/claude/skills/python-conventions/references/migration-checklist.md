@@ -77,7 +77,7 @@ uv run ruff check --select=ERA --fix .
 
 - [ ] Remove scheduled CI triggers (activity without progress is theater)
 - [ ] Update CI to use `uv sync` and `uv run`
-- [ ] Pin GitHub Actions to SHA hashes
+- [ ] Pin GitHub Actions to specific versions
 - [ ] Set up security tooling (see [security-setup.md](./security-setup.md))
 
 ## Gradual ty Adoption

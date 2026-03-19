@@ -249,7 +249,7 @@ def test_unix_feature():
 ```yaml
 # GitHub Actions
 - name: Checkout
-  uses: actions/checkout@<sha>  # <latest> https://github.com/actions/checkout/releases
+  uses: actions/checkout@v4
 
 - name: Run tests
   run: |
@@ -262,7 +262,7 @@ def test_unix_feature():
     uv run pip-audit
 
 - name: Upload coverage
-  uses: codecov/codecov-action@<sha>  # <latest> https://github.com/codecov/codecov-action/releases
+  uses: codecov/codecov-action@v5
   with:
     files: ./coverage.xml
 ```

@@ -189,7 +189,7 @@ permissions:
 Common findings:
 - `excessive-permissions`: No `permissions:` block
 - `template-injection`: Using `${{ github.event.* }}` unsafely
-- `unpinned-action`: Actions not pinned to SHA
+- `unpinned-action`: Actions not pinned to a specific version
 - `dangerous-triggers`: `pull_request_target` with checkout
 
 ## Dependency Security

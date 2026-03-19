@@ -166,8 +166,8 @@ jobs:
   prek:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@<sha>  # <latest> https://github.com/actions/checkout/releases
-      - uses: j178/prek-action@<sha>  # <latest> https://github.com/j178/prek-action/releases
+      - uses: actions/checkout@v4
+      - uses: j178/prek-action@v1
 ```
 
 Or manually:
