@@ -80,5 +80,6 @@
   },
   "alwaysThinkingEnabled": true,
   "defaultMode": "acceptEdits",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "effortLevel": "medium"
 }
