@@ -133,7 +133,7 @@ short_model=$(echo "$model_name" | sed -E 's/Claude [0-9.]+ //; s/^Claude //')
 
 # LINE 1: [Model] folder | branch
 line1=$(printf '\033[37m[%s]\033[0m' "$short_model")
-line1="$line1 $(printf '\033[94m📁 %s\033[0m' "$folder_name")"
+line1="$line1 $(printf '\033[94m📁 %s\033[0m \033[2m@\033[0m \033[35m%s\033[0m' "$folder_name" "$(hostname -s)")"
 if [ -n "$git_branch" ]; then
     line1="$line1 $(printf '%b \033[96m🌿 %s\033[0m' "$SEP" "$git_branch")"
 fi
