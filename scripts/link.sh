@@ -84,6 +84,7 @@ link::extract_and_link() {
   local sep=' -> '
   while read -r line || [[ -n "$line" ]]
   do
+    [[ -z "$line" ]] && continue
     local src=${line%%$sep*}
     local dst=${line#*$sep}
     link::file "$(dirname "$1")/$src" "${dst/#\~/$HOME}"

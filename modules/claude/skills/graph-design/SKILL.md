@@ -34,7 +34,7 @@ finalize(
 ### Title stack (top → bottom)
 
 ```
-────        short red rule  (#bf352b, 3.5 lw)
+────────    short red rule  (#bf352b, 3.5 lw, 80 px)
 Title       IBM Plex Sans Bold, 12 pt
 Descriptor  IBM Plex Sans Regular, 9.5 pt
 ```

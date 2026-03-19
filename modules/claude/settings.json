@@ -78,6 +78,10 @@
     "type": "command",
     "command": "bash ~/.files/modules/claude/scripts/statusline.sh"
   },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
   "alwaysThinkingEnabled": true,
   "defaultMode": "acceptEdits",
   "skipDangerousModePermissionPrompt": true,
