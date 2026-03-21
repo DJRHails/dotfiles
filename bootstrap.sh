@@ -95,6 +95,7 @@ main() {
   log::header "Verify OS verion\n"
   platform::is_supported && log::success "$os_name with v$os_version is valid"
 
+
   # Cache sudo credentials early — before platform bootstrap or
   # interactive module selection can introduce delays that expire them.
   platform::ask_for_sudo
