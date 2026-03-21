@@ -1,4 +1,5 @@
 .env*
 *.bak
 .agents/settings.local.json
+.claude/settings.local.json
 .agents/worktrees/

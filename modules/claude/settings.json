@@ -69,6 +69,10 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/enforce-package-manager.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/block-inline-scripts.sh"
           }
         ]
       }
