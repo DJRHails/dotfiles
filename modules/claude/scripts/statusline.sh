@@ -63,6 +63,7 @@ fi
 if cd "$current_dir" 2>/dev/null; then
     git_branch=$(git -c core.useBuiltinFSMonitor=false branch --show-current 2>/dev/null)
     git_root=$(git -c core.useBuiltinFSMonitor=false rev-parse --show-toplevel 2>/dev/null)
+    git_commit=$(git -c core.useBuiltinFSMonitor=false rev-parse --short HEAD 2>/dev/null)
 fi
 
 # Build repo path display (folder name only for brevity)
@@ -136,6 +137,9 @@ line1=$(printf '\033[37m[%s]\033[0m' "$short_model")
 line1="$line1 $(printf '\033[94m📁 %s\033[0m \033[2m@\033[0m \033[35m%s\033[0m' "$folder_name" "$(hostname -s)")"
 if [ -n "$git_branch" ]; then
     line1="$line1 $(printf '%b \033[96m🌿 %s\033[0m' "$SEP" "$git_branch")"
+fi
+if [ -n "$git_commit" ]; then
+    line1="$line1 $(printf '\033[2m%s\033[0m' "$git_commit")"
 fi
 
 # LINE 2: Progress bar | Context % | cost | duration
