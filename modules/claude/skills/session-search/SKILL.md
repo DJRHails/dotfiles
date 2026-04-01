@@ -5,7 +5,7 @@ description: Search previous Claude Code session history by keyword. Use when th
 
 # Session Search
 
-Search across all Claude Code session transcripts stored in `~/.agents/`.
+Search across all Claude Code session transcripts stored in `~/.claude/` and `~/.agents/`.
 
 ## When to use
 
@@ -18,7 +18,7 @@ Search across all Claude Code session transcripts stored in `~/.agents/`.
 Run the helper script with a quoted search query:
 
 ```bash
-python3 ~/.agents/skills/session-search/scripts/search.py "your search terms"
+python3 ~/.claude/skills/session-search/scripts/search.py "your search terms"
 ```
 
 All terms must appear in the same text block for a match (AND logic).
@@ -35,13 +35,13 @@ All terms must appear in the same text block for a match (AND logic).
 
 ```bash
 # Find sessions discussing margin notes
-python3 ~/.agents/skills/session-search/scripts/search.py "margin notes"
+python3 ~/.claude/skills/session-search/scripts/search.py "margin notes"
 
 # Narrow to a specific project
-python3 ~/.agents/skills/session-search/scripts/search.py "LoRA" --project kb
+python3 ~/.claude/skills/session-search/scripts/search.py "LoRA" --project kb
 
 # More context, more results
-python3 ~/.agents/skills/session-search/scripts/search.py "deploy" --context 400 --limit 20
+python3 ~/.claude/skills/session-search/scripts/search.py "deploy" --context 400 --limit 20
 ```
 
 ## Output
@@ -54,7 +54,7 @@ For each matching session the script prints:
 
 ## Notes
 
+- Searches both `~/.claude/projects/` and `~/.agents/projects/` for session transcripts
+- History index from both `~/.claude/history.jsonl` and `~/.agents/history.jsonl`
 - Searches only text content from user and assistant messages (skips tool calls, binary data, etc.)
-- History index (`~/.agents/history.jsonl`) provides session metadata (prompt, date, project)
-- Session transcripts live under `~/.agents/projects/<project-key>/<session-id>.jsonl`
 - Subagent files are not searched (only top-level session files)

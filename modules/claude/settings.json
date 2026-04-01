@@ -87,7 +87,7 @@
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
-  "defaultMode": "acceptEdits",
+  "effortLevel": "medium",
   "skipDangerousModePermissionPrompt": true,
-  "effortLevel": "medium"
+  "defaultMode": "acceptEdits"
 }

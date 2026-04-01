@@ -38,19 +38,29 @@ Write like you speak.
 5. **Connect sentences by referencing** — Each sentence should refer to the theme or rheme of the previous
 6. **Remove gerunds (-ing words)** — Be active, not passive
 7. **Flip the order** — Right branch sentences (subject-verb-object first) are more assertive
+8. **Verb early** — Put the verb as close to the start of the sentence as possible. Early verbs make sentences easier to parse.
+9. **Subject = focus** — Make the thing you care about the subject of the main clause. "The model achieves 95% accuracy" not "95% accuracy is achieved by the model."
+10. **Parallelism in lists** — Sibling items must match in grammar, capitalisation, and structure. If the first item is an imperative verb, every item is an imperative verb.
+11. **Algorithms don't try, think, or want** — Attribute intentions to researchers, not methods. "Our model tries to learn X" → "We train the model to learn X." Sloppy attribution undermines interpretability and fairness claims.
 
 ## Common Issues to Fix
 
 - **Passive voice**: "is logged and analysed" -> "the system logs and analyses it"
 - **Chatty fillers**: "Here's the kicker:", "And here's the twist:", "Of course,"
-- **Unnecessary words**: "currently", "precisely", "genuinely", "literally"
+- **Unnecessary words**: "currently", "precisely", "genuinely", "literally", "actually", "a bit", "fortunately", "very", "really", "extremely"
 - **Redundant phrases**: "a minority — a small but eager subset" (pick one)
-- **Long sentences**: Split sentences over 40 words
-- **Repeated words**: Watch for repeated "twist", "however", etc. in the same section
+- **Long sentences**: Split sentences over 40 words. Long sentences with simple words are fine; long sentences packed with dense content should be split. One sentence, one idea.
+- **Repeated words**: Watch for repeated "twist", "however", etc. in the same section. Do not repeat similar-sounding words in the same sentence.
 - **Vague 'this'**: Always clarify what "this" refers to
-- **Filler phrases**: "In order to" -> "To"; "Due to the fact that" -> "Because"; "It is important to note that" -> cut entirely
-- **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y"
+- **Filler phrases**: "In order to" -> "To"; "Due to the fact that" -> "Because"; "It is important to note that" -> cut entirely; "Note that" / "Observe that" -> cut, just state the observation; "Try to X" -> "X"
+- **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y". Limit "may" and "can" — hedge words should almost always be dropped. Either commit to the claim or cut it.
 - **Sycophantic tone**: "Great question!", "You're absolutely right!", "I hope this helps!" -- chatbot residue; delete on sight
+- **Bare comparatives**: "improves performance", "is more efficient" — compared to what? Always specify both sides of a comparison.
+- **Scare quotes**: Do not use quotation marks to smuggle imprecise words in. If a term needs scare quotes, find a precise term instead.
+- **Unnecessary sentences**: Ask of every sentence: "Is this necessary? Can I phrase this more simply?" Cut sentences that add no information.
+- **"Etc." and "and so on"**: Be exhaustive or pick representative examples. Trailing off signals lazy thinking.
+- **Number threshold**: Write whole numbers below ten as words; use numerals for 10 and above. Be consistent throughout the document.
+- **Vague praise**: "interesting", "fascinating", "groundbreaking" — without argument, these are empty. Explain *why* a result matters: first result, best performance, or new knowledge.
 
 ## AI Writing Patterns to Avoid
 
@@ -94,6 +104,9 @@ These patterns signal machine-generated text. Never use them.
 | `testament` | "stands as a testament to" |
 | `align with` | Corporate AI-speak |
 | `profound` | Almost never earned |
+| `interesting`, `fascinating` | Empty praise — explain *why* it matters |
+| `groundbreaking` | Let the reader judge significance |
+| `complex`, `rich` (as praise) | Vacuous; describe what makes it so |
 
 ### Banned Atmospheric Words
 
@@ -117,6 +130,62 @@ These patterns signal machine-generated text. Never use them.
 - **Vague attribution** — "Experts believe", "Industry observers note", "Several sources suggest". Name the source or cut the claim.
 - **Formulaic challenges sections** — "Despite challenges... continues to thrive." State the specific problem and what was done about it.
 - **Generic positive conclusions** — "The future looks bright", "Exciting times lie ahead." End with a concrete fact, not optimism.
+
+## Paragraph Craft
+
+1. **Lead and end with strong sentences** — The first sentence of a paragraph states the point. The last sentence drives it home. Middle sentences elaborate.
+2. **No orphan words** — A single word alone on the last line of a paragraph wastes space and looks ugly. Shorten a sentence in the paragraph to fix the layout.
+3. **Explain uncommon terminology on first use** — Define jargon, acronyms, or domain-specific terms the first time they appear.
+
+## Academic & Conference Papers
+
+These rules apply to formal academic writing. They override the conversational register elsewhere in this guide.
+
+### General
+
+1. **Expand contractions** — "it's" -> "it is", "don't" -> "do not"
+2. **Unfold possessive apostrophes** — "the model's accuracy" -> "the accuracy of the model". Formal register; aids non-native readers.
+3. **Do not start every sentence with "We"** — Vary sentence openings. "We train... We evaluate... We find..." is monotonous.
+4. **Do not begin sentences with conjunctions** — No "And", "But", or "Or" at the start of a sentence in formal writing.
+5. **Minimum 3 sentences per paragraph** — A 1-2 sentence paragraph signals an underdeveloped idea. Occasional exceptions for transitions.
+6. **Describe what your method does, not what it doesn't** — Positive framing. "Our method avoids X, Y, Z" tells the reader nothing about what the method *is*.
+7. **No hostages to fortune** — Avoid claims vulnerable to easy disagreement. Replace absolute claims with qualified ones ("many" instead of "most"). If you cannot defend a one-line boast, cut it.
+8. **Run a spell checker before final submission** — Overleaf misses errors that dedicated tools (e.g. Grammarly, LanguageTool) catch.
+
+### Abstract
+
+Structure the abstract as a 2-minute spotlight talk:
+
+1. Contextualise the problem (1-2 sentences)
+2. Identify the gap in existing approaches (1 sentence)
+3. State the contribution (1 sentence)
+4. Key results with concrete numbers (2-3 sentences)
+
+Include quantitative results directly — do not tease them. Avoid generic openings that could apply to any ML paper.
+
+### Introduction
+
+- **Arrive at the contribution quickly** — Lengthy front-matter bores reviewers. State what you did within the first page.
+- **Lead with a compelling real-world example** — Then formalise the abstract problem. Close the loop by addressing the motivating case in experiments.
+- **Anticipate critical questions** — Answer them before the reader raises them.
+
+### Layout
+
+- **Minimise white space** — Dense layouts let you fit more content in page-limited submissions. Applies to figures, captions, section headers, and paragraph spacing.
+- **Eye-catching first-page figure** — Most readers decide whether to continue based on the first page. A clear, compelling figure earns their attention.
+- **Spend writing time in proportion to reading time** — Title, abstract, and introduction receive the most reader attention. Spend equal effort on each. (Adapted from Jitendra Malik.)
+- **Balanced sections** — Section titles should belong to the same scope. A section should contain more than one subsection.
+
+### Citations
+
+- **Citation grammar** — A parenthetical citation must be removable without breaking the sentence. "Wilson et al. (2016) showed..." not "(Wilson et al. 2016) showed..."
+- **Cite generously** — Especially work by likely reviewers. Fill the references section; blank bibliography pages signal carelessness.
+- **Cite throughout the paper** — Not only in the Related Work section. Recent work (last 5-10 years) deserves inline citations.
+
+### Captions
+
+- **1-3 lines** — Avoid paragraph-length captions. The main text carries the argument.
+- **State direction** — Clarify whether higher or lower is better when the answer is ambiguous.
 
 ## Essay Style
 
@@ -167,3 +236,5 @@ Ask: does this change make the writing better, or just more uniform?
 ## References
 
 - [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) — comprehensive catalogue of AI text patterns, maintained by WikiProject AI Cleanup
+- [Shomir Wilson: Guide for Scholarly Writing](https://shomir.net/scholarly_writing.html) — detailed academic writing guide covering language, figures, citations, and LaTeX
+- [Zachary Lipton: Heuristics for Scientific Writing](https://www.approximatelycorrect.com/2018/01/29/heuristics-technical-scientific-writing-machine-learning-perspective/) — ML-focused writing heuristics covering abstracts, introductions, and positioning
