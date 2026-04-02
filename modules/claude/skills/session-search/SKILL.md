@@ -5,7 +5,7 @@ description: Search previous Claude Code session history by keyword. Use when th
 
 # Session Search
 
-Search across all Claude Code session transcripts stored in `~/.claude/` and `~/.agents/`.
+Search across all Claude Code session transcripts (`~/.claude/`, `~/.agents/`) and Pi agent sessions (`~/.pi/agent/sessions/`), including Pi artifacts (plans, context docs, etc.).
 
 ## When to use
 
@@ -54,7 +54,9 @@ For each matching session the script prints:
 
 ## Notes
 
-- Searches both `~/.claude/projects/` and `~/.agents/projects/` for session transcripts
+- Searches `~/.claude/projects/`, `~/.agents/projects/`, and `~/.pi/agent/sessions/` for session transcripts
 - History index from both `~/.claude/history.jsonl` and `~/.agents/history.jsonl`
-- Searches only text content from user and assistant messages (skips tool calls, binary data, etc.)
+- Pi sessions are identified with `[pi]` label and show the file path instead of a resume command
+- Pi artifacts (markdown files under `artifacts/`) are also searched and labelled `(pi artifact: <name>)`
+- Searches text content from user and assistant messages (skips tool calls, binary data, etc.)
 - Subagent files are not searched (only top-level session files)
