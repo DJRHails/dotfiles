@@ -3,7 +3,8 @@
 ##? Setup Claude Code CLI
 ##?
 ##? Installs Claude Code via official installer and sets up the configuration directory.
-##? Config lives in modules/claude/; symlinks.conf links into ~/.claude/ and ~/.agents/.
+##? Config lives in modules/claude/ (Claude-specific) and modules/agents/ (shared).
+##? symlinks.conf links into ~/.claude/ and ~/.agents/.
 
 . "$DOTFILES/scripts/core/main.sh"
 

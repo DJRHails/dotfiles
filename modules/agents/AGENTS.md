@@ -181,6 +181,12 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   - `$PROJECTS/github.com/TypeCellOS/BlockNote`
   - `$PROJECTS/registry.tiptap.dev/@tiptap-pro/extension-ai`
 
+### Worktrees
+
+- Put git worktrees under `.data/worktrees/` inside the repo root, not as sibling directories or in ad hoc temp locations.
+- Audit worktrees regularly: list them, verify they still map to active branches/PRs, and check for stale or abandoned work.
+- Clean worktrees regularly: remove merged or unused worktrees promptly so local state stays understandable and disk usage stays bounded.
+
 ## Session Insights & Memory
 
 - After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to AGENTS.md
