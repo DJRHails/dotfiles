@@ -225,6 +225,14 @@ mdstruct auto path/to/file            # splits .md file or joins folder
 
 - **Always gitignore `.agents/settings.local.json`** (and `.claude/settings.local.json`) - If you see these files in `git status` or `git diff`, add them to `.gitignore` before committing. These files contain local permissions and should never be tracked.
 
+## MCP Servers (mcporter)
+
+| server | description |
+| --- | --- |
+| `context7` | Look up live documentation and code examples for any library/framework via Context7 |
+| `playwriter` | Control Chrome via Playwright — browser automation, scraping, testing, and recording |
+| `serper-search` | Google search (web, images, videos, news, scholar, patents, shopping, maps) and webpage scraping via Serper |
+
 ## References
 
 - [trailofbits/claude-code-config](https://github.com/trailofbits/claude-code-config) - Security-hardened Claude Code configuration
