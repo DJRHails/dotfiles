@@ -182,10 +182,18 @@ Include quantitative results directly — do not tease them. Avoid generic openi
 - **Cite generously** — Especially work by likely reviewers. Fill the references section; blank bibliography pages signal carelessness.
 - **Cite throughout the paper** — Not only in the Related Work section. Recent work (last 5-10 years) deserves inline citations.
 
-### Captions
+## Figure Captions
 
-- **1-3 lines** — Avoid paragraph-length captions. The main text carries the argument.
-- **State direction** — Clarify whether higher or lower is better when the answer is ambiguous.
+Every caption should answer three questions in order: *what am I looking at*, *how should I read it*, and *what should I conclude*.
+
+1. **Self-contained** — A reader should understand the figure without reading the surrounding text. You could rip any figure out and it would still make sense.
+2. **Define terms inline** — Don't assume the reader remembers what a metric means. Restate definitions in the caption (e.g. "0 = uniform prediction, 100 = perfect foresight"; "replaceability = reduction in score when removing a model").
+3. **State the takeaway** — Don't just describe axes and labels. Say what the reader should conclude. "gpt-oss-120b climbs 7 points and marginally exceeds Gemini 3 Pro" not "shows training curves".
+4. **Include specific numbers** — Ensemble weights (40%, 20%, 20%, 20%), score improvements (38.6 → 45.8), chosen baselines (18.8%). Ground the caption so the figure is verifiable.
+5. **Explain design choices** — Why the Y-axis is truncated at 22.3, what marker colour encodes, why a particular baseline is chosen. Prevent misreading.
+6. **Short enough to scan** — Most captions should be 2–3 sentences. Earn extra length only by packing in necessary context.
+6. **1-3 lines** — Avoid paragraph-length captions. The main text carries the argument.
+7. **State direction** — Clarify whether higher or lower is better when the answer is ambiguous.
 
 ## Essay Style
 
