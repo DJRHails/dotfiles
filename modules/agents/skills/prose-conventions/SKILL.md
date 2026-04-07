@@ -192,8 +192,8 @@ Every caption should answer three questions in order: *what am I looking at*, *h
 4. **Include specific numbers** — Ensemble weights (40%, 20%, 20%, 20%), score improvements (38.6 → 45.8), chosen baselines (18.8%). Ground the caption so the figure is verifiable.
 5. **Explain design choices** — Why the Y-axis is truncated at 22.3, what marker colour encodes, why a particular baseline is chosen. Prevent misreading.
 6. **Short enough to scan** — Most captions should be 2–3 sentences. Earn extra length only by packing in necessary context.
-6. **1-3 lines** — Avoid paragraph-length captions. The main text carries the argument.
-7. **State direction** — Clarify whether higher or lower is better when the answer is ambiguous.
+7. **1-3 lines** — Avoid paragraph-length captions. The main text carries the argument.
+8. **State direction** — Clarify whether higher or lower is better when the answer is ambiguous.
 
 ## Essay Style
 
