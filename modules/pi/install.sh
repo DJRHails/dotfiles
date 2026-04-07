@@ -11,6 +11,14 @@ fi
 # Install pi extensions
 if platform::command_exists "pi"; then
   log::execute \
-    "pi install git:github.com/HazAT/pi-interactive-subagents" \
+    "pi install git:github.com/DJRHails/pi-interactive-subagents" \
     "pi-interactive-subagents"
+
+  log::execute \
+    "pi install git:github.com/pasky/chrome-cdp-skill" \
+    "chrome-cdp-skill"
+
+  log::execute \
+    "pi install git:github.com/HazAT/pi-smart-sessions" \
+    "pi-smart-sessions"
 fi
