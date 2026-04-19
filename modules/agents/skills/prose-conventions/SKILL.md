@@ -52,8 +52,8 @@ Write like you speak.
 - **Long sentences**: Split sentences over 40 words. Long sentences with simple words are fine; long sentences packed with dense content should be split. One sentence, one idea.
 - **Repeated words**: Watch for repeated "twist", "however", etc. in the same section. Do not repeat similar-sounding words in the same sentence.
 - **Vague 'this'**: Always clarify what "this" refers to
-- **Filler phrases**: "In order to" -> "To"; "Due to the fact that" -> "Because"; "It is important to note that" -> cut entirely; "Note that" / "Observe that" -> cut, just state the observation; "Try to X" -> "X"
-- **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y". Limit "may" and "can" — hedge words should almost always be dropped. Either commit to the claim or cut it.
+- **Filler phrases**: "In order to" -> "To"; "Due to the fact that" -> "Because"; "It is important to note that" / "It's worth noting" -> cut entirely; "Note that" / "Observe that" -> cut, just state the observation; "Try to X" -> "X"
+- **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y". Limit "may" and "can" — hedge words should almost always be dropped. Either commit to the claim or cut it. Specific AI hedge phrases to strip: "arguably", "it could be said", "in many ways", "to some extent".
 - **Sycophantic tone**: "Great question!", "You're absolutely right!", "I hope this helps!" -- chatbot residue; delete on sight
 - **Bare comparatives**: "improves performance", "is more efficient" — compared to what? Always specify both sides of a comparison.
 - **Scare quotes**: Do not use quotation marks to smuggle imprecise words in. If a term needs scare quotes, find a precise term instead.
@@ -68,7 +68,7 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Punctuation & Syntax
 
-- **Excessive em dashes** — use them sparingly. Prefer `;`.
+- **Excessive em dashes** — zero to two in the whole piece. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`.
 - **"It's not X, it's Y"** — formulaic contrast
 - **"You're not X, you're Y"** — formulaic contrast
 - **"No X. No Y. Just Z."** — rule-of-threes literary variant
@@ -93,8 +93,11 @@ These patterns signal machine-generated text. Never use them.
 | `nuanced` | Usually isn't |
 | `consult` | Corporate AI-speak |
 | `shaped by`, `shaped this` | Corporate AI-speak |
-| `additionally` | AI's favourite conjunction |
-| `crucial`, `pivotal`, `vital` | Inflated importance |
+| `additionally`, `furthermore`, `moreover`, `ultimately`, `indeed`, `that said`, `in conclusion` | AI connective tissue |
+| `crucial`, `pivotal`, `vital`, `plays a crucial role` | Inflated importance |
+| `ecosystem`, `synergy`, `the space` (vague nouns) | Replace with concrete things |
+| `realm`, `dive into` | AI spatial metaphors |
+| `meaningfully`, `seamless`, `credible`, `beautifully unpredictable`, `quietly radical`, `disproportionate effect` | AI modifier tells |
 | `enduring`, `lasting` | Legacy puffery |
 | `foster`, `cultivate` | AI growth verbs |
 | `enhance` | Vague improvement |
@@ -117,7 +120,8 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Rhetorical Moves
 
-- **Compulsive tricolons** — not everything needs three items
+- **Compulsive tricolons** — a balanced three-item list ("X, Y, and Z") is a fingerprint. Break to two, split across sentences, or disrupt with an off fourth item.
+- **Formulaic openings** — "In today's fast-paced world", "In the age of X", "There is something almost mythic about..."
 - **Empty profundity** — "carve your code into my core, etched like prophecy"
 - **Mixed metaphors** — piling concepts until collapse
 - **Sensory abstractions** — attaching physical senses to abstract concepts
@@ -130,6 +134,14 @@ These patterns signal machine-generated text. Never use them.
 - **Vague attribution** — "Experts believe", "Industry observers note", "Several sources suggest". Name the source or cut the claim.
 - **Formulaic challenges sections** — "Despite challenges... continues to thrive." State the specific problem and what was done about it.
 - **Generic positive conclusions** — "The future looks bright", "Exciting times lie ahead." End with a concrete fact, not optimism.
+
+### Human Signals — sprinkle these in
+
+Small imperfections that make prose sound like a person. From the Pangram reflection convergence.
+
+- **Real asides** — "give or take", "or whatever", "I forget the exact number", "this took me longer than I'd like to admit"
+- **Concrete specifics** — brand names, dollar amounts, street names, weather, times ("8 a.m."), named objects. Replaces vague abstract nouns.
+- **Vary list/step openings** — in numbered or stepped content, don't make every item start with an imperative verb. Alternate structures.
 
 ## Paragraph Craft
 
