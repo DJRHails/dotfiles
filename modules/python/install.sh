@@ -15,3 +15,10 @@ install::with "uv tool" "ty" "ty" ""
 install::with "uv tool" "pip-audit" "pip-audit" ""
 install::with "uv tool" "ipython" "ipython" ""
 install::with "uv tool" "jupyter" "jupyter-core" ""
+install::with "uv tool" "pre-commit" "pre-commit" ""
+
+if cmd_exists pre-commit; then
+  mkdir -p "$HOME/.git-hooks"
+  pre-commit init-templatedir "$HOME/.git-hooks" >/dev/null
+  log::success "pre-commit templatedir initialised at ~/.git-hooks"
+fi

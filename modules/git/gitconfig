@@ -191,6 +191,7 @@
     autocrlf = input
     editor = vim
     excludesfile = ~/.gitignore
+	hooksPath = /Users/dh/.git-hooks
 
 [diff]
 
@@ -248,6 +249,7 @@
 
 [init]
     defaultBranch = main
+	templateDir = /Users/dh/.git-hooks
 
 [fetch]
     prune = true
