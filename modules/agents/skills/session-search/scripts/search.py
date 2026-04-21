@@ -90,6 +90,7 @@ class PiSessionHeader:
     session_id: str = ""
     timestamp_iso: str = ""
     cwd: str = ""
+    name: str = ""
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -366,19 +367,24 @@ def search_session(sf: SessionFile, terms: Sequence[str], context_chars: int) ->
 
 
 def extract_pi_session_header(path: Path) -> PiSessionHeader:
+    session_id = timestamp_iso = cwd = name = ""
     try:
         with open(path) as f:
             for line in f:
-                obj = json.loads(line)
-                if obj.get("type") == "session":
-                    return PiSessionHeader(
-                        session_id=obj.get("id", ""),
-                        timestamp_iso=obj.get("timestamp", ""),
-                        cwd=obj.get("cwd", ""),
-                    )
-    except (json.JSONDecodeError, OSError):
+                try:
+                    obj = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                t = obj.get("type")
+                if t == "session":
+                    session_id = obj.get("id", "")
+                    timestamp_iso = obj.get("timestamp", "")
+                    cwd = obj.get("cwd", "")
+                elif t == "session_info" and obj.get("name"):
+                    name = obj["name"]  # last one wins
+    except OSError:
         pass
-    return PiSessionHeader()
+    return PiSessionHeader(session_id=session_id, timestamp_iso=timestamp_iso, cwd=cwd, name=name)
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +397,7 @@ def _build_pi_result(sf: SessionFile, matches: tuple[MatchSnippet, ...]) -> Sear
     return SearchResult(
         session_id=header.session_id or sf.file_id,
         path=sf.path,
-        display="(pi session)",
+        display=header.name or "(pi session)",
         timestamp_ms=_iso_to_ms(header.timestamp_iso),
         project=header.cwd or sf.path.parent.name,
         source=sf.source,
