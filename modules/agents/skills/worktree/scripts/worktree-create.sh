@@ -55,6 +55,9 @@ CHECKOUT_WORKERS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # End-to-end: ~7-8s vs ~180s for a 46GB repo with 12k tracked files.
 # Requires main worktree to be clean (no dirty tracked files), otherwise
 # we'd smuggle uncommitted content into the new worktree outside tree-diff.
+# If MAIN is dirty we auto-stash tracked/staged changes before the fast
+# path snapshots the tree and pop them back on EXIT (see stash block
+# below TMPDIR setup).
 worktree::fast_path_available() {
   [[ "$(uname)" == "Darwin" ]] || return 1
   command -v cpow >/dev/null 2>&1 || return 1
@@ -144,7 +147,30 @@ REMOTE_BRANCHES=$(
 # Pruning huge gitignored dirs (.venv, .next, .terraform, caches) is
 # critical — without it, a 46GB repo takes ~60s to walk.
 TMPDIR_WT=$(mktemp -d)
-trap 'rm -rf "$TMPDIR_WT"' EXIT
+
+# If MAIN has dirty tracked/staged changes, stash them so the fast path
+# can snapshot a clean tree, then pop on EXIT so the user's work is
+# never lost (even on Ctrl-C or mid-script failure). Untracked files
+# are left alone — ls-files -z ignores them so they don't leak into
+# the new worktree anyway.
+STASHED=
+if ! git -C "$MAIN" diff --quiet HEAD 2>/dev/null \
+   || ! git -C "$MAIN" diff --cached --quiet 2>/dev/null; then
+  if git -C "$MAIN" stash push -m "worktree-create: auto-stash" >/dev/null 2>&1; then
+    STASHED=1
+    worktree::info "stashed dirty main worktree (will pop on exit)"
+  else
+    worktree::warn "failed to stash dirty main — fast path will be skipped"
+  fi
+fi
+
+trap '
+  rm -rf "$TMPDIR_WT"
+  if [[ -n "${STASHED:-}" ]]; then
+    git -C "$MAIN" stash pop >/dev/null 2>&1 \
+      || echo "stash pop failed — run: git -C $MAIN stash pop" >&2
+  fi
+' EXIT
 
 # Shared prune expression for heavy/uninteresting trees.
 PRUNE_DIRS=(
