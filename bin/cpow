@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""Copy-on-write file/directory copy — macOS APFS + Linux btrfs/xfs.
+
+Three modes:
+
+  # Single clone (file or directory — recursive for dirs):
+  cpow <src> <dst>
+
+  # Batch of files (stdin: NUL-separated rel paths, cloned under src_root → dst_root):
+  git ls-files -z | cpow --batch-files <src_root> <dst_root>
+
+  # Batch of directory pairs (stdin: lines of "src\\tdst"):
+  printf '%s\\t%s\\n' /a /b /c /d | cpow --batch-dirs
+
+macOS: calls clonefile(2) — a single syscall clones an entire directory
+hierarchy, sharing data extents via APFS copy-on-write.
+Linux: falls back to `cp -R --reflink=auto` (FICLONE on btrfs/xfs).
+Elsewhere: falls back to a regular recursive copy.
+"""
+
+from __future__ import annotations
+
+import concurrent.futures
+import ctypes
+import ctypes.util
+import errno
+import os
+import platform
+import shutil
+import subprocess
+import sys
+
+_IS_MACOS = platform.system() == "Darwin"
+_IS_LINUX = platform.system() == "Linux"
+
+if _IS_MACOS:
+    _libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    _libc.clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint32]
+    _libc.clonefile.restype = ctypes.c_int
+    _CLONE_NOFOLLOW = 1
+
+
+def _clone_macos(src: str, dst: str) -> int:
+    rc = _libc.clonefile(src.encode(), dst.encode(), _CLONE_NOFOLLOW)
+    return 0 if rc == 0 else ctypes.get_errno()
+
+
+def _clone_linux(src: str, dst: str) -> int:
+    rc = subprocess.call(
+        ["/bin/cp", "-R", "--reflink=auto", src, dst],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return 0 if rc == 0 else errno.EIO
+
+
+def _clone_fallback(src: str, dst: str) -> int:
+    try:
+        if os.path.islink(src):
+            os.symlink(os.readlink(src), dst)
+        elif os.path.isdir(src):
+            shutil.copytree(src, dst, symlinks=True)
+        else:
+            shutil.copy2(src, dst, follow_symlinks=False)
+    except OSError as exc:
+        return exc.errno or errno.EIO
+    return 0
+
+
+def clone(src: str, dst: str, create_parent: bool = True) -> int:
+    """Clone src to dst. Returns 0 on success, else errno."""
+    if create_parent:
+        parent = os.path.dirname(dst)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+
+    if _IS_MACOS:
+        err = _clone_macos(src, dst)
+        if err == 0 or err == errno.EEXIST:
+            return err
+    elif _IS_LINUX:
+        err = _clone_linux(src, dst)
+        if err == 0:
+            return 0
+    return _clone_fallback(src, dst)
+
+
+def _clone_file_entry(src: str, dst: str) -> None:
+    """Clone one tracked file — handles symlinks and parent creation."""
+    parent = os.path.dirname(dst)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    if os.path.islink(src):
+        try:
+            os.symlink(os.readlink(src), dst)
+        except FileExistsError:
+            pass
+        return
+    err = clone(src, dst, create_parent=False)
+    if err and err != errno.EEXIST:
+        shutil.copy2(src, dst, follow_symlinks=False)
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        sys.exit(__doc__)
+
+    workers = max(os.cpu_count() or 4, 4)
+    mode = sys.argv[1]
+
+    if mode == "--batch-dirs":
+        pairs = [
+            line.split("\t", 1)
+            for line in sys.stdin.read().splitlines()
+            if line
+        ]
+        errors: list[str] = []
+
+        def run(pair: list[str]) -> None:
+            src, dst = pair
+            if os.path.exists(dst):
+                return
+            err = clone(src, dst)
+            if err and err != errno.EEXIST:
+                errors.append(f"{src} -> {dst}: {os.strerror(err)} ({err})")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(run, pairs))
+
+        for e in errors:
+            print(f"cpow: {e}", file=sys.stderr)
+        sys.exit(1 if errors else 0)
+
+    if mode == "--batch-files":
+        if len(sys.argv) < 4:
+            sys.exit(__doc__)
+        src_root = sys.argv[2].rstrip("/")
+        dst_root = sys.argv[3].rstrip("/")
+        paths = [p.decode() for p in sys.stdin.buffer.read().split(b"\0") if p]
+        if not paths:
+            return
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [
+                ex.submit(_clone_file_entry, f"{src_root}/{p}", f"{dst_root}/{p}")
+                for p in paths
+            ]
+            for f in concurrent.futures.as_completed(futures):
+                f.result()
+        return
+
+    # Single-shot: cpow <src> <dst>
+    if len(sys.argv) != 3:
+        sys.exit(__doc__)
+    src, dst = sys.argv[1], sys.argv[2]
+    if os.path.exists(dst):
+        print(f"cpow: destination already exists: {dst}", file=sys.stderr)
+        sys.exit(1)
+    err = clone(src, dst)
+    if err:
+        print(
+            f"cpow: {src} -> {dst}: {os.strerror(err)} ({err})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
