@@ -19,6 +19,10 @@ if platform::command_exists "pi"; then
     "chrome-cdp-skill"
 
   log::execute \
-    "pi install git:github.com/HazAT/pi-smart-sessions" \
+    "pi install git:github.com/DJRHails/pi-smart-sessions" \
     "pi-smart-sessions"
+
+  log::execute \
+    "pi install npm:pi-multi-pass" \
+    "pi-multi-pass"
 fi

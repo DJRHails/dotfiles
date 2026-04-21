@@ -1,5 +1,6 @@
 {
   "packages": [
-    "git:github.com/DJRHails/pi-interactive-subagents"
+    "git:github.com/DJRHails/pi-interactive-subagents",
+    "npm:pi-multi-pass"
   ]
 }
