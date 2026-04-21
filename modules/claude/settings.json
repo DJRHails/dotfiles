@@ -19,8 +19,6 @@
       "Bash(dd *)",
       "Bash(curl *|bash*)",
       "Bash(wget *|bash*)",
-      "Bash(git push --force*)",
-      "Bash(git push *--force*)",
       "Bash(git reset --hard*)",
       "Edit(~/.bashrc)",
       "Edit(~/.zshrc)",
@@ -73,6 +71,34 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/block-inline-scripts.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/block-force-push-main.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js session-start",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js stop",
+            "async": true
           }
         ]
       }

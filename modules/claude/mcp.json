@@ -4,8 +4,11 @@
       "type": "stdio",
       "command": "npx",
       "args": [
-        "playwriter"
-      ]
+        "playwriter@0.0.105"
+      ],
+      "env": {
+        "PLAYWRITER_AUTO_ENABLE": "1"
+      }
     },
     "figma-dev-mode-mcp-server": {
       "type": "http",
