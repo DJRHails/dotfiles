@@ -215,6 +215,11 @@ Every caption should answer three questions in order: *what am I looking at*, *h
 - Write the way a brilliant after-dinner speaker talks: digressive and funny, happy to make a bold claim and then back it up with a surprising example rather than a footnote.
 - Reframe — take a familiar experience and make the reader see it differently. The reader should take pleasure in the shift in perspective.
 - Write with genuine warmth towards human fallibility. Do not be cynical. Find contradictions and confusion endearing rather than contemptible. Make the reader feel understood rather than judged.
+- Prefer unfolding cadence to drumbeat cadence. Let a paragraph develop an idea, turn it once, then land it. Avoid stacks of short verdict sentences unless you need a deliberate jolt.
+- Do not make every insight sound like a slogan. A line can be neat; it should not feel pre-fabricated. If a sentence reads like a maxim dropped in from above, soften it with explanation, example, or a human observation.
+- Let conclusions feel discovered, not announced. The final instruction or claim should sound like the natural end of the argument, not a poster slogan pasted on top.
+- Mix sentence lengths. A short sentence works best after a longer one has set it up. Too many short declarative sentences in a row make the prose sound abrupt and prosecutorial.
+- Preserve warmth in analytical writing. When describing confusion, ambiguity, or disagreement, sound interested rather than exasperated.
 
 ## Technical Writing
 
