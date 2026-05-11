@@ -43,6 +43,7 @@
       "Read(~/Library/Application Support/**/solflare*/**)"
     ]
   },
+  "model": "opus",
   "enableAllProjectMcpServers": false,
   "hooks": {
     "Notification": [
@@ -113,7 +114,8 @@
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
+  "theme": "dark",
   "defaultMode": "acceptEdits"
 }
