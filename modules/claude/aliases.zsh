@@ -2,9 +2,11 @@
 
 alias claude::yolo="claude --dangerously-skip-permissions"
 
+_claude_aliases_dir="${${(%):-%x}:A:h}"
+
 claude::jnj() {
   set -a
-  source "${0:A:h}/.env.jnj"
+  source "${_claude_aliases_dir}/.env.jnj"
   set +a
   claude "$@"
 }
