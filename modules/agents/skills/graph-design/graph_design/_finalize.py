@@ -61,6 +61,7 @@ def finalize(
     y_cursor = bbox.y1 + y_start
 
     if descriptor:
+        n_desc_lines = descriptor.count("\n") + 1
         fig.text(
             tx,
             y_cursor,
@@ -71,8 +72,11 @@ def finalize(
             color=C_TEXT,
             va="bottom",
             ha="left",
+            linespacing=1.25,
         )
-        y_cursor += 0.032 + line_gap
+        # 0.032 is the height of one descriptor line in figure coords;
+        # add 0.022 per extra line so the title sits clear of the wrap.
+        y_cursor += 0.032 + 0.022 * (n_desc_lines - 1) + line_gap
 
     if title:
         fp = fm.FontProperties(family=_get_font(), weight=700)
