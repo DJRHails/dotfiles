@@ -7,16 +7,23 @@ from typing import Sequence
 from graph_design._palette import C_CI, C_GRID, C_LABEL, C_RED, C_SPINE, colors
 
 
-def ci_fill(ax, x, y_lower, y_upper, *, color: str | None = None):
-    """Fill a confidence-interval band using Economist salmon (#f5c5b8)."""
-    ax.fill_between(
-        x,
-        y_lower,
-        y_upper,
-        color=color or C_CI,
-        linewidth=0,
-        zorder=1,
-    )
+def ci_fill(ax, x, y_lower, y_upper, *, color: str | None = None, alpha: float = 0.20):
+    """Fill a confidence-interval band.
+
+    By default uses the Economist salmon (#f5c5b8) at full opacity — the
+    legacy behaviour, fine for charts with a single series. When a colour is
+    provided, draws a semi-transparent fill in that colour so the band visibly
+    matches its line. Pair with `ax.plot(..., color=col)` and pass the same
+    `col` here.
+
+    Args:
+        color: Fill colour. Pass the matching line colour to colour-match.
+        alpha: Opacity when `color` is given. Ignored when `color` is None.
+    """
+    if color is None:
+        ax.fill_between(x, y_lower, y_upper, color=C_CI, linewidth=0, zorder=1)
+    else:
+        ax.fill_between(x, y_lower, y_upper, color=color, alpha=alpha, linewidth=0, zorder=1)
 
 
 def bar_h(

@@ -104,9 +104,22 @@ def finalize(
     )
 
     if source:
+        # Place source below the xlabel if present, so the two never collide.
+        # Default: bbox.y0 - 0.06. With an xlabel rendered, measure its lower
+        # edge in figure coords and put the source line under that.
+        source_y = bbox.y0 - 0.06
+        xlabel = ax.xaxis.label
+        if xlabel.get_text():
+            try:
+                renderer = fig.canvas.get_renderer()
+                xlbl_bbox = xlabel.get_window_extent(renderer=renderer)
+                xlbl_fig = xlbl_bbox.transformed(fig.transFigure.inverted())
+                source_y = min(source_y, xlbl_fig.y0 - 0.015)
+            except Exception:
+                pass
         fig.text(
             tx,
-            bbox.y0 - 0.06,
+            source_y,
             source,
             transform=fig.transFigure,
             fontsize=7.5,
