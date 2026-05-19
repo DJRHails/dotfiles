@@ -19,6 +19,15 @@ check_api_key() {
     fi
 }
 
+# Strip a -<slot> suffix to get the underlying GPU type. "4090-a" -> "4090".
+# Allows multiple pods of the same GPU type to coexist via distinct slot names
+# (gpu-4090, gpu-4090-a, gpu-4090-b, ...). The slot is preserved in state-file
+# keys so each pod is tracked independently; the base name is used for the
+# RunPod API gpuTypeIds lookup.
+gpu_base() {
+    echo "${1%-*}"
+}
+
 # Execute a REST API call
 runpod_api() {
     local method="$1"
@@ -59,7 +68,7 @@ get_pod_ssh() {
 # Returns the pod ID on success
 create_pod() {
     local gpu="$1"
-    local gpu_type="${GPU_TYPES[$gpu]}"
+    local gpu_type="${GPU_TYPES[$(gpu_base "$gpu")]}"
 
     if [ -z "$gpu_type" ]; then
         echo "[gpu-vm] Unknown GPU type: ${gpu}. Available: ${!GPU_TYPES[*]}" >&2

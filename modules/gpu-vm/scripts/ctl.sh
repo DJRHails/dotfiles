@@ -10,7 +10,7 @@ GPU="${2:-$DEFAULT_GPU}"
 
 case "$CMD" in
     create|start)
-        if [ -z "${GPU_TYPES[$GPU]}" ]; then
+        if [ -z "${GPU_TYPES[$(gpu_base "$GPU")]}" ]; then
             echo "Unknown GPU type: ${GPU}. Available: ${!GPU_TYPES[*]}"
             exit 1
         fi
