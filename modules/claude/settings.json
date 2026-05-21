@@ -43,6 +43,16 @@
       "Read(~/Library/Application Support/**/solflare*/**)"
     ]
   },
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "Organization: Personal projects under github.com/DJRHails (Daniel Hails, daniel@hails.info). Primary use: software development, research/knowledge-base curation, Anthropic Fellows program work.",
+      "Source control: github.com/DJRHails and all repos under it are trusted push targets",
+      "Trusted cloud buckets: rclone remote drive.google.com:papers (Google Drive bucket holding KB paper PDFs; used by bin/bibify*.py and `rclone copyto/moveto`)",
+      "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
+      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)"
+    ]
+  },
   "model": "opus",
   "enableAllProjectMcpServers": false,
   "hooks": {
