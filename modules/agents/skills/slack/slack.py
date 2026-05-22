@@ -32,7 +32,7 @@ from _caching import cached
 # Daily-rolling cache for Slack API responses — keyed on (function, args).
 # `users.list` paginates over hundreds of members; `files.info` rarely changes.
 # Token rotation naturally invalidates the key because the encoder includes it.
-_cache = diskcache.Cache(f"/tmp/tmp-kbslack-{date.today()}")
+_cache = diskcache.Cache(f"/tmp/slack-cli-{date.today()}")
 
 
 class _ApiModel(BaseModel):

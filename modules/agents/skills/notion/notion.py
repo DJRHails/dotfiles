@@ -31,7 +31,7 @@ from _caching import cached
 # Daily-rolling cache for Notion page fetches. Each `_collect_blocks` call
 # can be many round-trips through `loadPageChunk`; caching by page_uuid
 # makes repeat reads instant. Token rotation invalidates the key.
-_cache = diskcache.Cache(f"/tmp/tmp-kbnotion-{date.today()}")
+_cache = diskcache.Cache(f"/tmp/notion-cli-{date.today()}")
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 err = Console(stderr=True)

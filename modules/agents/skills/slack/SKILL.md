@@ -83,7 +83,7 @@ Workspace resolution: derived from the validated token's `auth.test` URL. Overri
 
 ## Caching
 
-Responses memoized to `/tmp/tmp-kbslack-{YYYY-MM-DD}` (rolls daily). The heavyweight `users.list` pagination (hundreds of members across multiple pages) and `auth.test` token-probing dominate uncached time; both are cached after first run. Pydantic models round-trip via `_caching`'s `model_dump`/`model_validate`.
+Responses memoized to `/tmp/slack-cli-{YYYY-MM-DD}` (rolls daily). The heavyweight `users.list` pagination (hundreds of members across multiple pages) and `auth.test` token-probing dominate uncached time; both are cached after first run. Pydantic models round-trip via `_caching`'s `model_dump`/`model_validate`.
 
 ## Gotchas
 
@@ -94,4 +94,4 @@ Responses memoized to `/tmp/tmp-kbslack-{YYYY-MM-DD}` (rolls daily). The heavywe
 ## Local files
 
 - `slack.py` — the CLI (PEP 723 inline deps, runs via `uv run`)
-- `_caching.py` — disk-cache decorator with pydantic-aware encoding; vendored copy of `kb/bin/shared/cached.py`
+- `_caching.py` — disk-cache decorator with pydantic-aware encoding
