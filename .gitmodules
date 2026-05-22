@@ -4,3 +4,6 @@
 [submodule "modules/askllm"]
 	path = modules/askllm
 	url = git@github.com:DJRHails/askllm.git
+[submodule "modules/agents/skills/graph-design/graphs"]
+	path = modules/agents/skills/graph-design/graphs
+	url = https://github.com/DJRHails/graphs.git

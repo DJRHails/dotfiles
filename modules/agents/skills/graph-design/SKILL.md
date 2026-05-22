@@ -10,10 +10,17 @@ description: >
 
 Economist-style data-visualisation system for matplotlib and seaborn.
 
+> **Source is now external.** The Python package has been extracted to
+> [`DJRHails/graphs`](https://github.com/DJRHails/graphs) and is vendored here
+> as a git submodule at `./graphs/`. Install with `pip install djrhails-graphs`
+> (PyPI), or `pip install git+https://github.com/DJRHails/graphs.git` until the
+> PyPI release lands. The import package is `graphs` (renamed from
+> `graph_design`).
+
 ## Quick start
 
 ```python
-from graph_design import set_theme, finalize, label_lines, get_font, colors
+from graphs import set_theme, finalize, label_lines, get_font, colors
 
 set_theme()
 
@@ -60,7 +67,7 @@ labels `#666666`, CI band `#f5c5b8`.
 IBM Plex Sans is loaded automatically. If the font is already registered
 in matplotlib's font manager (e.g. installed system-wide), no download
 occurs. Otherwise the TTF files are fetched from `github.com/IBM/plex`
-on first use and cached in `graph_design/_fonts_cache/`.
+on first use and cached in `graphs/_fonts_cache/`.
 
 Fallback chain: IBM Plex Sans → Verdana → Arial → DejaVu Sans.
 
@@ -74,14 +81,15 @@ Fallback chain: IBM Plex Sans → Verdana → Arial → DejaVu Sans.
 ## Package structure
 
 ```
-graph_design/
+graphs/
 ├── __init__.py      # re-exports all public API
 ├── _palette.py      # colours: C_BG, C_SPINE, C_RED, C_CI, colors, …
 ├── _fonts.py        # IBM Plex Sans lazy loader (skips download if registered)
 ├── _theme.py        # set_theme() — global rcParams
 ├── _finalize.py     # finalize(), panel_label()
 ├── _charts.py       # bar_h(), dumbbell(), ci_fill()
-└── _labels.py       # label_lines()
+├── _labels.py       # label_lines()
+└── _legend.py       # smart_legend()
 ```
 
 ## API reference
@@ -92,19 +100,41 @@ Apply the Economist visual style globally. Call once at the top of a script.
 Sets rcParams for figure size (7×5), DPI (150), grid, spines, ticks, fonts,
 and the 8-colour cycle.
 
-### `finalize(ax, title, descriptor, source, *, y_axis_right, title_x, y_start)`
+### `finalize(ax, title, descriptor, source, *, y_axis_right, title_x, y_start, autoscale_y)`
 
 Add the title stack, red rule, and source line. Moves y-axis to the right.
+Auto-checks for two common bugs:
+
+- **Reversed x-axis** — warns if `xlim[0] > xlim[1]` (e.g. accidentally
+  inverted axes).
+- **Wasted y-canvas** — when the data fills <40% of the current y-range and
+  the user hasn't pinned `ylim`, auto-tightens to data + 10% headroom.
+  Disable with `autoscale_y=False` if you need a fixed 0–100% canvas.
+
+`source` is placed below the lowest of (xlabel, x-tick labels), so wrapped
+two-line tick labels can't clip into the source line anymore.
 
 - `title_x` — override horizontal anchor (figure coords). Use `0.02` for
   charts with wide left margins or faceted layouts.
 - `y_start` — vertical gap above axes where the stack begins. Increase to
   `0.075` for faceted charts to clear panel labels.
 
-### `label_lines(ax, labels, *, x_offset, fontsize, stroke, min_sep_pct)`
+### `label_lines(ax, labels, *, x_offset, fontsize, stroke, min_sep_pct, tick_pad_pct, edge_pull_pct)`
 
 Label each line at its rightmost point. Applies iterative vertical nudges to
-prevent collisions. `stroke=True` adds a white halo for readability.
+prevent collisions and a render-pass pixel-overlap fix so labels never stack.
+Lines that end exactly at the axis extremes are pulled `edge_pull_pct` into
+the chart so they don't print on top of the 0% / 100% tick text. After
+placement, warns if any label still overlaps a y-tick label.
+`stroke=True` adds a white halo for readability.
+
+### `smart_legend(ax, *, pad, prefer, fontsize, frame, **legend_kwargs)`
+
+Place a legend in the emptiest corner. Scores all four corners by the
+pixel-area of data ink (bars, lines, error bars, fills) overlapping a
+candidate legend bbox, then picks the lowest-overlap corner. Falls back to
+warning if even the best corner overlaps data — in that case move the
+legend outside the axes via `bbox_to_anchor`.
 
 ### `ci_fill(ax, x, y_lower, y_upper, *, color)`
 
