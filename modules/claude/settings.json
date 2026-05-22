@@ -51,6 +51,10 @@
       "Trusted cloud buckets: rclone remote drive.google.com:papers (Google Drive bucket holding KB paper PDFs; used by bin/bibify*.py and `rclone copyto/moveto`)",
       "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
       "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)"
+    ],
+    "allow": [
+      "$defaults",
+      "Reading the user's own Chromium-family browser profile data (~/Library/Application Support/{Arc,Google/Chrome,Chromium,BraveSoftware/Brave-Browser,Microsoft Edge}/User Data/*/{Local Storage,IndexedDB,Session Storage,Cookies}/**) is authorized for the chromium-reader library at $PROJECTS/github.com/DJRHails/chromium-reader and for bin/{slack,notion}.py token/cookie auto-discovery in $PROJECTS/github.com/DJRHails/kb. Analogous to yt-dlp's --cookies-from-browser — the user's own scripts reading the user's own browser data. NOT exfiltration: nothing leaves the machine; extracted secrets stay local (e.g. ~/.config/slack/token, mode 0600) or are used in-process for API calls the user themselves makes daily."
     ]
   },
   "model": "opus",
