@@ -13,7 +13,7 @@ stdin_data=$(cat)
 # Single jq call - extract all values at once
 # Prefer pre-calculated remaining_percentage (100 - remaining = used toward compact)
 # Fall back to manual calc from raw tokens if not available
-IFS=$'\t' read -r current_dir model_name cost lines_added lines_removed duration_ms ctx_used cache_pct < <(
+IFS=$'\t' read -r current_dir model_name cost lines_added lines_removed duration_ms ctx_used cache_pct session_id < <(
     echo "$stdin_data" | jq -r '[
         .workspace.current_dir // "unknown",
         .model.display_name // "Unknown",
@@ -37,7 +37,8 @@ IFS=$'\t' read -r current_dir model_name cost lines_added lines_removed duration
                 ((.cache_read_input_tokens // 0) * 100 /
                  ((.input_tokens // 0) + (.cache_read_input_tokens // 0))) | floor
             else 0 end
-        ) catch 0)
+        ) catch 0),
+        (.session_id // "")
     ] | @tsv'
 )
 
@@ -51,6 +52,7 @@ if [ -z "$current_dir" ] && [ -z "$model_name" ]; then
     duration_ms=$(echo "$stdin_data" | jq -r '(.cost.total_duration_ms // 0)' 2>/dev/null)
     ctx_used=""
     cache_pct="0"
+    session_id=$(echo "$stdin_data" | jq -r '.session_id // ""' 2>/dev/null)
     : "${current_dir:=unknown}"
     : "${model_name:=Unknown}"
     : "${cost:=0}"
@@ -161,6 +163,9 @@ else
 fi
 if [ -n "$session_time" ]; then
     line2="$line2 $(printf '%b \033[36m⏱ %s\033[0m' "$SEP" "$session_time")"
+fi
+if [ -n "$session_id" ]; then
+    line2="$line2 $(printf ' \033[2m%s\033[0m' "$session_id")"
 fi
 if [ "$cache_pct" -gt 0 ] 2>/dev/null; then
     line2="$line2 $(printf ' \033[2m↻%s%%\033[0m' "$cache_pct")"
