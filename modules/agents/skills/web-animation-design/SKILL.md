@@ -1,325 +1,226 @@
----
-name: web-animation-design
-description: "Design and implement web animations that feel natural and purposeful. Use this skill proactively whenever the user asks questions about animations, motion, easing, timing, duration, springs, transitions, or animation performance. This includes questions about how to animate specific UI elements, which easing to use, animation best practices, or accessibility considerations for motion. Triggers on: easing, ease-out, ease-in, ease-in-out, cubic-bezier, bounce, spring physics, keyframes, transform, opacity, fade, slide, scale, hover effects, microinteractions, Framer Motion, React Spring, GSAP, CSS transitions, entrance/exit animations, page transitions, stagger, will-change, GPU acceleration, prefers-reduced-motion, modal/dropdown/tooltip/popover/drawer animations, gesture animations, drag interactions, button press feel, feels janky, make it smooth."
----
-
-# Web Animation Design
-
-A comprehensive guide for creating animations that feel right, based on Emil Kowalski's "Animations on the Web" course.
-
-## Initial Response
-
-When this skill is first invoked without a specific question, respond only with:
-> I'm ready to help you with animations based on Emil Kowalski's animations.dev course.
-
-Do not provide any other information until the user asks a question.
-
-## Review Format (Required)
-
-When reviewing animations, you MUST use a markdown table. Do NOT use a list with "Before:" and "After:" on separate lines. Always output an actual markdown table like this:
-
-| Before                                | After                                           |
-| ------------------------------------- | ----------------------------------------------- |
-| `transform: scale(0)`                 | `transform: scale(0.95)`                        |
-| `animation: fadeIn 400ms ease-in`     | `animation: fadeIn 200ms ease-out`              |
-| No reduced motion support             | `@media (prefers-reduced-motion: reduce) {...}` |
-
-Wrong format (never do this):
-```
-Before: transform: scale(0)
-After: transform: scale(0.95)
-────────────────────────────
-Before: 400ms duration
-After: 200ms
-```
-
-Correct format: A single markdown table with | Before | After | columns, one row per issue.
-
-## Quick Start
-
-Every animation decision starts with these questions:
-
-1. **Is this element entering or exiting?** → Use `ease-out`
-2. **Is an on-screen element moving?** → Use `ease-in-out`
-3. **Is this a hover/color transition?** → Use `ease`
-4. **Will users see this 100+ times daily?** → Don't animate it
-
-## The Easing Blueprint
-
-### ease-out (Most Common)
-
-Use for **user-initiated interactions**: dropdowns, modals, tooltips, any element entering or exiting the screen.
-
-```css
-/* Sorted weak to strong */
---ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
---ease-out-cubic: cubic-bezier(0.215, 0.61, 0.355, 1);
---ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
---ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
---ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
---ease-out-circ: cubic-bezier(0.075, 0.82, 0.165, 1);
-```
-
-Why it works: Acceleration at the start creates an instant, responsive feeling. The element "jumps" toward its destination then settles in.
-
-### ease-in-out (For Movement)
-
-Use when **elements already on screen need to move or morph**. Mimics natural motion like a car accelerating then braking.
-
-```css
-/* Sorted weak to strong */
---ease-in-out-quad: cubic-bezier(0.455, 0.03, 0.515, 0.955);
---ease-in-out-cubic: cubic-bezier(0.645, 0.045, 0.355, 1);
---ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
---ease-in-out-quint: cubic-bezier(0.86, 0, 0.07, 1);
---ease-in-out-expo: cubic-bezier(1, 0, 0, 1);
---ease-in-out-circ: cubic-bezier(0.785, 0.135, 0.15, 0.86);
-```
-
-### ease (For Hover Effects)
-
-Use for **hover states and color transitions**. The asymmetrical curve (faster start, slower end) feels elegant for gentle animations.
-
-```css
-transition: background-color 150ms ease;
-```
-
-### linear (Avoid in UI)
-
-Only use for:
-
-- Constant-speed animations (marquees, tickers)
-- Time visualization (hold-to-delete progress indicators)
-
-Linear feels robotic and unnatural for interactive elements.
-
-### ease-in (Almost Never)
-
-**Avoid for UI animations.** Makes interfaces feel sluggish because the slow start delays visual feedback.
-
-### Paired Elements Rule
-
-Elements that animate together must use the same easing and duration. Modal + overlay, tooltip + arrow, drawer + backdrop—if they move as a unit, they should feel like a unit.
-
-```css
-/* Both use the same timing */
-.modal { transition: transform 200ms ease-out; }
-.overlay { transition: opacity 200ms ease-out; }
-```
-
-## Timing and Duration
-
-### Duration Guidelines
-
-| Element Type                      | Duration  |
-| --------------------------------- | --------- |
-| Micro-interactions                | 100-150ms |
-| Standard UI (tooltips, dropdowns) | 150-250ms |
-| Modals, drawers                   | 200-300ms |
-| Page transitions                  | 300-400ms |
-
-**Rule:** UI animations should stay under 300ms. Larger elements animate slower than smaller ones.
-
-### The Frequency Principle
-
-Determine how often users will see the animation:
-
-- **100+ times/day** → No animation (or drastically reduced)
-- **Occasional use** → Standard animation
-- **Rare/first-time** → Can add delight
-
-**Example:** Raycast never animates its menu toggle because users open it hundreds of times daily.
-
-## When to Animate
-
-**Do animate:**
-
-- Enter/exit transitions for spatial consistency
-- State changes that benefit from visual continuity
-- Responses to user actions (feedback)
-- Rarely-used interactions where delight adds value
-
-**Don't animate:**
-
-- Keyboard-initiated actions
-- Hover effects on frequently-used elements
-- Anything users interact with 100+ times daily
-- When speed matters more than smoothness
-
-**Marketing vs. Product:**
-
-- Marketing: More elaborate, longer durations allowed
-- Product: Fast, purposeful, never frivolous
-
-## Spring Animations
-
-Springs feel more natural because they don't have fixed durations—they simulate real physics.
-
-### When to Use Springs
-
-- Drag interactions with momentum
-- Elements that should feel "alive" (Dynamic Island)
-- Gestures that can be interrupted mid-animation
-- Organic, playful interfaces
-
-### Configuration
-
-**Apple's approach (recommended):**
-
-```js
-// Duration + bounce (easier to understand)
-{ type: "spring", duration: 0.5, bounce: 0.2 }
-```
-
-**Traditional physics:**
-
-```js
-// Mass, stiffness, damping (more complex)
-{ type: "spring", mass: 1, stiffness: 100, damping: 10 }
-```
-
-### Bounce Guidelines
-
-- **Avoid bounce** in most UI contexts
-- **Use bounce** for drag-to-dismiss, playful interactions
-- Keep bounce subtle (0.1-0.3) when used
-
-### Interruptibility
-
-Springs maintain velocity when interrupted—CSS animations restart from zero. This makes springs ideal for gestures users might change mid-motion.
-
-## Performance
-
-### The Golden Rule
-
-Only animate `transform` and `opacity`. These skip layout and paint stages, running entirely on the GPU.
-
-**Avoid animating:**
-
-- `padding`, `margin`, `height`, `width` (trigger layout)
-- `blur` filters above 20px (expensive, especially Safari)
-- CSS variables in deep component trees
-
-### Optimization Techniques
-
-```css
-/* Force GPU acceleration */
-.animated-element {
-  will-change: transform;
-}
-```
-
-**React-specific:**
-
-- Animate outside React's render cycle when possible
-- Use refs to update styles directly instead of state
-- Re-renders on every frame = dropped frames
-
-**Framer Motion:**
-
-```jsx
-// Hardware accelerated (transform as string)
-<motion.div animate={{ transform: "translateX(100px)" }} />
-
-// NOT hardware accelerated (more readable)
-<motion.div animate={{ x: 100 }} />
-```
-
-### CSS vs. JavaScript
-
-- CSS animations run off main thread (smoother under load)
-- JS animations (Framer Motion, React Spring) use `requestAnimationFrame`
-- CSS better for simple, predetermined animations
-- JS better for dynamic, interruptible animations
-
-## Accessibility
-
-Animations can cause motion sickness or distraction for some users.
-
-### prefers-reduced-motion
-
-Whenever you add an animation, also add a media query to disable it:
-
-```css
-.modal {
-  animation: fadeIn 200ms ease-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .modal {
-    animation: none;
-  }
-}
-```
-
-### Reduced Motion Guidelines
-
-- Every animated element needs its own `prefers-reduced-motion` media query
-- Set `animation: none` or `transition: none` (no `!important`)
-- No exceptions for opacity or color - disable all animations
-- Show play buttons instead of autoplay videos
-
-### Framer Motion Implementation
-
-```jsx
-import { useReducedMotion } from "framer-motion";
-
-function Component() {
-  const shouldReduceMotion = useReducedMotion();
-
-  return (
-    <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    />
-  );
-}
-```
-
-### Touch Device Considerations
-
-```css
-/* Disable hover animations on touch devices */
-@media (hover: hover) and (pointer: fine) {
-  .element:hover {
-    transform: scale(1.05);
-  }
-}
-```
-
-Touch devices trigger hover on tap, causing false positives.
-
-## Practical Tips
-
-Quick reference for common scenarios. See [PRACTICAL-TIPS.md](PRACTICAL-TIPS.md) for detailed implementations.
-
-| Scenario                        | Solution                                        |
-| ------------------------------- | ----------------------------------------------- |
-| Make buttons feel responsive    | Add `transform: scale(0.97)` on `:active`       |
-| Element appears from nowhere    | Start from `scale(0.95)`, not `scale(0)`        |
-| Shaky/jittery animations        | Add `will-change: transform`                    |
-| Hover causes flicker            | Animate child element, not parent               |
-| Popover scales from wrong point | Set `transform-origin` to trigger location      |
-| Sequential tooltips feel slow   | Skip delay/animation after first tooltip        |
-| Small buttons hard to tap       | Use 44px minimum hit area (pseudo-element)      |
-| Something still feels off       | Add subtle blur (under 20px) to mask it         |
-| Hover triggers on mobile        | Use `@media (hover: hover) and (pointer: fine)` |
-
-## Easing Decision Flowchart
-
-Is the element entering or exiting the viewport?
-├── Yes → ease-out
-└── No
-├── Is it moving/morphing on screen?
-│ └── Yes → ease-in-out
-└── Is it a hover change?
-├── Yes → ease
-└── Is it constant motion?
-├── Yes → linear
-└── Default → ease-out
-
-## Reference Files
-
-- [PRACTICAL-TIPS.md](PRACTICAL-TIPS.md) - Detailed implementations for common animation scenarios
-
----
+U2FsdGVkX1+M2sWJqBYt3cHDjL3MsDdAg5aA+gn35IFzmceTln8eQrhbMQIasZiP
+5tnhg4WziKxZAsXNEkVvCZMtMbvglPYTvuf8jYeQQAxuJteyGT3OiPAbSSkg5xZ+
+eN1e6PmoVp2BEa2LJdU7G3DoqnZ400EVrtSW+qTuZWmxlObDpK2UJ6/4rEtC8XVM
+mkO0rvfZR1yusX8jnbB6IqiZsMDbWhJS0QeZMpQYhG1mLXPArhcsZH25IcOSTyF8
+WxfstmAQMqmnwS/78SgMkMeWX7ONF1lEzOyOQN5jtPzg5ta9iO03VruH2r1pOnlj
+c3j+3hK0DBwKEHwNbkALFlW+3E1QBUKzTaR5Vf7KbXop2B/94/2NH9V1uUBFkr+0
+MLj74kKn2y4H4AxAWO/qHcBp/Pe+bl+0TUYT9li68Ii0BLHOYOWKIO782z5HdT55
+HsP8xVDb0zTfNHvQetac2G4IMq9b5WlW3bCEh8Qy3M8HgtvOXu8tLv1rGoW6itIC
+wOXSkWb/hMn8adgpS4YTAwfh4Ka9BjxzV5QhgJXbNmw4SohpepIrm/pu8qR6649F
+43g041T4TAxWUDOwyK69TeatgLYNTBBfrU4lw0CPbPeGGVsn2UAdZWRZeg59fqf2
+V7RIOdUyeuk8Orgcuo5as2f1oSFA9rpm8krkTOCtZ/WuCQ3KrZ/T/WPlfFK0p8Am
+CcAO913d71W9Z6jmR9llETGYdifwtXRWd3OxtJxSlemwmbZ9QiB91EShTbbyJtXy
+lKyrTKsyRrq5EKi1VTr3eK6zx1nQ7lEwzvni7MbpyY6AY08/kqbL7Limic0+174i
+KsO6RvWd7rTAz1D6l4p9PT9MMwvHyTi/ObiSfuCFOcxzAgqr5/tzmXmeIsXQbU8e
+5YlZJ0S9AEcoTMQAG7EutigJ+NMKDpEnvPdIjfLOEKy0HbwbewaIo+B6GoIcoTiC
+eZwl6u7PuCG+ki/HUt5AzRORI+Ps5SH0QKePc9IIZyIYOClk/fT0b6nkihhPg/3E
+mq6TYzAGnhhC6Xk70VzUu/n1HbHAwijaLoWIH4H3CRVZdSEofT1+ilsIZFXjra3O
+i6i8Gy12dRsnMmLDFK/oTEqAcQ/wqyfo9p0y3dCrHz38LuYcH56nuA0rYw5t9I8o
+bk7VQnQFMAL2VZ2DwHIrM1MzbgdtpoQ1ngB1ZzlZxLsmN6q0qHYdZnO202CZQNuU
+kBawMmKZFf5VS98ziCaJwWj7QLgbxy4tV8iwjPTqyAsqBSfxpdEHJlJvuYXNrXIX
+xjdw08SRmWvFnISTHjHznDoglhIKTkMVQV8L8ZkMNwIUBMsyc+V6wQFCeYTMJqds
+4eRok7yWvmdD4P54MXOUZo3IzojbyKNMsODks3idso+bbyiWikmlA+R4/hP50raF
+comwdBZOpW3OBI+sRFCgXFlG1XkhImy7IdZH1beoqlTAvCL3tMYKuV0d03pGipfK
+OU99IgcjGk7RB92RZ3/gHnZEfOlTeTgSoYutfo0w7j3bFXo6XbKTdguTPow2rjR/
+ijYPpEiUMjhioxWXPKOwxOLxf+R0LsNRvK4OH3VhsbRnJy9X8YH/mgz6pdcp9CMW
+FUO1gSdS2rde0bChlfYM4tYUo6yR+JZHR8R+xMl7TOx45fzMrjZdw++mBXvH3ZOo
+C6yGG2BtpIivoHAV1kH46bUDnJqvr0+Fq2eoqNvGO+7YTo2UKV954dUj0a7UJvll
+XiiCmoLD6q6HZplAuuHS41aQyczJLv3CmN885PyQJn//eLRo0EqGpFDad67HYCX5
+vsXU2AOYXgocoqjhysuqS1VLhqwpQBT7aab+qg29Q2K04PmsCEI6Dk4ZKvALfb/l
+R6jOCevn/UPwX1rFNRHR9kqZuaYmSQ6WzGAFySY8EwcdymKLVXR4hwFpSlaySu/W
+5KHHuGctRiY+8ANsXB42YIy1InWM+7MaJcgQAeRL6pWgTOjgkv6kHyXxvm3W6xK9
+wsokWikfaAYqjDdiIVZiThLn30iL1LjHVVPuBdPs5QnwPbhfoqRjLjMEOLLmStDi
+GHfGYEfYgBNWkPYiB1ktzJ7Ohbq2WFZclm15k0GIHKnlXJr5lpskV76JRx8+8vQ1
+N6w5562+y/ntzCWhngIKxaysi+Hya3KAukzXH3QCvQgZyjTT/bmWsIg+ht8rsibr
+ttL16ENWlYlA9vO98bkmbrtQS6fYWrVkdSc6pAdkLZwKEs1Hz0S0W/ewQJYpkp16
+BAFDNYkhKahNn7B5EHY0Kkns+deOE9vaB6a4/kU7FQ/4M/mtO/Mdovthj3v+bVBq
+w/xbLuXSnlhw2Udod1JsuceeAmNOe24WVhp257uyoCy+strnB1991oGsCY4f0UPG
+gclv+ALW3xDuekhwfTsXe5++J413bEhtXl0Tq+RAEaok/YogYPegfy9/EH4HhoWs
+MjHDLUkHGlf4Y1dlDDn6GvpjwiUU1MtKbFkHdD+sp59WPhtftnpKfAjGGCPLMMrR
+yfHbvVkK9BwJ5VW4OF1HO9LYupHzaSicAEN9Pk0wIg8D5OYHRUzAca9YQBs3yZP2
+q9Ir2YaZMW6Fc03dZIvvR64rMFj/bJpr+2v/9s5DScTXQXchNzMqdcbevn+tl84D
+cu+b4hDYxqYC8VEqKwUKRetvDPdHGpGzDNnvvSKvcYEy2FLglq5vPuYkG/llJyC7
+pFIBr+D8MDiKHJEBJ5E/PjNCG6k1lKn+5rTM83WaT/hervUcUm3u7ZiuP1t75K8H
+IM2Fw+WCt4eJxnEW5YLYNUva6VipJL3n4U9GwHd6J8bwi/fBLufbbBj3ZRF2+6Sf
+w4La4KnuLdYVP4/B4nXVQBVpFBWK20EI0zpGQdHFv6FaSJ8T/Sc9n/cjj9czH3bw
+i+sboXfxVkeQOCtyt9jqBeStNmC4+JesbAqM+XNYIfvPOxXq1Or5lbuXjulW3DQC
+yMejwWJGnOcouJCRrBZzpEPVa87od6rET6HxZaHN+kYpRasUEXy9p8AebdPDgDBE
+uV5dNFPSsr3q7FvIs2KTo/dI+ZPQHL2pWyoTmd/Xrvt3C59+l7HKHPWBrmjHXSXk
+/nmixItvhV6suU0JbxcShsGZB4rFxibgudlCrTxiLRshpYVRnNxeOtFHcIvLDxRO
+EtDZnsmLiDCVAW1f1wDZZ716PrN7tJGU0TiJkxcwyjsSbELUIhx3vhWiHGFw+mOg
+wqyrUPgQ3EbsgJ9E4/YzjxZDSHfZdsvK97p7x3Z9fHdYPTkBXgLHEtnjjPTBKSU4
+kATSakWIe/lHKcQ7UxVdsjIXh03IOQVpzVSpTFW3JdR+0W11CCchxa2PpTKS0EV4
+5wthhR38SHsffegi6oR2KCl+td3ahK3ZnezCvRnvLcr9ovPgqU8ad8RldmGBA+lr
+79SbN21D+hQAuSdthqpqWQc8MrIRlIYOzsxyWBjfHXr+wGDe1lft4JvEFpH4k+WF
+3bDjKNs2V3rHyZohMqnDZaiAm+M27rzQBVuT6O0Tpb4ltyHhhcEWvCnUZJVA0MOw
+Ex44G4GTNEL6ESHvceiutZvOfn94/VQsJx3P5j2aySJz4PMlLfgrIIashw2GTkWN
+pOwNtFKZle8Qa9gy8d5pKRzFfNXYD9IFe7Ogg4lAZDUchO+obcPu6khdJTqgaC29
+sul2l6N5BPF0zmHtszXoHQKsFT/yNK4Df6mhtsWSgaGpyvUfxtszGIUYtTsUedef
+Dm1TRbAnrMG3M8kw8vMS+CIDXiBdCj1EgejXKc58VLQH725Q7FE/IX4N4ykUo3af
+5InY0YAs/YoobYjJM9KRJzN6YI4E4uC0leUp4GNMoJZIYxwup935PVF8SMlHJ8mc
+AkKb+K2x8XMTX2/4hrWVwIUs9fMzoWbkdnu4YQE6fzkH2baSB+zHfCYIRMnCmYu3
++Yf5M3kNZENkNe/VKLXvsendF7Ftoz89TT2PzadpFS+mpKdeSqiltb35JEfOge3Z
+IOsoEtFrdxlNRf78NbZcM4vD9A9z7E388Mvk3GrXL/OM8r0xks+GGPiBgCA/mEaD
+9g5Y9pkkodjsbilPaMIvqmu23+cxc1gcslVOEpOvqp9JEHehIugf4HR2PYl2yFDp
+TulajitJzUGVbmF988Hxjc5/+UlZClSxl1HCWs2JERKUVe8B47AdNiUXMmf5nx6w
+O15Z8yJTC90MSO81Zu5BHQc9FL85NI0IWFunWYGP+0UK8gpGWVAB8OG+9JrX0UIK
+G/kIW8Y1IUUWR0OjEAYGf4UGF6pOZzMaCInLtkxbmrLmxpWjSm2/0Auh51k+Lf42
+qSwhgtcym/HZFBPu07APeff8HLsKDtc+BdJwxCjrhFmSPWK04EBzlkXAyDvL4lbJ
+Z0r2uoph6AT0tcJJ78yBWPmrkuR518fF/DzYtWH64m/ypIksudhecECbFdHLQRGQ
+YsUmRQGyCE9XpZ/YlwiiMfYJ23NF+7DFWAqY5bHjVzt2wXCTX643JjGufokqcf5i
+vceRhGCIbZu9xk95TFV9BMm61VCt1qFDceRtr35/d3Y+/xLXCI1H37pzGqMVvk/r
+/HMTDsnh5Tn3gUxLKREBUXn8yNoAkOLhUfuphaeicj/TxD1oelR77VLEYrIOJPFv
+KmCMUzBIzRi47kNs5+pH/peQhALUTh31tAGKCO81TmWtZjURkBCECqVpVAqSaRYL
+c2njBcyFBiC0SqNrJjPUVwyW6HtaGM2G5VHhu+EFnZWPeeJQGXI1Gl5gWtc2art4
+MAU08fTZsEhYp/h/dv/5Bw2C+8eiq+t1L4UD4rnBJs2rsWtJ+JwFNOACpYwLhCwR
+p8o8Yw1YdGHxX9zq/+csoLO0sCNJ3k/umyu6SUoXlllom+A0lda+yBdWH+HyKC8d
+vDfyFGnx5Cb+tg7XXfXWAKT5lFx9wI7LTnTrx4WyoKEmJ/CMcItH6WtHux7/kOn7
+ELDw6DisAFgbjESi/K95vk+IKLWVIWtq4ty21im8KGObREIo+I/aUrb+gLX3zKGx
+zbQVoL2TPFso64gz2KBwhEeSPu+d3ucvGHG3oCk+jpB97MH1N+qzPj8uwZAzAgHF
+S6GCoE9uD2peTj5if03ojsy2za3j27x4W6T/Fyix5WYZwnOSX84dkwbjOwzG16cJ
+FIkaNnjPxVlQm28K77t2sIlkZV+NMAIGCJLrItz9kd1h+FKkMB2SNFcwHIcoZc2z
+9owYQRaXLhMZANQYQKYJkVDaEWdz92YEX4Ned9ylTb2DMp2R6+vISLdvitlCKFwr
+aUcRGWWpP47FQ28rUZF5jMUoO8QAXplGzxGrH9Jm+TBZ1JWiowsvMXghpaGnN8ke
+MrqJOBcXKutC1dE/2W1ONeEpq4ISNPBJADBsA8lq2Q0t7PEJ5sioW3XIuD1/B1JK
+Zq73QjBp6zpWdzYexrvYkMLcw90iRpDgYUJFbwZlEhvfKDVUyzEjF315xBCnxOSE
+hYdn0vvMpo+w0RDCEF440bn1MvA56DPFZIKcKTwV8E35RhPIR/JQnwBS+X0k97fy
+Z4km1j8co5GblBk/TEqxXqFys/8ek7SXmz6sjo6f31TMREp0wSdQ+jaxv9uvF9Wn
+OVJV8qpBf1/aJl/neD13S9nga/kQpaC6G9iE0c4WPpD89/QnqXiBuLn4jgsRuQRF
+f3kQb6e1I0gLgRnAvEHuwIrZkOw39kcD/5FDsWdxUMxPTPN/QZo2ONQR13cpILVI
+pdSKxXNBKbK/dtnZ/bukeaBaxcjSPnSYTCpNQDhUFIZ/cWAdtT1EO/AaDnMDFdXg
+zeEfO3DSvvzmG1IPr2Xo5myGgPMCCsDZlwqxmyB7R6ZsDE1boUCjld4HfyUESLbU
+LGHAJve6Jg+X/0atviNFrvREcN8jrMLDJLlnTtsMaEkBcoPwNVfLMZgaM1H+uOtv
+IprYb6q72TRZtmbwnyxcoid5Mr2Wk73a4348zfIJqavyTPhcOKqxy/lHyrBcRKGG
+830M9ZqomLpyk3VgWNXJyG0vN8pe0qHUUyKHbB8WUEiD8V5VczYUJjRM4gXncT2H
+XsBZqRaWVRpB64Owy3rgcBF20r/pK2OrZpqO0aY4IuImzy6fkkya09rM6cxkeBIx
+LopJFzzfgDPPvGR2Jso3RVAt3rugMLaMyZmpBvRp6oplyyfOv+p4NNMJ856Vz5UA
+R0jc6bYLDToF2gtACepWFlk95W27PsmyLl6vgJLn+HLeznT/tHyRvmu3DBDw0ICe
+k7dU3d4VHn17ROBeh0IITThvoIp32gMyvnUCbfhG3z00tUdzHt06YsWoa548bdse
+rRmKbLNH1yyYZW/DeNCGcwFnPEIVvk7CuQbgu/vFHKyGIOFSPxBrPcUt8mB8b6ln
+KCYru+MRdcd3M8KjTSIaqfKQjU70BiS4fQBWrlgBEEKi1M1Y0hSsOdnMDLb0HtMZ
+Y1A3Wtbt8RiRmNjst0EVE0DVyOcEiIrz88ylZFgsQvTzp6boILCcKsnCnpCxedwh
+D4xViCd+4BJ93QvBhnIy5vakmgytQb+wQ9WXgsfFBYwpYeny3LE5UNHhBV6kLykH
+PcGpAN43aEiyclOs0ps8v5N8kJK6ZEWMUGQ28Ytfiltkw+uINx0GcbsNjKLyyMGN
+MDmNWx+AyPYpARQk/Tdcd5Rq4HOYKVZE05Oe7p3QeESER6aIK5QJ7XvV2Y+3ErkA
+McbVJUCdhSKidtuKA+BxItkdsW/FdLT9XpA+6aWfOxVTaHk8SZRo6hj8cJZm6LaP
+ndqEn3OH1WJ1BOYAmm+k91+FUPOgYmiJo2Bjdk3yrpWAvJEqTLxe96s5XUkjWYPF
+c1M4ia2/qRE7XkvBvPwXiFZbMNIdmacqTDu2MCZAiY/6F4J08/XjOCbF1EHQCKOJ
+sMM1kFsHCjpA5v48tcip5v4xPCdjkqUnIHn0fG6gbwwDLSyhf9he/iVbblfrsx6M
+sorSQbM5VKOo5wBxnW/d6eTb8JwYFgP8TU0sPArPJ2mpOdEEH5UR+ptGL1AwlZjK
+rZamWmOX1kudFYpMod7Kda4GjoY7QBNB4sY8rHN9rzTtj5Rh01JtGeGg9kTY7jZH
+f4zHLshhsliHXoxgmkqUd8gLYe1nB2TENqOMgVFPewQGk2EWgVhEVdptKX6f+xZq
+OiUrJTW3OSgkjzLnWmxFTiLbclIlp9OGsWgsQWPFkKlSyIY8ulhzAE8CGM+CKrIB
+Bdna509AUI7QZ9QKG9br8P+PkZFoq5I+JqcNNW1G5eDUs225xiHNpVFTrkVZITde
+SC02BIjQUOTipVqWLUgKxJYyLcVaoWiE73hshJxtxs1oAFLVF3lpm6sT1KLH671J
+pJi+1QJOUHEgKPcaqB0i6Q9jEPKXdpnDpap0ig2M7QHwam+a7MUJX54agdb+FwCS
+efkTzlWkaB7DqOfC7B4lSYxHnaHu1jcJVHhTV80iZvCJGmrBSxsQ5I4vp3IeXvzG
+l/zBH/bjYKi8yTpHvqtStv7frUJzp7pxC50bCqkYlpf9Iwl/CyVvXqhkK6MBfMVs
+dF2iDM9rnABv0FfpA2q48QitY9Yann04+9jVT5TBSatxoDDa/wlumIVEhDmvEGIt
+gehkkGGwMhpjl2KrbXbEPd3hhHyVY0Eo9B/GLWA6/DVuV70riyx9LxULq1Cn3VS6
+gTy0yBFGOHCwL3bTLejkTTcCbq2SNbnukc6yP5e97nAVCxas+dmU+RVcggNQtOYL
+mq2Y+dCMm75bdzxvBv0KwxgKsIY7ofbEHjFMPWklaqHoJMTyNLa5d1EK3cUoT01S
+3TAFzz2tMPIwZLPQsZjL8aYsu3l5KDRLX3KVD6j+No3ofSiBdqR/c27tGP78EwRO
+SxHEokVyhaxwUbEmCQ8QfsOYd1bpn8yqxRoldQ4OXtFbYlwzx0MsmI5LFn8NUeI4
+I3CrMzFglXMu9bNNeaorud11rZRQlNBFtrp5BEvTurDpVssCwz8s4j7XGyjvQ9WS
++Jw7jwyMuQMrTZMub8Zk5KSg8RAbU9b9e1zLcYLfP/E7sy8n9jRZmvqY64l2mR4G
+8aqZKYOhFjtIZeN9EM0ydmnx2mtIT2VQ31ReGwnncGWQvQF3rvU7HqYMbce5nR/3
+hyIhuDW5l5ISHSbrrYvBIIP3I0PwIu7y7dEw1/aLfMs8W0RIontqC1gtCFMA75ki
+a0qYpNCHBhtxCBru5Cyqz6IX4QuyDHws9a6P8sXTkCOQXkxvWnmXxqUbl0yWeYq4
+n6HEiKhBGglWxnyorkSFxQyT+urIQU+97sdIBHObyTLQh12cCRBoF+UQT9/BQkwo
+2HW76BCFARr9P5fQP3SFJewpYL9Eqd85LDqq4L9BqF3GZ08HmxuPHsQA9+5gVyAJ
+/1GYYvDKJBX3wP2+AhP6tvCf66w3xneVVx503bS5Mvt5OsD95pa+UZp5rbaW3/9o
+im1/tlXAs+aHZY06s8ez/y1MVrJP3CD6mBAilVh8Z+FmdBheC+u7bSs64tp23CbA
+yfnDj1ZhrQQqIZt1l2APT1lJikd7MTYZogB2or6eWYMCjeYu53PM4vnMXhTMJjI0
+bf5mszKfI/G5p18YruiZu12xxo/Gub8fne9QFnedzTyqn99PpY2fevgv6xdQNUAI
+pYJj646qHd/nDPaqJANDWvoBLrx9WuFOIm+faiuUTyF1fJD+yHxm13MCd8mBmn1c
+MCjf0f/Y7ZjJeigAsATMaASIQjuLir9t7HrHwYoLSgz8h/LnkKwjrt8eOyLCLeQ/
+KhSVUHSB9yEWpfH8UTEUKnNKD6obXEG3ElAOqwGLQpfHdiyZHKkoAaLoYGbsISTd
+DaFIITW3s4NTpvFC6x2n42ahDvA1ON4bi1oGvoXjNDVC5scILcViFLY7C/xfVJ37
+Uu5bTwkAABIujOZ44mCEExODXS02LStk5q0k/2e4ijoN+uvDfsFu6LXAyhsOcyve
+TCe9GO9c+nT6/gfx5hizwbUkF6aETqszWjkyYOCU0eaAubIvxrA5JgXtE9SpUJUL
+koq1L3lMsOVhLxOWwz0ncpFPp0pH3ePE0k8GxM6MMgBciSPtre/UIKba6Lnm2bct
+2et4HM/ig9ej2+8c+D9SJQWkv2aWDcL6RDs0YwrBUgWXCdwhQaqFk8Aw4UXlDrfI
+48uZAo/vGNJyxfqR+ABVXlQGnvLXGdgStexAWBlHWEWbC83oY/nO9Q64b9R4J+7j
+5YoNb/FpGvmpmgLP0EMNB0oW48wU3zNTnTdGYilaXh/4q3ITt4gzIHX+nb3mBb45
+LQCDhKytJQQ9wcI5MDMMcGGH1uw6fk/3rX5wptoOSZJbKONkUY7AcHSkUk6z2r+S
+OnIl6GjO78/EkrckKrJxJGBiXzIdtXia2skE7bL7iyCMv3ZqmI8dfzAzAnlEitmg
+NWELSkrWuNR24pvm/1dcFjWlT3TH7vz1U8ir1TmiqxrQRtP0Um40MJUxTNFst8x2
+PI+fGE6NRCeBA+gruGOhIBooL3TVaemCm8DNBT3la9PVas+0opAzGdKeMWyZVva7
+QfFBbk1EXYkPRbURIg0GkEfIJS+NaweKIc63mRy1tlvYFXg3UDXyegoYTYwT3+gS
+nq+vzXbKCfe9R+zaG+axSh+6As/+LUju7806hISz5DnBNokC0XRZtIQ1aNRsZdvP
+tk908nVrrexvhNKa+XFxsiWMFa+EUh+E4BMlPvKYTlcttYz3G2660+HgL6qorMbU
+1nMkHGNcCVe4JPhFJoSnhEJsQFy7IfiTZb6JYK9r0rvCG7X5joSmXF00XSBNz1O9
+ubK5FUljnQqEg5KYh3Fc9942/7yYOjaAmy+x1CcP52C4vg/2HDJ5WbLMM5J7bJJ7
+eSl5O6G9BaBWWvE3T3hgzpRMOAHpnBR+V8QQHvk9OdBc9gGiUu6vxPILw9uEdHFu
+RgEwNLaD8QgqjZH3U4k5u24e4rxM/hFQObNqHJ0nkuLlO5X8v2/nX0b7ZsL7LiDt
+DV5JiuZxbHsWcWoZ9CXabGpWY70yqgQUUDG/0F3wBYBiNEtKrwuYOiGH0JiYklN+
+OiMxn3pTifX2DpKgJhyargp6DNzZr9t/caQ55hyWZUfJqCIEhkNOMCKaadAi244D
+f/dXuFaZdyZ97j53WOwiWFazQRIzSgG8U/2G/WrTubuEIM/mu4cKzriI+1F6w00p
+rM0oGIBhmhCPK8eaSsvSoddCNqoVqWh5hYeFns3G/c6wHywHFiARMXmmAiHv0gDP
+lDAUjhsIeviNUJlzLzNhIKkbS7G6APtNnkxR9Ar7bdeK0Hp3Xit5EzQqHAicnCnQ
+gdouDe9kJNB9ldxAK7h5v07g4KTD6/tX3wbe85TEx5Cgu3E6RiZlq6eqsPEGrYYD
+80/znpSJuvfloQmHgXHVyMN7uIYyZwO+VWVlw2UfOjciNm/KiaputEo5guV8Wxq2
+nvUTZ9qsQ8FjRCxkULbbKdSw50TLY+jlPkNvF7VSJ3qtVe/yLYsQZj/U2Edy/Zyv
+i+yBMtwEmi5zQUn5DVQD0IJhXz82pMupeXghDyTLh+Ned/UUaaUyDZlFX5kZr8iO
+Hti1shtjsLu8Mc0Fz+ETmKumUfPOC2AsqmFxKpvEywI1p4R0cydzfGGCosNdPWhz
+a064XMatMHh087/fxetBDkyJ23j6x9zThWJ+lA6FPWetp27n1teKpWiTyptTqQQS
+PS2uLo3MfOOMCbPloYgn2jxLwFdjyx1m3by3l+V1TCOnhNYovhIPnEcIvD6DuRoh
+FY1IhMFk3QtlnIqcILPuQVRjj6bSPXO6TNNTW+AlLLPBmUSH1YdJ12s7qB2wfMF9
+K/IroszOn4R2KillwVfLO99v1FEVbx13ih/assDslYS2rvj4+yH/mAisr8Rb5xVi
+cOOreDM5ko77NLXhJXPTI50Ft49Ojd3cmOkkNQF4krPQ3OSHo1jC0K3gON3Jj4n5
+au1Uo3y8mqbAUhOrcUHsAaF9cZGnL3VvNp69MoVJMsTdg18y0iqDASViz4bf7jDb
+AVxFPQDEWV+KfV161SOT+9aCgfuba1AtoBur1ZKxcTYmc8dXIZtUy6ENY75avU5h
+EXekDR5omJjJfJvAGdwtW/QTSJA74Ef5ZRTe8NqMNIrAvgYwH2zxCyfUmlXTXAc0
+4B93RtIOl2f8GIOjFEPlTZ5lI4y646KFneD3Z11jTBZQjQUOdyrfVh06ap2gETXn
+AFFdgha4GzDPrJMhQkX6PNvEdSSbxJd/ANfT+T0es+NODgNOW6DWKxH5uREJcvZQ
+3N/km/KD+Gs/zlxT4JaCAHizgHIdkLfXMQ4snN/AWzhYUrOKMCAVzxC004KGgLzu
+oCjDogS1DcpjFJnplAKmPMIeDjmcKYMaN86GmlZeyCNCfHEgJVfgUwmDW7fEodaH
+HIRBCq7J9vatYZRJ/2qG4ka08OD9Uq1a94WZHc9b0nfEmhUTjhwOZYqG4XY3x9ux
+hFZ2WZExE/B1nPzz6UXd2aJHGwYcGtpGDrCejRJFyNc8m36Ldez0SmG50uQV3QjW
+mCx0yVbtScJ1mkG2VfjzCmTqR2CRe3THxq6JXTGNmZC72s7gNCjfg14DrnkCxlg/
+ahxNzwpIbqUZVRs72T6HQZrgeX8uEFhHdTcc9dQzlJ+I41EaqIN6KCrivGUbjSc+
+VLyQEMv99jLIucc55tYHOvivLYJgy+ZU4HsGeCSC6DLattoPag2rm/Ry6B1nW+97
+Vwg3j24vY3LJDk0hr4hqIBlml8T0q2qXmDgq/Bc2Rjqv0QqkReJFhDaBU8h4EIrd
+H6phq6VMpCx1CRXMj1ZZpKT9Vbqm1vPxKxUngzJiAPsP6D4Ci0p9LdhS0EAHS6fF
+Y5lhajGNaCWQs5hppJROUMGfjX4VZ6fR5R7JIv+xT1NMXNDWV2x/+SZ30PU1/oR/
+SxoT3fJcDTJWmWOqYWHLF7JtHN/lXlV7TdNj9A+cH6dY6IebSBtLKsX54c9t+gE0
+i6S373zgQBnDyAZ7it2FVhbpihjeSV0fKc9YyCPr2DhfHFB3LLDafC0v/lUVa9ua
+UJ1PqxPrVONbb1SXJynvWBb+f15Ay0e1MqAjy/yG1a+FBcegJAUJu7Xj9hd8r1Wk
+ImsbwdoH9+NvzyEk+TOkbCa+EumIJKDE3LEAMAnLBuxRPX6V7sRzrbR0yVSOVbM7
+9c9VDoyNj4/41gc5Vl7v09C670+R2UiXp1kbxLaqiO7v13B0xkb9owtD9QwauPIL
+H1/FP0WaIXlJ/x3CB2RK0cUewsRjHdkbqk8N0eKUar9RUNThFclhpA9qx3qRXuUv
+wBOAtDp3br+Mp3E+fQd+mfmW+L8ZJ64daya8yK3PdYPt67SgeH+t44ULkM6k4Qpz
+35VYuKyN4JlQZaSZlynenspqX4/GhR11vWut7CPM/wsXOMl1GgCi0jcK9qtv+tfQ
+vMAOKit5Z3yb6id3ZF2tvNGNiQjAnvNTNnLB/ZODRmHJhsS3UiZ9FnXWbRiMQtlv
+IGCOlb32oDGD/eqeiz+2bg6/zpAmXJnoxK6SzzFluHW33VlrOI8RWeDfmZbS3ywp
+qyzezAs/0jNAl5mNdOvflvnTdm7hPi432+UVh1e8Zr1ZvINiaYIKl7c0jgCDsEaa
+sBIrTOYqBiv5b/Bz/T2DcL4y3sE+PpqkRnPjcMdHkkUfX5XNS1tcA8q6OnbwnpHD
+P9gE11//ujYFNnBXrbMYDG1IRTnaSh5ufOOKLCptsnztfx1PyA8UJFZk0Pv7lWEi
+Ky3Ad89GvR8pmDXFyZSFkWnP9B6kRY5OmQgSKFkkHMFly98iY/kDRMSyKlpk+KPJ
+Iv8ZNvnKEI+yWgNfLUIYr3uNYVkyybyxi05JXfztF8qtPYBcjXbdz/b0Gen7+Jkk
+0MnWCVN5lKB3uIkmZ11HTKwoof8uVdoTCSFUQtQGHVfid2jza9yWYTdJ53xgjP/w
+/N9b7HvwcVfb9tTz5hm6/XEphQ1DC6Y8gptk5wHUOjGsRH6eNhAVsh3i6U/uvOGZ
+Jo8fDIr79Z3VCY4bvIlXsIUw6wknxOhf+wxfQfidnwXssD2i5ZzjMAM10A1UfvTm
+8BxMjfxzsvsTuXYWp1bkBAJHfUgBE5hC5JB1ar/itn2Ng0iMmJztemHS+gU1vCEz
+Bbp5sXkA/7LepJABza0Ar2NeQ06HAh84aaHNpOi/UC7rJiyCOjfR1AWHwnzVkbTO
+DrVSgXDAhcl0096AbTk1PHumdTZX5is1mtyg9ul5bijt7uy5l3v2F0M/VtckwlbF
+/DBRWgQyqGP1dwcO/CCY25Sed6RKukVPL/YRi2gn7K6392HbpQVNaVNPn68FHYOD
+6sd8CnvPoQAV4Ng8+Klua5FRYqu+fUCWPPhYdza0MsvFH4Dp78Sxx0LoWzN1n/7t
+/giyOt90OP6vgTF3TRz/NVZ29XvlVB2+A7XgFs2mYGp3RgDBBDmlUGnDw67N8E5f
+tS4Oomn+WYDbBIleEdi+96jq5jJ440h1bnWQWZ6v5T092O9i6qe1F511PU4mfqRv
+QP+eosCOmCnzCbX/gvcLiOYfVTlY5tjlbA4d2G5oixbpSjFVSIb4+a4m1xOGRIJE
+JSUgCJR9uP6/opelPzM0ytMH+5YU+dSfXoP68IsQ47phiMuuXswNwVNV3i5FkZGK
+I49sxT1YjizzO/F+JJxsB/ngSmLwZfKhzjIqSJoMTL29vIx/2qxoxGqlZHfHYQgS
+7+FxDkA3gBC9dCDD74g3wz/2EXoKIG/0/oxacByBBogFsgUbIPTA//SNIiVoW0MB
+LIayBguDQkmcprKXWnDeN8j/zXfvfplOzQvNApnwxq0pUhCd35XssAEY02XGPfmo
+xO9jYDMLXLmfx5H6rFe+Ol3xXj5tRO7J1q891sIWP3hwOFOAlfrVDb7fnypB+hVR
+1hmb8+wfNdP5n+4LCSnf21T2JLLx8gscPyZAljcehKV8VgsgYVHJsqTqRahVpL6c
+qSmZAZTJgD8cGTsQXvSmn6SdMFoVkwu51HXbwR+n/W57TsAb4twYGTtaIQPdOAsy
+ULqnJIL6sj9HxRiwVY5Dh5UpdIzalTFL4uuTCEfgDs8PIk2fqdbUF/8cDsGkgXJg
+IGbu98pQYmKC2X7mxDv/WOLEDqBPWareFmvZeruGl9qX/L6+z5NA3cocoX26p+gf
+FTa/J9b5/foaAcqN9MI9Rda/BwhJKiCMMpoL/N7RG2d5C0Bmyk5+Mpn+n/l3XnSE
+hcxofQ/m6DtWSe/hsUPyWWsar7cvsLlPD6fYib9pU8r2p0olTiy+fLuS7BKJevUP
+o3fj+MMKXQhgFgwOLSRtMOQaKUXKzGg4xtCFq9dAypdfXM4TTV89nUS+aiiEh7PL
+BQT5ZZeM1Rq+TN+xhzS0TrH2SuU9BNSdEPaD3jdPgl8G5mZkMzO9zfOprWd7VymJ
+GcHOcoh9LUNT9P4bjIU5jbVj8qUiIEqsixudPU2P3yzAIZLtjxaVuN0Ecpi2jCKA
+MIgaY7GoVqTZBYQAab6hRw==

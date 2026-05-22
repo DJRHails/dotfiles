@@ -1,304 +1,136 @@
-# Practical Animation Tips
-
-Detailed reference guide for common animation scenarios. Use this as a checklist when implementing animations.
-
-## Recording & Debugging
-
-### Record Your Animations
-
-When something feels off but you can't identify why, record the animation and play it back frame by frame. This reveals details invisible at normal speed.
-
-### Fix Shaky Animations
-
-Elements may shift by 1px at the start/end of CSS transform animations due to GPU/CPU rendering handoff.
-
-**Fix:**
-
-```css
-.element {
-  will-change: transform;
-}
-```
-
-This tells the browser to keep the element on the GPU throughout the animation.
-
-### Take Breaks
-
-Don't code and ship animations in one sitting. Step away, return with fresh eyes. The best animations are reviewed and refined over days, not hours.
-
-## Button & Click Feedback
-
-### Scale Buttons on Press
-
-Make interfaces feel responsive by adding subtle scale feedback:
-
-```css
-button:active {
-  transform: scale(0.97);
-}
-```
-
-This gives instant visual feedback that the interface is listening.
-
-### Don't Animate from scale(0)
-
-Starting from `scale(0)` makes elements appear from nowhere—it feels unnatural.
-
-**Bad:**
-
-```css
-.element {
-  transform: scale(0);
-}
-.element.visible {
-  transform: scale(1);
-}
-```
-
-**Good:**
-
-```css
-.element {
-  transform: scale(0.95);
-  opacity: 0;
-}
-.element.visible {
-  transform: scale(1);
-  opacity: 1;
-}
-```
-
-Elements should always have some visible shape, like a deflated balloon.
-
-## Tooltips & Popovers
-
-### Skip Animation on Subsequent Tooltips
-
-First tooltip: delay + animation. Subsequent tooltips (while one is open): instant, no delay.
-
-```css
-.tooltip {
-  transition:
-    transform 125ms ease-out,
-    opacity 125ms ease-out;
-  transform-origin: var(--transform-origin);
-}
-
-.tooltip[data-starting-style],
-.tooltip[data-ending-style] {
-  opacity: 0;
-  transform: scale(0.97);
-}
-
-/* Skip animation for subsequent tooltips */
-.tooltip[data-instant] {
-  transition-duration: 0ms;
-}
-```
-
-Radix UI and Base UI support this pattern with `data-instant` attribute.
-
-### Make Animations Origin-Aware
-
-Popovers should scale from their trigger, not from center.
-
-```css
-/* Default (wrong for most cases) */
-.popover {
-  transform-origin: center;
-}
-
-/* Correct - scale from trigger */
-.popover {
-  transform-origin: var(--transform-origin);
-}
-```
-
-**Radix UI:**
-
-```css
-.popover {
-  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
-}
-```
-
-**Base UI:**
-
-```css
-.popover {
-  transform-origin: var(--transform-origin);
-}
-```
-
-## Speed & Timing
-
-### Keep Animations Fast
-
-A faster-spinning spinner makes apps feel faster even with identical load times. A 180ms select animation feels more responsive than 400ms.
-
-**Rule:** UI animations should stay under 300ms.
-
-### Don't Animate Keyboard Interactions
-
-Arrow key navigation, keyboard shortcuts—these are repeated hundreds of times daily. Animation makes them feel slow and disconnected.
-
-**Never animate:**
-
-- List navigation with arrow keys
-- Keyboard shortcut responses
-- Tab/focus movements
-
-### Be Careful with Frequently-Used Elements
-
-A hover effect is nice, but if triggered multiple times a day, it may benefit from no animation at all.
-
-**Guideline:** Use your own product daily. You'll discover which animations become annoying through repeated use.
-
-## Hover States
-
-### Fix Hover Flicker
-
-When hover animation changes element position, the cursor may leave the element, causing flicker.
-
-**Problem:**
-
-```css
-.box:hover {
-  transform: translateY(-20%);
-}
-```
-
-**Solution:** Animate a child element instead:
-
-```html
-<div class="box">
-  <div class="box-inner"></div>
-</div>
-```
-
-```css
-.box:hover .box-inner {
-  transform: translateY(-20%);
-}
-
-.box-inner {
-  transition: transform 200ms ease;
-}
-```
-
-The parent's hover area stays stable while the child moves.
-
-### Disable Hover on Touch Devices
-
-Touch devices don't have true hover. Accidental finger movement triggers unwanted hover states.
-
-```css
-@media (hover: hover) and (pointer: fine) {
-  .card:hover {
-    transform: scale(1.05);
-  }
-}
-```
-
-**Note:** Tailwind v4's `hover:` class automatically applies only when the device supports hover.
-
-## Touch & Accessibility
-
-### Ensure Appropriate Target Areas
-
-Small buttons are hard to tap. Use a pseudo-element to create larger hit areas without changing layout.
-
-**Minimum target:** 44px (Apple and WCAG recommendation)
-
-```css
-@utility touch-hitbox {
-  position: relative;
-}
-
-@utility touch-hitbox::before {
-  content: "";
-  position: absolute;
-  display: block;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-  min-height: 44px;
-  min-width: 44px;
-  z-index: 9999;
-}
-```
-
-Usage:
-
-```jsx
-<button className="touch-hitbox">
-  <BellIcon />
-</button>
-```
-
-## Easing Selection
-
-### Use ease-out for Enter/Exit
-
-Elements entering or exiting should use `ease-out`. The fast start creates responsiveness.
-
-```css
-.dropdown {
-  transition:
-    transform 200ms ease-out,
-    opacity 200ms ease-out;
-}
-```
-
-`ease-in` starts slow—wrong for UI. Same duration feels slower because the movement is back-loaded.
-
-### Use ease-in-out for On-Screen Movement
-
-Elements already visible that need to move should use `ease-in-out`. Mimics natural acceleration/deceleration like a car.
-
-```css
-.slider-handle {
-  transition: transform 250ms ease-in-out;
-}
-```
-
-### Use Custom Easing Curves
-
-Built-in CSS curves are usually too weak. Custom curves create more intentional motion.
-
-**Resources:**
-
-- Course reference: `/learn/easing-curves`
-- External: [easings.co](https://easings.co/)
-
-## Visual Tricks
-
-### Use Blur as a Fallback
-
-When easing and timing adjustments don't solve the problem, add subtle blur to mask imperfections.
-
-```css
-.button-transition {
-  transition:
-    transform 150ms ease-out,
-    filter 150ms ease-out;
-}
-
-.button-transition:active {
-  transform: scale(0.97);
-  filter: blur(2px);
-}
-```
-
-Blur bridges visual gaps between states, tricking the eye into seeing smoother transitions. The two states blend instead of appearing as distinct objects.
-
-**Performance note:** Keep blur under 20px, especially on Safari.
-
-## Why Details Matter
-
-> "All those unseen details combine to produce something that's just stunning, like a thousand barely audible voices all singing in tune."
-> — Paul Graham, Hackers and Painters
-
-Details that go unnoticed are good—users complete tasks without friction. Great interfaces enable users to achieve goals with ease, not to admire animations.
+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
