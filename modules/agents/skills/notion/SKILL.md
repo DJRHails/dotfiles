@@ -73,9 +73,8 @@ Browser cookies do everything — no env vars, no tokens to manage. If a profile
 
 ## Caching
 
-Responses are memoized to `/tmp/notion-cli-{YYYY-MM-DD}` — a fresh dir per day, so cache rolls automatically. Pydantic models (`NotionBlock`, etc.) round-trip cleanly because `_caching` uses `model_dump`/`model_validate` for BaseModel returns.
+Responses are memoized to `/tmp/notion-cli-{YYYY-MM-DD}` — a fresh dir per day, so cache rolls automatically. Pydantic models (`NotionBlock`, etc.) round-trip cleanly because [`emboss`](https://pypi.org/project/emboss/) uses `model_dump`/`model_validate` for BaseModel returns.
 
 ## Local files
 
 - `notion.py` — the CLI (PEP 723 inline deps, runs via `uv run`)
-- `_caching.py` — disk-cache decorator that knows how to encode pydantic models

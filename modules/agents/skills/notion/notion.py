@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["browser-cookie3", "diskcache", "pydantic", "requests", "rich", "typer"]
+# dependencies = ["browser-cookie3", "diskcache", "emboss", "pydantic", "requests", "rich", "typer"]
 # ///
 
 """Fetch Notion pages via the unofficial /api/v3 endpoint using browser cookies.
@@ -26,7 +26,7 @@ import requests
 import typer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from rich.console import Console
-from _caching import cached
+from emboss import cached
 
 # Daily-rolling cache for Notion page fetches. Each `_collect_blocks` call
 # can be many round-trips through `loadPageChunk`; caching by page_uuid

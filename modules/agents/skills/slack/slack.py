@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run
 # /// script
-# dependencies = ["browser-cookie3", "chromium-reader", "diskcache", "pydantic", "requests", "rich", "typer"]
+# dependencies = ["browser-cookie3", "chromium-reader", "diskcache", "emboss", "pydantic", "requests", "rich", "typer"]
 # ///
 
 """Download Slack files from the CLI using browser cookies + a workspace token.
@@ -27,7 +27,7 @@ import requests
 import typer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from rich.console import Console
-from _caching import cached
+from emboss import cached
 
 # Daily-rolling cache for Slack API responses — keyed on (function, args).
 # `users.list` paginates over hundreds of members; `files.info` rarely changes.
