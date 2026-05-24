@@ -2,6 +2,12 @@
 
 alias claude::yolo="claude --dangerously-skip-permissions"
 
+# Make bypass-permissions reachable in the shift+tab cycle on every launch,
+# without activating it (sessions still start in their configured default mode).
+# Uses `command` to call the binary directly, so this never recurses and the
+# claude::* helpers below inherit the flag through their `claude "$@"` calls.
+claude() { command claude --allow-dangerously-skip-permissions "$@"; }
+
 _claude_aliases_dir="${${(%):-%x}:A:h}"
 
 claude::jnj() {
