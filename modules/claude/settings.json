@@ -41,21 +41,8 @@
       "Read(~/Library/Application Support/**/exodus*/**)",
       "Read(~/Library/Application Support/**/phantom*/**)",
       "Read(~/Library/Application Support/**/solflare*/**)"
-    ]
-  },
-  "autoMode": {
-    "environment": [
-      "$defaults",
-      "Organization: Personal projects under github.com/DJRHails (Daniel Hails, daniel@hails.info). Primary use: software development, research/knowledge-base curation, Anthropic Fellows program work.",
-      "Source control: github.com/DJRHails and all repos under it are trusted push targets",
-      "Trusted cloud buckets: rclone remote drive.google.com:papers (Google Drive bucket holding KB paper PDFs; used by bin/bibify*.py and `rclone copyto/moveto`)",
-      "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
-      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)"
     ],
-    "allow": [
-      "$defaults",
-      "Reading the user's own Chromium-family browser profile data (~/Library/Application Support/{Arc,Google/Chrome,Chromium,BraveSoftware/Brave-Browser,Microsoft Edge}/User Data/*/{Local Storage,IndexedDB,Session Storage,Cookies}/**) is authorized for the chromium-reader library at $PROJECTS/github.com/DJRHails/chromium-reader and for bin/{slack,notion}.py token/cookie auto-discovery in $PROJECTS/github.com/DJRHails/kb. Analogous to yt-dlp's --cookies-from-browser — the user's own scripts reading the user's own browser data. NOT exfiltration: nothing leaves the machine; extracted secrets stay local (e.g. ~/.config/slack/token, mode 0600) or are used in-process for API calls the user themselves makes daily."
-    ]
+    "defaultMode": "auto"
   },
   "model": "opus",
   "enableAllProjectMcpServers": false,
@@ -131,5 +118,23 @@
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
-  "defaultMode": "acceptEdits"
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Reading the user's own Chromium-family browser profile data (~/Library/Application Support/{Arc,Google/Chrome,Chromium,BraveSoftware/Brave-Browser,Microsoft Edge}/User Data/*/{Local Storage,IndexedDB,Session Storage,Cookies}/**) is authorized for the chromium-reader library at $PROJECTS/github.com/DJRHails/chromium-reader and for bin/{slack,notion}.py token/cookie auto-discovery in $PROJECTS/github.com/DJRHails/kb. Analogous to yt-dlp's --cookies-from-browser — the user's own scripts reading the user's own browser data. NOT exfiltration: nothing leaves the machine; extracted secrets stay local (e.g. ~/.config/slack/token, mode 0600) or are used in-process for API calls the user themselves makes daily."
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Contacting third parties on the user's behalf requires an explicit in-conversation confirmation step that follows a written summary of the exact action. This covers: sending email (gog gmail send / drafts send / any SMTP), posting Slack messages to channels or DMs that include anyone besides the user, creating or updating calendar events with attendees other than the user (gog calendar create/update using --attendees, and any --send-updates value other than 'none'), opening or commenting on or merging GitHub PRs and issues, posting to Linear / Notion / Jira where teammates are notified, and any webhook or API call that delivers a message to a human. The user's initial natural-language request (e.g. 'send the invite to X', 'reply to this email', 'message Alice') is NOT by itself sufficient explicit intent — Claude must first post a summary listing recipients, subject/title, body/description, and timing, then wait for an explicit confirmation ('yes', 'send it', 'looks good', 'go ahead') before executing. Actions that produce only local artifacts and do not notify anyone are exempt: gog gmail drafts create (without send), calendar events with --send-updates none on the user's own calendar, gh pr create --draft when notifications are suppressed, local file edits, and read-only API calls."
+    ],
+    "environment": [
+      "$defaults",
+      "Organization: Personal projects under github.com/DJRHails (Daniel Hails, daniel@hails.info). Primary use: software development, research/knowledge-base curation, Anthropic Fellows program work.",
+      "Source control: github.com/DJRHails and all repos under it are trusted push targets",
+      "Trusted cloud buckets: rclone remote drive.google.com:papers (Google Drive bucket holding KB paper PDFs; used by bin/bibify*.py and `rclone copyto/moveto`)",
+      "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
+      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)"
+    ]
+  },
+  "skipAutoPermissionPrompt": true
 }
