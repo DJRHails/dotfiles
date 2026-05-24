@@ -8,16 +8,26 @@
 # ssh::open_url, path::abs.
 
 code() {
-  local ui self scheme abs
+  local ui self scheme abs root
   ui=$(ssh::ui_host)
   self=$(ssh::self)
+  abs=$(path::abs "${1:-.}")
+  root=$(git -C "${abs%/*}" rev-parse --show-toplevel 2>/dev/null)
 
   if [[ "$ui" == "$self" ]]; then
-    command code "$@"
+    if [[ -n "$root" && -f "$abs" && "$abs" != "$root" ]]; then
+      command code "$root" --goto "$abs"
+    else
+      command code "$@"
+    fi
     return $?
   fi
 
   scheme="${CODE_URL_SCHEME:-cursor}"
-  abs=$(path::abs "${1:-.}")
-  ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${abs}"
+  if [[ -n "$root" && -f "$abs" && "$abs" != "$root" ]]; then
+    ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${root}"
+    ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${abs}"
+  else
+    ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${abs}"
+  fi
 }
