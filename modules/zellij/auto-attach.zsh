@@ -4,8 +4,10 @@
 # /opt/homebrew/bin on PATH first, otherwise homebrew-installed zellij is
 # invisible.
 #
-# Skipped in cmux's *ssh* surfaces (CMUX_REMOTE_TRANSPORT=ws): zellij over
-# cmux's ssh relay loses keyboard input. Local cmux surfaces only.
+# Cmux's ssh relay (CMUX_REMOTE_TRANSPORT=ws) sets TERM=tmux-256color and
+# TERM_PROGRAM=tmux because the relay impersonates tmux. Zellij sees that
+# and switches to tmux-passthrough input handling which the cmux relay
+# doesn't proxy, so the user can't type. We strip those before exec.
 #
 # Logs every invocation to ~/.cache/cmux-zellij/attempts.log.
 # Circuit-breaker: if we tried to attach the same session within the last
@@ -20,21 +22,15 @@
 
     local _log
     _log() {
-        printf '%s pid=%s ppid=%s host=%s ws=%s sf=%s transport=%s zellij=%s i=%s %s %s\n' \
+        printf '%s pid=%s ppid=%s host=%s ws=%s sf=%s transport=%s term=%s zellij=%s i=%s %s %s\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" "$PPID" "${HOST:-$(hostname -s)}" \
             "${CMUX_WORKSPACE_ID:-}" "${CMUX_SURFACE_ID:-}" "${CMUX_REMOTE_TRANSPORT:-local}" \
-            "${ZELLIJ:+set}" "$([[ $- == *i* ]] && echo y || echo n)" \
+            "${TERM:-}" "${ZELLIJ:+set}" "$([[ $- == *i* ]] && echo y || echo n)" \
             "$1" "${2:-}" >> "$logfile" 2>/dev/null
     }
 
     if [[ -z $CMUX_WORKSPACE_ID ]]; then
         _log skip not-cmux
-        return 0
-    fi
-
-    if [[ -n $CMUX_REMOTE_TRANSPORT ]]; then
-        # cmux ssh relay: zellij loses keyboard input through the ws transport.
-        _log skip cmux-ssh-surface
         return 0
     fi
 
@@ -77,6 +73,13 @@
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
 
-    _log attach "session=$session tmpdir=$short_tmp"
-    TMPDIR="$short_tmp" exec zellij attach -c "$session"
+    if [[ -n $CMUX_REMOTE_TRANSPORT ]]; then
+        # cmux ssh relay impersonates tmux; zellij would talk tmux passthrough.
+        _log attach "session=$session tmpdir=$short_tmp ssh-relay term-override=xterm-256color"
+        TMPDIR="$short_tmp" TERM=xterm-256color TERM_PROGRAM= TERM_PROGRAM_VERSION= \
+            exec zellij attach -c "$session"
+    else
+        _log attach "session=$session tmpdir=$short_tmp"
+        TMPDIR="$short_tmp" exec zellij attach -c "$session"
+    fi
 }
