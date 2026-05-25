@@ -46,7 +46,13 @@
         return 0
     fi
 
-    local session="cmux-${USER}-${CMUX_WORKSPACE_ID}-${CMUX_SURFACE_ID}"
+    # Short UUID prefixes only: macOS UNIX socket paths are capped at 103 bytes
+    # and zellij stuffs the session name into a path under $TMPDIR. Two full
+    # UUIDs blow past the limit and zellij crashes immediately, which then
+    # respawns the shell into another failed attach loop.
+    local ws_short="${CMUX_WORKSPACE_ID[1,8]}"
+    local sf_short="${CMUX_SURFACE_ID[1,8]}"
+    local session="cmux-${ws_short}-${sf_short}"
     session="${session//\//-}"
     session="${session// /-}"
 
@@ -61,6 +67,13 @@
     fi
     date +%s > "$stamp" 2>/dev/null
 
-    _log attach "session=$session"
-    exec zellij attach -c "$session"
+    # macOS $TMPDIR (/var/folders/.../T/) plus zellij-${UID}/contract_version_1/
+    # plus session leaves ~38 bytes for the session name before hitting the
+    # 103-byte UNIX socket limit. Use /tmp instead so zellij's socket path stays
+    # well under the cap regardless of session-name growth.
+    local short_tmp="/tmp"
+    [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
+
+    _log attach "session=$session tmpdir=$short_tmp"
+    TMPDIR="$short_tmp" exec zellij attach -c "$session"
 }
