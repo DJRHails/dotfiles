@@ -29,6 +29,35 @@
             "$1" "${2:-}" >> "$logfile" 2>/dev/null
     }
 
+    # Honor a queued action from a previous in-zellij `mzj` call: when mzj is
+    # invoked inside local zellij it writes here, detaches, and lets the
+    # respawned shell pick the action up — escaping the nested-zellij trap.
+    if [[ -n $CMUX_SURFACE_ID ]]; then
+        local queue_file="$logdir/queue-${CMUX_SURFACE_ID}"
+        if [[ -f $queue_file ]]; then
+            local q_mtime
+            q_mtime=$(stat -f %m "$queue_file" 2>/dev/null) \
+                || q_mtime=$(stat -c %Y "$queue_file" 2>/dev/null) \
+                || q_mtime=0
+            local q_age=$(( $(date +%s) - q_mtime ))
+            local q_content="$(<"$queue_file")"
+            rm -f "$queue_file"
+            if (( q_age <= 30 )); then
+                local -a q_parts=("${(@s.|.)q_content}")
+                _log queue-exec "age=${q_age}s content=$q_content"
+                if [[ ${q_parts[1]} == mzj ]] && (( ${#q_parts} >= 2 )); then
+                    # mzj lives in mosh-zellij.zsh; load order in zshrc isn't
+                    # guaranteed to define it before us, so source on demand.
+                    local self_dir="${${(%):-%x}:A:h}"
+                    [[ -f $self_dir/mosh-zellij.zsh ]] && source "$self_dir/mosh-zellij.zsh"
+                    exec mzj "${q_parts[@]:1}"
+                fi
+            else
+                _log queue-stale "age=${q_age}s content=$q_content"
+            fi
+        fi
+    fi
+
     if [[ -z $CMUX_WORKSPACE_ID ]]; then
         _log skip not-cmux
         return 0
@@ -69,7 +98,11 @@
     # blow the limit. Use 8-char prefixes plus TMPDIR=/tmp.
     local ws_short="${CMUX_WORKSPACE_ID[1,8]}"
     local sf_short="${CMUX_SURFACE_ID[1,8]}"
-    local session="cmux-${ws_short}-${sf_short}"
+    local host_label="${HOST%%.*}"
+    [[ -z $host_label ]] && host_label=$(hostname -s 2>/dev/null)
+    host_label="${(L)host_label}"
+    host_label="${host_label//[^a-z0-9-]/-}"
+    local session="cmux-${host_label:-unknown}-${ws_short}-${sf_short}"
     session="${session//\//-}"
     session="${session// /-}"
 
