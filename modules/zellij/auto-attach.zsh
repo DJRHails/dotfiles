@@ -34,6 +34,14 @@
         return 0
     fi
 
+    if [[ -n $CMUX_REMOTE_TRANSPORT ]] && [[ -z $CMUX_ZELLIJ_OVER_SSH ]]; then
+        # cmux's ws relay doesn't pump the pty fast enough for zellij's tight
+        # render/input loop; keys arrive with extreme latency. Set
+        # CMUX_ZELLIJ_OVER_SSH=1 to opt back in for testing.
+        _log skip cmux-ssh-surface-latency
+        return 0
+    fi
+
     if [[ -n $ZELLIJ ]]; then
         _log skip already-in-zellij
         return 0
