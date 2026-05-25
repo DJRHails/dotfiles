@@ -43,7 +43,15 @@ mzj() {
             cmd_text+=" ${(q-)a}"
         done
         print -u2 "mzj: spawning new cmux workspace 'mosh:$host' (local zellij left running)"
-        exec cmux new-workspace --name "mosh:$host" --command "$cmd_text" --focus true
+        # Do NOT exec here. When the requesting process dies, cmux appears to
+        # cancel the new-workspace and the spawned workspace never materializes.
+        # Run it as a sync child so the daemon commits before we return.
+        if ! cmux new-workspace --name "mosh:$host" --command "$cmd_text" --focus true; then
+            print -u2 "mzj: cmux new-workspace failed; keeping you in local zellij"
+            rm -f "$skip_dir/skip-next-attach"
+            return 1
+        fi
+        return 0
     fi
 
     local ws="${CMUX_WORKSPACE_ID}"
