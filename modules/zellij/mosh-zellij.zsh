@@ -26,23 +26,24 @@ mzj() {
 
     local host="$1"; shift
 
-    # Unwrap: if we're already inside a local zellij, step out of it and queue
-    # the mosh action. After detach, the cmux surface respawns a fresh shell
-    # which sources zshrc, the auto-attach snippet sees the queue file, and
-    # exec's `mzj <host> ...` outside zellij — proceeding to the normal path.
+    # Unwrap: if we're inside a local zellij, spawn a sibling cmux workspace
+    # that runs `mzj <host>` outside zellij. Local zellij stays running so the
+    # user can switch back to it. We can't use `zellij action detach` and let
+    # cmux respawn — cmux just closes the workspace instead of respawning.
     if [[ -n $ZELLIJ ]]; then
-        if [[ -z $CMUX_SURFACE_ID ]]; then
-            print -u2 "mzj: inside zellij but no CMUX_SURFACE_ID — cannot queue unwrap; refusing to nest"
+        if ! command -v cmux >/dev/null 2>&1; then
+            print -u2 "mzj: inside zellij and no cmux CLI to spawn out — refusing to nest"
             return 1
         fi
-        local queue_dir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
-        local queue_file="$queue_dir/queue-${CMUX_SURFACE_ID}"
-        mkdir -p "$queue_dir" 2>/dev/null
-        # Format: mzj|<host>|<arg1>|<arg2>|...
-        local -a queue_parts=(mzj "$host" "$@")
-        print -r -- "${(j.|.)queue_parts}" > "$queue_file"
-        print -u2 "mzj: stepping out of local zellij; will mosh to $host on respawn"
-        exec zellij action detach
+        local skip_dir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
+        mkdir -p "$skip_dir" 2>/dev/null
+        touch "$skip_dir/skip-next-attach"
+        local cmd_text="mzj ${(q-)host}"
+        for a in "$@"; do
+            cmd_text+=" ${(q-)a}"
+        done
+        print -u2 "mzj: spawning new cmux workspace 'mosh:$host' (local zellij left running)"
+        exec cmux new-workspace --name "mosh:$host" --command "$cmd_text" --focus true
     fi
 
     local ws="${CMUX_WORKSPACE_ID}"
