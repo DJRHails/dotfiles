@@ -35,10 +35,14 @@
     fi
 
     if [[ -n $CMUX_REMOTE_TRANSPORT ]] && [[ -z $CMUX_ZELLIJ_OVER_SSH ]]; then
-        # cmux's ws relay doesn't pump the pty fast enough for zellij's tight
-        # render/input loop; keys arrive with extreme latency. Set
-        # CMUX_ZELLIJ_OVER_SSH=1 to opt back in for testing.
-        _log skip cmux-ssh-surface-latency
+        # Known cmux bug: the ssh hot-path adds enough overhead that TUI apps
+        # which hammer the pty (tmux, zellij) get severe input latency or no
+        # input at all. Tracked upstream:
+        #   cmux#4681 typing latency: cmux + ssh + tmux is seriously laggy
+        #   cmux#4686 PR: fix ssh tmux terminal typing hot-path overhead
+        #   cmux#2969 ssh to remote host causes doubled keystrokes (TERM=xterm-ghostty)
+        # Flip CMUX_ZELLIJ_OVER_SSH=1 to opt in once the upstream fix lands.
+        _log skip cmux-ssh-upstream-bug-4681
         return 0
     fi
 
