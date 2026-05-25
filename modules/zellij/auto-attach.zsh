@@ -34,14 +34,16 @@
         return 0
     fi
 
-    if [[ -n $CMUX_REMOTE_TRANSPORT ]] && [[ -z $CMUX_ZELLIJ_OVER_SSH ]]; then
-        # Known cmux bug: the ssh hot-path adds enough overhead that TUI apps
-        # which hammer the pty (tmux, zellij) get severe input latency or no
-        # input at all. Tracked upstream:
-        #   cmux#4681 typing latency: cmux + ssh + tmux is seriously laggy
-        #   cmux#4686 PR: fix ssh tmux terminal typing hot-path overhead
-        #   cmux#2969 ssh to remote host causes doubled keystrokes (TERM=xterm-ghostty)
-        # Flip CMUX_ZELLIJ_OVER_SSH=1 to opt in once the upstream fix lands.
+    if [[ $CMUX_REMOTE_TRANSPORT == ws ]] && [[ -z $CMUX_ZELLIJ_OVER_SSH ]]; then
+        # Known cmux bug: the ssh ws hot-path adds enough overhead that TUI
+        # apps which hammer the pty (tmux, zellij) get severe input latency
+        # or no input at all. Tracked upstream:
+        #   https://github.com/manaflow-ai/cmux/issues/4681
+        #   https://github.com/manaflow-ai/cmux/pull/4686
+        #   https://github.com/manaflow-ai/cmux/issues/2969
+        # Workaround: use `mzj <host>` (modules/zellij/mosh-zellij.zsh) which
+        # tunnels via mosh and sets CMUX_REMOTE_TRANSPORT=mosh which IS allowed.
+        # Or flip CMUX_ZELLIJ_OVER_SSH=1 once the upstream fix lands.
         _log skip cmux-ssh-upstream-bug-4681
         return 0
     fi
