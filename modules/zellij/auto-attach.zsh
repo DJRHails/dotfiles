@@ -29,26 +29,6 @@
             "$1" "${2:-}" >> "$logfile" 2>/dev/null
     }
 
-    # One-shot skip flag honored once on the next interactive cmux shell to
-    # start (and dropped). mzj-in-zellij uses this to spawn a sibling cmux
-    # workspace whose shell will NOT auto-attach zellij, so the --command
-    # text (`mzj <host>`) runs outside zellij and proceeds normally to
-    # mosh + remote-zellij auto-attach. Stale flags (>5s) are dropped silently.
-    local skip_file="$logdir/skip-next-attach"
-    if [[ -f $skip_file ]]; then
-        local skip_mtime
-        skip_mtime=$(stat -f %m "$skip_file" 2>/dev/null) \
-            || skip_mtime=$(stat -c %Y "$skip_file" 2>/dev/null) \
-            || skip_mtime=0
-        local skip_age=$(( $(date +%s) - skip_mtime ))
-        rm -f "$skip_file"
-        if (( skip_age <= 5 )); then
-            _log skip one-shot-skip-flag
-            return 0
-        fi
-        _log skip-flag-stale "age=${skip_age}s"
-    fi
-
     if [[ -z $CMUX_WORKSPACE_ID ]]; then
         _log skip not-cmux
         return 0
