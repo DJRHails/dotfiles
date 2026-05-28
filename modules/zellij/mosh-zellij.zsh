@@ -1,4 +1,4 @@
-# mzj <host> [mosh-args...]
+# ssh::durable <host> [mosh-args...]
 #
 # Mosh into <host>, forwarding the local cmux workspace/surface ids and
 # tagging the remote shell as CMUX_REMOTE_TRANSPORT=mosh. The remote
@@ -9,17 +9,17 @@
 # (cmux#4681 / cmux#4686) that makes zellij/tmux unusable over it. Mosh's UDP
 # state-sync handles high-redraw TUIs without the latency.
 #
-# Nesting: if you run mzj from inside a local zellij pane you end up nested.
-# That's fine — local outer zellij + remote inner zellij both work; detach
-# from the inner with the usual zellij keybinding when you're done.
-mzj() {
+# Nesting: if you run ssh::durable from inside a local zellij pane you end up
+# nested. That's fine — local outer zellij + remote inner zellij both work;
+# detach from the inner with the usual zellij keybinding when you're done.
+ssh::durable() {
     emulate -L zsh
     if (( $# < 1 )); then
-        print -u2 "usage: mzj <host> [mosh-args...]"
+        print -u2 "usage: ssh::durable <host> [mosh-args...]"
         return 2
     fi
     if ! command -v mosh >/dev/null 2>&1; then
-        print -u2 "mzj: mosh not installed locally"
+        print -u2 "ssh::durable: mosh not installed locally"
         return 127
     fi
 
@@ -32,7 +32,7 @@ mzj() {
             : ${ws:=$(uuidgen)}
             : ${sf:=$(uuidgen)}
         else
-            print -u2 "mzj: CMUX_WORKSPACE_ID/CMUX_SURFACE_ID unset and uuidgen missing"
+            print -u2 "ssh::durable: CMUX_WORKSPACE_ID/CMUX_SURFACE_ID unset and uuidgen missing"
             return 1
         fi
     fi
