@@ -30,7 +30,7 @@
 
 # Legacy fallback: mosh in, forward cmux ids, let the remote auto-attach the designated
 # session (creating it if needed). Used when nothing is picked or no sessions exist.
-ssh::durable_fresh() {
+ssh::durable::fresh() {
     emulate -L zsh
     local host="$1"; shift
     local ws="${CMUX_WORKSPACE_ID}" sf="${CMUX_SURFACE_ID}"
@@ -86,5 +86,5 @@ ssh::durable() {
         fi
     fi
 
-    ssh::durable_fresh "$host" "$@"
+    ssh::durable::fresh "$host" "$@"
 }
