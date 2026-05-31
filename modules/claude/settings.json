@@ -101,6 +101,10 @@
             "type": "command",
             "command": "node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js stop",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/experiment-log.sh"
           }
         ]
       }
