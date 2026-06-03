@@ -64,16 +64,25 @@
         return 0
     fi
 
-    # macOS UNIX socket paths cap at 103 bytes; zellij stuffs the session name
-    # into $TMPDIR/zellij-$UID/contract_version_1/<session>. Two full UUIDs
-    # blow the limit. Use 8-char prefixes plus TMPDIR=/tmp.
-    local ws_short="${CMUX_WORKSPACE_ID[1,8]}"
-    local sf_short="${CMUX_SURFACE_ID[1,8]}"
     local host_label="${HOST%%.*}"
     [[ -z $host_label ]] && host_label=$(hostname -s 2>/dev/null)
     host_label="${(L)host_label}"
     host_label="${host_label//[^a-z0-9-]/-}"
-    local session="cmux-${host_label:-unknown}-${ws_short}-${sf_short}"
+
+    # Readable session id via the user's `humane` lib (`humane id --short <seed>`),
+    # seeded deterministically by the surface UUID so re-runs of THIS surface hit the
+    # same session. cmux re-mints UUIDs per app-restart, so the id still changes across
+    # app sessions like the old hex did (the picker re-attaches orphans) — this just makes
+    # names legible: cmux-<host>-9-trim-lobsters instead of cmux-<host>-F79079CA-D38DFEEB.
+    # Falls back to the 8-char hex pair if humane isn't installed, so attach never breaks.
+    # (Stays well under the 103-byte macOS UNIX-socket path cap; TMPDIR=/tmp below.)
+    local id_part
+    if command -v humane >/dev/null 2>&1; then
+        id_part="$(humane id --short "$CMUX_SURFACE_ID" 2>/dev/null)"
+    fi
+    [[ -z $id_part ]] && id_part="${CMUX_WORKSPACE_ID[1,8]}-${CMUX_SURFACE_ID[1,8]}"
+    id_part="${(L)id_part//[^a-z0-9-]/-}"
+    local session="cmux-${host_label:-unknown}-${id_part}"
     session="${session//\//-}"
     session="${session// /-}"
 
