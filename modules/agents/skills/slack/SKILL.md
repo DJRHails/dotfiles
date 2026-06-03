@@ -1,96 +1,136 @@
----
-name: slack
-description: Search Slack files / messages / users and download files by ID using the user's browser session — no per-workspace bot token setup. Auto-discovers xoxc tokens from Chromium localStorage. Use when the user references a Slack file ID (e.g. F0A8SHNBR2N), wants to find a file or message in Slack, needs to resolve a person's display name to their @handle, or wants to download a Slack attachment.
----
-
-# Slack CLI
-
-Reads Slack via the unofficial web API using xoxc workspace tokens auto-extracted from Chromium localStorage (via `chromium-reader`) + `d` cookie from the browser. Works against Enterprise Grid workspaces (Anthropic, Constellation/astra-fellowship, etc.) where bot tokens require admin install.
-
-## Prerequisites
-
-- User signed into Slack web (`https://app.slack.com/`) in a Chromium-family browser (Arc default; also Chrome, Brave, Edge, Chromium). Firefox/Safari supported for cookies only — auto-discovery needs Chromium localStorage.
-- `uv` installed — PEP 723 deps include `browser-cookie3`, `chromium-reader`, `diskcache`, `pydantic`, `requests`, `rich`, `typer`.
-
-## Commands
-
-All commands use `slack.py` from this skill dir. Default browser is Arc; override with `-b chrome|brave|edge|chromium|firefox|safari`. Top-level `-v` / `--verbose` exposes auto-discovery details on stderr.
-
-### Files
-
-```bash
-./slack.py files info <FILE_ID>           # metadata + download URL
-./slack.py files download <FILE_ID>       # save to file's own name in cwd
-./slack.py files download <FILE_ID> -o /path/out.md
-./slack.py files search "<query>"         # Slack syntax: 'filename:*.md', 'from:@handle', 'in:#chan'
-```
-
-### Messages
-
-```bash
-./slack.py messages search "<query>"      # 'from:@handle slurm', 'in:#fellows-tech-support-chatter', 'has:link'
-```
-
-### Users — resolve display name to @handle
-
-```bash
-./slack.py users search "<substring>"     # matches against handle / real name / display name / email
-```
-
-Slack's `from:@<handle>` filter needs the exact username, not the display name. Use `users search` to look it up. The paginated `users.list` is cached daily.
-
-### Bootstrap (rarely needed — auto-discovery usually works)
-
-```bash
-./slack.py bootstrap                      # capture xoxc from clipboard or stdin → ~/.config/slack/token
-```
-
-Only needed if the user isn't signed into a Chromium browser. In any logged-in Slack web tab → DevTools Console → `copy(TS.boot_data.api_token)`, then run `bootstrap`.
-
-## Auth
-
-Token resolution order:
-1. `$SLACK_TOKEN` env (or `$SLACK_XOXC_TOKEN`)
-2. `~/.config/slack/token`
-3. **Auto-discovery**: scan all Chromium browser profile leveldb stores for xoxc tokens, validate each against `auth.test`, pick the first that works. Multi-workspace users get correct routing.
-
-Workspace resolution: derived from the validated token's `auth.test` URL. Override with `$SLACK_WORKSPACE`.
-
-## When to use this skill
-
-- **Use** when:
-  - The user references a Slack file ID (`F0A8SHNBR2N` format)
-  - "Find this in Slack" / "what did so-and-so say about X" / "download that attachment"
-  - The user wants to look up a Slack handle for someone they only know by display name
-- **Don't use** for actions that send/post in Slack — this CLI is read-only.
-
-## Examples
-
-```bash
-# Download Faizan's RunPod guide attached to a Slack message
-./slack.py files download F0A8SHNBR2N -o RUNPOD_INFRASTRUCTURE_GUIDE.md
-
-# Resolve "faizan" → @faizanali619 before searching for messages
-./slack.py users search faizan
-# → @faizanali619  Faizan Ali  (faizan)  Anthropic Fellow  U09MQ1LP269
-
-# Find messages from that user about slurm
-./slack.py messages search 'from:@faizanali619 slurm' -n 5
-
-# Search files for the runpod guide
-./slack.py files search 'RUNPOD_INFRASTRUCTURE' -n 3
-```
-
-## Caching
-
-Responses memoized to `/tmp/slack-cli-{YYYY-MM-DD}` (rolls daily). The heavyweight `users.list` pagination (hundreds of members across multiple pages) and `auth.test` token-probing dominate uncached time; both are cached after first run. Pydantic models round-trip via [`emboss`](https://pypi.org/project/emboss/)'s `model_dump`/`model_validate`.
-
-## Gotchas
-
-- **Multiple Slack accounts**: with 3+ profiles signed into different workspaces, auto-discovery validates each token and picks one that works. `-v` shows which workspace was selected. Use `$SLACK_WORKSPACE` to pin.
-- **Enterprise Grid quirks**: the `search.modules.users` and `users.search` typeahead endpoints return `unknown_method` for xoxc — that's why `users search` falls back to paginating `users.list`. Slower (~5s on first run) but reliable.
-- **Slack `from:` filter is case-sensitive on handle**: `from:@FaizanAli619` ≠ `from:@faizanali619`. `users search` output gives the right casing.
-
-## Local files
-
-- `slack.py` — the CLI (PEP 723 inline deps, runs via `uv run`)
+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
