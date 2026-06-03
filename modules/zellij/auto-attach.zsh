@@ -115,6 +115,12 @@
     fi
     date +%s > "$stamp" 2>/dev/null
 
+    # Live cmux-ids sidecar: cmux re-mints workspace/surface UUIDs per app-restart, so the
+    # forwarded $CMUX_* env goes stale. Persist the *current* ids (live on this fresh attach)
+    # keyed by session name, so remote cmux tools (cmux-session-tab / fork) target the current
+    # app surface regardless of the stale env. The picker re-attach path writes this too.
+    print -r -- "${CMUX_WORKSPACE_ID} ${CMUX_SURFACE_ID}" > "$logdir/live-$session" 2>/dev/null
+
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
 

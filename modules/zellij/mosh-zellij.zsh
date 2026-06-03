@@ -69,6 +69,18 @@ ssh::durable::fresh() {
         zsh -l
 }
 
+# Persist THIS cmux surface's live ids on the remote so remote cmux tools (cmux-session-tab /
+# fork) can target the current app surface even though the durable session's $CMUX_* env is
+# frozen at creation and goes stale when cmux re-mints UUIDs. Keyed by the zellij session name,
+# matching auto-attach.zsh's sidecar path. Best-effort; never blocks the attach.
+ssh::durable::write_live_ids() {
+    emulate -L zsh
+    local host="$1" sess="$2"
+    [[ -n $CMUX_SURFACE_ID && -n $sess ]] || return 0
+    local dir='${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij'
+    ssh "$host" "mkdir -p $dir && printf '%s %s\n' ${(q)CMUX_WORKSPACE_ID} ${(q)CMUX_SURFACE_ID} > $dir/live-${(q)sess}" 2>/dev/null || true
+}
+
 ssh::durable() {
     emulate -L zsh
     if (( $# < 1 )); then
@@ -103,6 +115,7 @@ ssh::durable() {
             if [[ -n $chosen ]]; then
                 local sess="${chosen%%$'\t'*}"
                 print -r -- "ssh::durable: attaching ${sess} on ${host} …"
+                ssh::durable::write_live_ids "$host" "$sess"
                 exec mosh "$@" "$host" -- zellij attach "$sess"
             fi
             # Esc / no pick → fall through to a fresh session.
