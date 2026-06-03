@@ -28,6 +28,27 @@
 : ${DURABLE_SUMMARY_TTL:=300}
 : ${DURABLE_SUMMARY_PAR:=6}
 
+# Draw a single-line progress bar on the tty from the remote's stderr progress events
+# (DURABLE_TOTAL <n> then one DURABLE_TICK per finished summary). Anything else on
+# stderr is passed through. The bar is cleared on EOF.
+ssh::durable::render_progress() {
+    emulate -L zsh
+    local line bar k filled total=0 cnt=0 width=20
+    local out=/dev/null; { : > /dev/tty } 2>/dev/null && out=/dev/tty
+    while IFS= read -r line; do
+        case $line in
+            'DURABLE_TOTAL '*) total=${line#DURABLE_TOTAL } ;;
+            'DURABLE_TICK')    (( cnt < total )) && (( cnt++ )) ;;
+            *) [[ -n $line ]] && print -r -- "$line" >&2 ;;
+        esac
+        (( total > 0 )) || continue
+        filled=$(( cnt * width / total ))
+        bar=''; for (( k = 0; k < filled; k++ )); do bar+='#'; done
+        printf '\r  titling sessions  [%-*s] %d/%d' "$width" "$bar" "$cnt" "$total" > $out
+    done
+    (( total > 0 )) && printf '\r\033[2K' > $out
+}
+
 # Legacy fallback: mosh in, forward cmux ids, let the remote auto-attach the designated
 # session (creating it if needed). Used when nothing is picked or no sessions exist.
 ssh::durable::fresh() {
@@ -65,10 +86,12 @@ ssh::durable() {
     # Picker path: needs fzf locally and the remote generator script.
     if command -v fzf >/dev/null 2>&1 && [[ -r $rscript ]]; then
         local menu
-        menu=$(ssh "$host" sh -s -- "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" < "$rscript")
+        menu=$(ssh "$host" sh -s -- "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" 1 \
+            < "$rscript" 2> >(ssh::durable::render_progress))
+        { : > /dev/tty } 2>/dev/null && printf '\r\033[2K' > /dev/tty
         if [[ -n $menu ]]; then
             local reload="ssh ${(q)host} sh -s -- ${(q)host} ${(q)DURABLE_SUMMARY_MODEL} 0 ${(q)DURABLE_SUMMARY_PAR} < ${(q)rscript}"
-            local preview="ssh ${(q)host} 'zellij -s {1} action dump-screen 2>/dev/null | tail -n 200'"
+            local preview="ssh ${(q)host} sh -s -- --preview {1} < ${(q)rscript}"
             local chosen
             chosen=$(print -r -- "$menu" | fzf \
                 --ansi --delimiter=$'\t' --with-nth=2 \
