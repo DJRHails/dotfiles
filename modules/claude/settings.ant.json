@@ -4,7 +4,8 @@
   "env": {
     "DISABLE_TELEMETRY": "1",
     "DISABLE_ERROR_REPORTING": "1",
-    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+    "CLAUDE_CODE_EFFORT_LEVEL": "xhigh"
   },
   "attribution": {
     "commit": "",
@@ -101,9 +102,11 @@
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "fastMode": true,
+  "showThinkingSummaries": true,
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "theme": "dark",
   "skipAutoPermissionPrompt": true,
   "autoMode": {
@@ -122,7 +125,7 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Contacting third parties on the user's behalf requires an explicit in-conversation confirmation step that follows a written summary of the exact action. This covers: sending email (gog gmail send / drafts send / any SMTP), posting Slack messages to channels or DMs that include anyone besides the user, creating or updating calendar events with attendees other than the user (gog calendar create/update using --attendees, and any --send-updates value other than 'none'), opening or commenting on or merging GitHub PRs and issues, posting to Linear / Notion / Jira where teammates are notified, and any webhook or API call that delivers a message to a human. The user's initial natural-language request (e.g. 'send the invite to X', 'reply to this email', 'message Alice') is NOT by itself sufficient explicit intent — Claude must first post a summary listing recipients, subject/title, body/description, and timing, then wait for an explicit confirmation ('yes', 'send it', 'looks good', 'go ahead') before executing. Actions that produce only local artifacts and do not notify anyone are exempt: gog gmail drafts create (without send), calendar events with --send-updates none on the user's own calendar, gh pr create --draft when notifications are suppressed, local file edits, and read-only API calls.",
+      "Contacting third parties on the user's behalf requires an explicit in-conversation confirmation step that follows a written summary of the exact action. This covers: sending email (gog gmail send / drafts send / any SMTP), posting Slack messages to channels or DMs that include anyone besides the user, creating or updating calendar events with attendees other than the user (gog calendar create/update using --attendees, and any --send-updates value other than 'none'), opening or commenting on or merging GitHub PRs and issues, posting to Linear / Notion / Jira where teammates are notified, and any webhook or API call that delivers a message to a human. The user's initial natural-language request (e.g. 'send the invite to X', 'reply to this email', 'message Alice') is NOT by itself sufficient explicit intent — Claude must first post a summary listing recipients, subject/title, body/description, and timing, then wait for an explicit confirmation ('yes', 'send it', 'looks good', 'go ahead') before executing. Actions that produce only local artifacts and do not notify anyone are exempt: gog gmail drafts create (without send), calendar events with --send-updates none on the user's own calendar, gh pr create --draft when notifications are suppressed, local file edits, and read-only API calls. ALSO EXEMPT: opening, commenting on, or merging GitHub PRs and issues on the user's own personal repositories under github.com/DJRHails/* (solo repos that notify no one else) — `gh pr create`/`gh pr merge`/`gh issue create`/`gh pr comment` and equivalent API calls targeting a DJRHails/* repo need NO confirmation step. The confirmation step still applies to repos in shared orgs (e.g. safety-research) or any repo with other collaborators.",
       "System Package Install: A command starting with `apt install`, `apt-get install`, `apt upgrade`, `dpkg -i`, `snap install`, `docker build`, `docker-compose build`, or any install/build targeting `/usr/`, `/lib/`, or `/opt/`. Both `apt install` and `docker build` have broken glibc and taken nodes offline requiring full reimage. Default to `pip`/`uv` into a user-owned venv under `/workspace-vast/djrhails/envs/`, `pipx`, or `~/.local/`; clearing requires the user to have explicitly named the system package.",
       "Fresh Package Version: A `pip`/`uv`/`npm` install command with `--upgrade`, `--pre`, `-U`, `@latest`, `uv sync --upgrade`, or an unpinned package name (`pip install foo` with no `==`/`~=`/`>=` version) that is not in the well-known ML set; or an `--exclude-newer` override. Supply-chain risk: a compromised release (e.g. the LiteLLM incident) can exfiltrate SSH keys cluster-wide within hours of publication. Prefer pinning to a version ≥~7 days old or rely on the cluster's `uv` `exclude-newer` default. Does NOT apply to lockfile/manifest installs (`uv sync`, `pip install -r requirements.txt`).",
       "Other-Fellow Storage Write: A destructive or mutating command — `rm`, `rm -rf`, `mv`, `cp` onto, `>`/`>>` redirect, `chmod`, `chown`, `rsync --delete`, `find ... -delete`, `sed -i`, or Write/Edit tool — whose target path is under `/workspace-vast/<name>/`, `/workspace/<name>/`, or `/home/<name>/` where `<name>` is NOT the configured current user `djrhails`. Reading other fellows' directories is fine.",
@@ -168,6 +171,5 @@
       "**Classifier visibility**: The classifier sees user messages, CLAUDE.md, and prior tool CALLS (command strings, file paths, script bodies) — but NOT tool RESULTS (sbatch output, squeue output, echo output), and NOT runtime state (env vars, hostname, disk usage, process ownership). If a SOFT rule's applicability depends on something the user has stated in the transcript (e.g. 'I'm inside an srun shell', 'job 12345 is mine', 'that PID is mine'), treat that as user intent."
     ]
   },
-  "// NOTE": "This file goes in ~/.claude/settings.json (user-level), NOT .claude/settings.json in a repo. Auto-mode config is deliberately not read from project settings (a malicious repo could otherwise inject classifier rules). REPLACE <your-username> below with your actual cluster username before use — the classifier uses it to tell your own storage apart from other fellows'.",
-  "skipWorkflowUsageWarning": true
+  "// NOTE": "This file goes in ~/.claude/settings.json (user-level), NOT .claude/settings.json in a repo. Auto-mode config is deliberately not read from project settings (a malicious repo could otherwise inject classifier rules). REPLACE <your-username> below with your actual cluster username before use — the classifier uses it to tell your own storage apart from other fellows'."
 }
