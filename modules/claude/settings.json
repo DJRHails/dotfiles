@@ -73,10 +73,6 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/block-inline-scripts.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash ~/.files/modules/claude/hooks/block-force-push-main.sh"
           }
         ]
       }
