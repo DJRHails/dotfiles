@@ -77,6 +77,24 @@
     session="${session//\//-}"
     session="${session// /-}"
 
+    # Explicit session override: lets tooling bind THIS surface to a specific session
+    # (e.g. resurrect an existing one) instead of the default UUID-derived name. Checks
+    # $CMUX_ZELLIJ_SESSION first, then a one-shot marker file keyed by surface id
+    # (written before the surface's shell starts). The marker is consumed on read so the
+    # rebind happens once, not on every resurrect.
+    local override_file="$logdir/override-${CMUX_SURFACE_ID}"
+    if [[ -n $CMUX_ZELLIJ_SESSION ]]; then
+        session="$CMUX_ZELLIJ_SESSION"
+        _log override "env session=$session"
+    elif [[ -f $override_file ]]; then
+        local override_name="$(<"$override_file")"
+        rm -f "$override_file"
+        if [[ -n $override_name ]]; then
+            session="$override_name"
+            _log override "file session=$session"
+        fi
+    fi
+
     local stamp="$logdir/last-$session"
     if [[ -f $stamp ]]; then
         local now=$(date +%s) last=$(cat "$stamp" 2>/dev/null || echo 0)
