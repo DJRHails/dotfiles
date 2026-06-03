@@ -83,6 +83,10 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/experiment-log.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
           }
         ]
       }
