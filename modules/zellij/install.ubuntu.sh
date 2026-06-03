@@ -19,3 +19,8 @@ trap 'rm -rf "$TMPDIR_ZELLIJ"' EXIT
 wget -q --show-progress -O "$TMPDIR_ZELLIJ/${ZELLIJ_TARBALL}" "$ZELLIJ_URL"
 tar -xzf "$TMPDIR_ZELLIJ/${ZELLIJ_TARBALL}" -C "$TMPDIR_ZELLIJ"
 platform::sudo install -m 0755 "$TMPDIR_ZELLIJ/zellij" /usr/local/bin/zellij
+
+# humane CLI — auto-attach.zsh / mosh-zellij.zsh use `humane id` for readable session names.
+if platform::command_exists uv; then
+  command -v humane >/dev/null 2>&1 || uv tool install humane
+fi
