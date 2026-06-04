@@ -26,11 +26,16 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
 ## What it does
 
 1. Resolves context from env (no process-tree guessing): `CLAUDE_CODE_SESSION_ID`,
-   `CLAUDE_CONFIG_DIR`, `CMUX_WORKSPACE_ID`. The **surface id** is read live from the
-   `~/.cache/cmux-zellij/live-$ZELLIJ_SESSION_NAME` sidecar (written by the zellij
-   attach scripts on every connect), falling back to the forwarded `CMUX_SURFACE_ID`.
-   The forwarded env freezes at session creation and goes stale when cmux re-mints
-   UUIDs, which is what caused the old "Workspace not found" on a durable remote.
+   `CLAUDE_CONFIG_DIR`. Reads the session **name** from the sessions JSON. The **live
+   surface id** is then resolved on a remote by matching that name against the cmux
+   surface *titles* (`cmux tree --all`): the Stop-hook titler propagates the session
+   name out as the terminal title (Claude session → zellij/mosh → cmux surface title),
+   so the surface whose title contains the name is this one. That key is the only one
+   that is **focus-independent** and survives cmux re-minting UUIDs across app restarts
+   — unlike the forwarded `CMUX_SURFACE_ID` / the live-ids sidecar (both go stale → the
+   old "Workspace not found"), and unlike "focused" (drifts between tabs). Locally the
+   freshly-injected `CMUX_SURFACE_ID` is trusted directly. The resolved id also heals
+   the sidecar so `cmux-session-tab` recovers too.
 2. Reads the session **name** and project **cwd** from the matching
    `$CLAUDE_CONFIG_DIR/sessions/<pid>.json`.
 3. Opens a split beside the caller via `cmux rpc surface.split` (or a tab via
@@ -62,10 +67,15 @@ app binary exists on this host (`/Applications/cmux.app/.../bin/cmux`):
   split creates a fresh shell *on the mac*, while the session's cwd + `claude` live on
   the remote — so a bare `cd` would fail (this was the "didn't ssh into bonbon" bug).
   Instead the script (running on the remote) writes a one-pane zellij **layout** that
-  launches the fork, then drives the mac surface to `mosh <remote> -- zellij --session
-  <forksess> --layout …`. The fork lands in its own **durable zellij session** on the
-  remote, and its live-id sidecar is written so it's controllable via
-  `cmux-session-tab` afterwards.
+  launches the fork, then drives the mac surface to `mosh <remote> -- zellij
+  --new-session-with-layout <layout> --session <forksess>` (the `--session …/--layout`
+  pair *attaches* and errors if absent — `--new-session-with-layout` is what *creates*).
+  Because the split's login shell needs a beat to reach a prompt (input typed too early
+  is dropped), the send is **retried until the session actually comes up** — the script
+  runs on the fork's own host, so a local `zellij list-sessions` is the authoritative
+  readiness check, and it re-checks before each resend so the hop is never typed into an
+  already-attached mosh pane. The fork lands in its own **durable zellij session**, and
+  its live-id sidecar is written so it's controllable via `cmux-session-tab` afterwards.
 
 The `zsh -lc` outer hop (login, non-interactive) gets PATH but does **not** source
 `.zshrc`, so `auto-attach.zsh` doesn't fire and fight the explicit attach; the layout

@@ -69,18 +69,6 @@ if [ -x "$APP_CMUX" ]; then MODE=local; else MODE=remote; fi
 
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH"
 
-# --- targeting: live surface id from the sidecar, fallback to forwarded env ---
-SURFACE="${CMUX_SURFACE_ID:-}"
-LIVE_WS="${CMUX_WORKSPACE_ID:-}"
-sidecar="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij/live-${ZELLIJ_SESSION_NAME:-}"
-if [ -n "${ZELLIJ_SESSION_NAME:-}" ] && [ -r "$sidecar" ]; then
-  live_sf=$(awk '{print $2; exit}' "$sidecar" 2>/dev/null)
-  live_ws=$(awk '{print $1; exit}' "$sidecar" 2>/dev/null)
-  [ -n "$live_sf" ] && SURFACE="$live_sf"
-  [ -n "$live_ws" ] && LIVE_WS="$live_ws"
-fi
-[ -n "$SURFACE" ] || die "no surface id (CMUX_SURFACE_ID unset, no sidecar)"
-
 # --- context: claude session name + project cwd + launcher --------------------
 SID="${CLAUDE_CODE_SESSION_ID:-}"
 [[ -n "$SID" ]] || die "CLAUDE_CODE_SESSION_ID unset (run inside a Claude Code session)"
@@ -94,6 +82,40 @@ NAME="${INFO%%$'\t'*}"
 PROJ="${INFO#*$'\t'}"
 [[ -n "$PROJ" ]] || PROJ="$PWD"
 TITLE="${PREFIX}${NAME:-$SID}"
+
+# --- targeting: resolve THIS session's live cmux surface ------------------------------
+# Map the session to its surface by the one key that is focus-independent and survives cmux
+# re-minting UUIDs across app restarts: the surface *title*. The Stop-hook titler propagates
+# the Claude session name out as the terminal title (Claude session → zellij/mosh → cmux
+# surface title), so the surface whose title contains NAME is ours. Locally we trust the
+# fresh $CMUX_SURFACE_ID instead (cmux injects it per surface; no app round-trip needed).
+# NOT the forwarded env or the live-ids sidecar (both go stale), and NOT "focused" (drifts).
+SURFACE="${CMUX_SURFACE_ID:-}"
+LIVE_WS="${CMUX_WORKSPACE_ID:-}"
+sidecar="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij/live-${ZELLIJ_SESSION_NAME:-}"
+if [ "$MODE" = remote ]; then
+  [ -n "$NAME" ] || die "session has no name yet — /rename it so its tab title can be matched"
+  tree=$(run_cmux --id-format both tree --all 2>/dev/null) || die "cmux tree failed (app host unreachable?)"
+  match=$(printf '%s\n' "$tree" | awk -v name="$NAME" '
+    /workspace workspace:/ {
+      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) ws = substr($0, RSTART, RLENGTH)
+    }
+    /surface surface:/ && index($0, name) {
+      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
+        print substr($0, RSTART, RLENGTH), ws
+        exit
+      }
+    }')
+  SURFACE="${match%% *}"
+  LIVE_WS="${match#* }"
+  [ -n "$SURFACE" ] || die "no cmux surface titled with session name \"$NAME\" (is the tab-sync hook running?)"
+  # Heal the sidecar so cmux-session-tab / the Stop-hook titler pick up the live id too.
+  if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
+    mkdir -p "$(dirname "$sidecar")"
+    printf '%s %s\n' "${LIVE_WS:-unknown}" "$SURFACE" >"$sidecar"
+  fi
+fi
+[ -n "$SURFACE" ] || die "no surface id (CMUX_SURFACE_ID unset and not resolvable)"
 
 # Pick the launcher that matches the session's config dir. claude::ant sources auth
 # (.env.ant) + runs its ensure step; a bare `CLAUDE_CONFIG_DIR=… claude` skips that
@@ -128,14 +150,16 @@ NEW=$(jq -r '.surface_id // empty' <<<"$res")
 if [ "$MODE" = local ]; then
   # The new surface is a shell on this (the cmux UI) host — same machine as the session.
   sleep 2 # let the new shell initialise before sending input
-  cmd="$FORK_CMD"
+  run_cmux rpc surface.send_text \
+    "$(jq -nc --arg s "$NEW" --arg t "$FORK_CMD"$'\n' '{surface_id:$s,text:$t}')" >/dev/null ||
+    die "rpc surface.send_text failed"
 else
-  # The new surface is a fresh shell on the mac, but the session + cwd + claude live on
+  # The new surface is a fresh login shell on the mac, but the session + cwd + claude live on
   # this remote. Write a one-pane layout here that launches the fork in a NEW durable zellij
-  # session, then drive the mac surface to mosh back here and attach it. `zsh -lc` (login,
-  # non-interactive) gets PATH but does NOT source .zshrc, so auto-attach.zsh does not fire
-  # and fight our explicit attach; the layout pane's `zsh -ic` is interactive so claude::ant
-  # resolves, and auto-attach there no-ops because $ZELLIJ is already set.
+  # session, then drive the mac surface to mosh back here and start it. `zsh -lc` (login,
+  # non-interactive) gets PATH but does NOT source .zshrc, so auto-attach.zsh does not fire and
+  # fight us; the layout pane's `zsh -ic` is interactive so claude::ant resolves, and
+  # auto-attach there no-ops because $ZELLIJ is already set.
   if command -v humane >/dev/null 2>&1; then
     fork_tag="$(humane id --short "$NEW-$SID" 2>/dev/null)"
   fi
@@ -151,13 +175,25 @@ else
   mkdir -p "$scdir"
   printf '%s %s\n' "${LIVE_WS:-unknown}" "$NEW" >"$scdir/live-$forksess"
 
-  cmd="exec mosh ${DURABLE_HOST} -- env TMPDIR=/tmp zsh -lc 'TMPDIR=/tmp zellij --session ${forksess} --layout ${layout}'"
-  sleep 2
+  # --new-session-with-layout *creates* a named session (plain --session attaches and errors
+  # if it doesn't exist). The split's login shell takes a beat to reach a prompt and input
+  # typed too early is dropped, so retry the send until the session actually comes up — we run
+  # on the fork's own host, so a local list-sessions is the authoritative readiness check, and
+  # checking before each (re)send avoids typing the hop into an already-attached mosh pane.
+  hop="exec mosh ${DURABLE_HOST} -- env TMPDIR=/tmp zsh -lc 'TMPDIR=/tmp zellij --new-session-with-layout ${layout} --session ${forksess}'"
+  launched=""
+  for _ in 1 2 3 4 5 6; do
+    sleep 3
+    if zellij list-sessions 2>/dev/null | sed -E 's/\x1b\[[0-9;]*m//g' |
+      awk -v s="$forksess" '$1==s{f=1} END{exit f?0:1}'; then
+      launched=ok
+      break
+    fi
+    run_cmux rpc surface.send_text \
+      "$(jq -nc --arg s "$NEW" --arg t "$hop"$'\n' '{surface_id:$s,text:$t}')" >/dev/null 2>&1 || true
+  done
+  [ -n "$launched" ] || die "fork hop sent but session '$forksess' never came up on ${DURABLE_HOST}"
 fi
-
-run_cmux rpc surface.send_text \
-  "$(jq -nc --arg s "$NEW" --arg t "$cmd"$'\n' '{surface_id:$s,text:$t}')" >/dev/null ||
-  die "rpc surface.send_text failed"
 
 run_cmux rpc tab.action \
   "$(jq -nc --arg s "$NEW" --arg n "$TITLE" '{action:"rename",tab_id:$s,title:$n}')" >/dev/null 2>&1 || true
