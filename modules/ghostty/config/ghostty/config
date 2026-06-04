@@ -1,0 +1,7 @@
+# Shift always overrides an application's mouse capture, so Shift+Cmd+click opens
+# OSC 8 hyperlinks inside zellij/tmux while mouse_mode stays on (wheel-scroll still
+# works). zellij requests shift-capture via XTSHIFTESCAPE (mode 1029), which
+# overrides Ghostty's default `false`; `never` makes that override impossible.
+# Tradeoff: Shift+drag no longer extends selection *inside* the multiplexer —
+# native terminal selection takes over instead.
+mouse-shift-capture = never
