@@ -11,6 +11,13 @@
 # legacy behaviour: forward the cmux ids and let the remote auto-attach snippet
 # create/attach the id-designated session.
 #
+# Non-interactive / scriptable (for automation like `resurrect`):
+#   ssh::durable <host> --list                 print "<session>\t<summary>" lines, no fzf, no attach
+#   ssh::durable <host> --attach <session>     attach an exact session name, skip the picker
+#   ssh::durable <host> --query <str> [mosh…]  attach the most-recent session whose menu line
+#                                              matches <str> (case-insensitive); no match → fresh
+# --attach/--query still `exec mosh`, so they work as a cmux workspace --command.
+#
 # Why mosh, not `cmux ssh`? Cmux's ws relay has known per-keystroke overhead
 # (cmux#4681 / cmux#4686) that makes zellij/tmux unusable over it. Mosh's UDP
 # state-sync handles high-redraw TUIs without the latency. We tag the remote with
@@ -49,6 +56,28 @@ ssh::durable::render_progress() {
     (( total > 0 )) && printf '\r\033[2K' > $out
 }
 
+# Fetch the host's live-session menu: tab-separated "<session-name>\t<summary>" lines,
+# most-recent first (ordering owned by durable-remote.sh). Summaries are cached on the
+# host for $DURABLE_SUMMARY_TTL. Progress bar goes to the tty (or /dev/null when scripted).
+ssh::durable::menu() {
+    emulate -L zsh
+    local host="$1"
+    local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
+    [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; return 1; }
+    ssh "$host" sh -s -- "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" 1 \
+        < "$rscript" 2> >(ssh::durable::render_progress)
+}
+
+# Attach an exact session by name (mosh + zellij attach). Replaces the shell via exec,
+# so it's safe to use as a cmux workspace --command. Trailing args are passed to mosh.
+ssh::durable::attach() {
+    emulate -L zsh
+    local host="$1" sess="$2"; shift 2
+    print -r -- "ssh::durable: attaching ${sess} on ${host} …"
+    ssh::durable::write_live_ids "$host" "$sess"
+    exec mosh "$@" "$host" -- zellij attach "$sess"
+}
+
 # Legacy fallback: mosh in, forward cmux ids, let the remote auto-attach the designated
 # session (creating it if needed). Used when nothing is picked or no sessions exist.
 ssh::durable::fresh() {
@@ -84,7 +113,7 @@ ssh::durable::write_live_ids() {
 ssh::durable() {
     emulate -L zsh
     if (( $# < 1 )); then
-        print -u2 "usage: ssh::durable <host> [mosh-args...]"
+        print -u2 "usage: ssh::durable <host> [--list | --attach <session> | --query <str>] [mosh-args...]"
         return 2
     fi
     if ! command -v mosh >/dev/null 2>&1; then
@@ -93,13 +122,44 @@ ssh::durable() {
     fi
     local host="$1"; shift
 
+    # Non-interactive selectors for automation. These short-circuit the fzf picker.
+    case "$1" in
+        --list|--ls)
+            ssh::durable::menu "$host"
+            return $?
+            ;;
+        --attach|-a)
+            shift
+            local sess="$1"; shift
+            if [[ -z $sess ]]; then
+                print -u2 "ssh::durable: --attach needs a session name"
+                return 2
+            fi
+            ssh::durable::attach "$host" "$sess" "$@"
+            ;;
+        --query|-q)
+            shift
+            local query="$1"; shift
+            if [[ -z $query ]]; then
+                print -u2 "ssh::durable: --query needs a match string"
+                return 2
+            fi
+            local line
+            line=$(ssh::durable::menu "$host" | grep -i -m1 -- "$query")
+            if [[ -n $line ]]; then
+                ssh::durable::attach "$host" "${line%%$'\t'*}" "$@"
+            fi
+            print -u2 "ssh::durable: no session matching '${query}' on ${host} — starting fresh"
+            ssh::durable::fresh "$host" "$@"
+            ;;
+    esac
+
     local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
 
     # Picker path: needs fzf locally and the remote generator script.
     if command -v fzf >/dev/null 2>&1 && [[ -r $rscript ]]; then
         local menu
-        menu=$(ssh "$host" sh -s -- "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" 1 \
-            < "$rscript" 2> >(ssh::durable::render_progress))
+        menu=$(ssh::durable::menu "$host")
         { : > /dev/tty } 2>/dev/null && printf '\r\033[2K' > /dev/tty
         if [[ -n $menu ]]; then
             local reload="ssh ${(q)host} sh -s -- ${(q)host} ${(q)DURABLE_SUMMARY_MODEL} 0 ${(q)DURABLE_SUMMARY_PAR} < ${(q)rscript}"
@@ -113,10 +173,7 @@ ssh::durable() {
                 --preview "$preview" --preview-window='right:62%:wrap' \
                 --bind "ctrl-r:reload($reload)")
             if [[ -n $chosen ]]; then
-                local sess="${chosen%%$'\t'*}"
-                print -r -- "ssh::durable: attaching ${sess} on ${host} …"
-                ssh::durable::write_live_ids "$host" "$sess"
-                exec mosh "$@" "$host" -- zellij attach "$sess"
+                ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
             fi
             # Esc / no pick → fall through to a fresh session.
         fi
