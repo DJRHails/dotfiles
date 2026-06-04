@@ -1,5 +1,27 @@
 #!/usr/bin/env bash
 
+github::install_cli() {
+  if platform::command_exists gh; then
+    log::success "GitHub CLI"
+    return 0
+  fi
+  if platform::is_osx; then
+    install::package "GitHub CLI" "gh"
+    return $?
+  fi
+  # Linux: gh is absent from the default apt repos — add the official one.
+  log::info "Adding the GitHub CLI apt repository..."
+  platform::sudo mkdir -p -m 755 /etc/apt/keyrings
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | platform::sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg >/dev/null
+  platform::sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
+    "$(dpkg --print-architecture)" \
+    | platform::sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+  platform::sudo apt update -qq
+  install::package "GitHub CLI" "gh"
+}
+
 github::add_ssh_configs() {
 
     printf "%s\n" \
