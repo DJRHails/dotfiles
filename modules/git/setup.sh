@@ -31,7 +31,7 @@ setup_gitconfig
 
 install::package "Git LFS" "git-lfs"
 install::package "Transcrypt" "transcrypt"
-install::package "Github CLI" "gh"
+github::install_cli
 
 if [ "$skipQuestions" != true ]; then
   feedback::ask_for_confirmation "Do you want to setup github?"

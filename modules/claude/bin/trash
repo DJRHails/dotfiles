@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Minimal `trash`: move paths into a trash directory instead of deleting them,
+# so an accidental removal stays recoverable. The macOS `trash` (macos-trash)
+# uses the real Finder Trash; on Linux this is the dependency-free equivalent.
+# Override the destination with $TRASH_DIR (default: /tmp/trash).
+set -euo pipefail
+
+dest="${TRASH_DIR:-/tmp/trash}"
+mkdir -p "$dest"
+
+if [ "$#" -eq 0 ]; then
+  printf 'usage: trash <path>...\n' >&2
+  exit 1
+fi
+
+for path in "$@"; do
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    printf 'trash: %s: no such file or directory\n' "$path" >&2
+    continue
+  fi
+  target="$dest/$(basename "$path")"
+  # Don't clobber an earlier trashed file of the same name.
+  suffix=1
+  while [ -e "$target" ]; do
+    target="$dest/$(basename "$path").$suffix"
+    suffix=$((suffix + 1))
+  done
+  mv "$path" "$target"
+done

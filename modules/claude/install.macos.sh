@@ -1,8 +1,6 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
+# GUI terminal — macOS only. The CLI tools (actionlint, zizmor, …) are now
+# cross-platform in install.sh; Node + pnpm live in the `node` module.
 install::cask "Ghostty" "ghostty"
-
-install::package "actionlint" "actionlint"
-install::package "zizmor" "zizmor"
-install::package "Node.js 22" "node@22"
-install::package "pnpm" "pnpm"
