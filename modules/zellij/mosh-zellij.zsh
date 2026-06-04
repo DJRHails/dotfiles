@@ -16,15 +16,18 @@
 #   ssh::durable <host> --attach <session>     attach an exact session name, skip the picker
 #   ssh::durable <host> --query <str> [mosh…]  attach the most-recent session whose menu line
 #                                              matches <str> (case-insensitive); no match → fresh
-# --attach/--query still `exec mosh`, so they work as a cmux workspace --command.
+# --attach/--query exec mosh when run outside a local zellij (via ssh::durable::go), so they
+# still work as a cmux workspace --command; inside one they de-nest like the interactive path.
 #
 # Why mosh, not `cmux ssh`? Cmux's ws relay has known per-keystroke overhead
 # (cmux#4681 / cmux#4686) that makes zellij/tmux unusable over it. Mosh's UDP
 # state-sync handles high-redraw TUIs without the latency. We tag the remote with
 # CMUX_REMOTE_TRANSPORT=mosh, which auto-attach.zsh treats as an allowed transport.
 #
-# Nesting: running this from inside a local zellij pane nests (local outer + remote
-# inner). That's fine — detach the inner with the usual zellij keybinding.
+# Nesting: when invoked from inside the local zellij that auto-attach.zsh created for the cmux
+# surface, we de-nest automatically — ssh::durable::go hands the mosh command to the surface's
+# outer login shell and detaches the local zellij, so you end up with just the remote zellij
+# (detach local → mosh → attach remote), not local-outer + remote-inner.
 #
 # Config (override in ~/.zshrc.local):
 #   DURABLE_SUMMARY_MODEL   summariser model. Default: claude-haiku-4-5
@@ -68,14 +71,35 @@ ssh::durable::menu() {
         < "$rscript" 2> >(ssh::durable::render_progress)
 }
 
-# Attach an exact session by name (mosh + zellij attach). Replaces the shell via exec,
-# so it's safe to use as a cmux workspace --command. Trailing args are passed to mosh.
+# Replace the surface with the durable command — but if we're nested inside a local zellij
+# (auto-attach.zsh created one for this cmux surface), don't nest mosh inside it. Instead hand
+# the command to the surface's outer login shell (the one that ran `zellij attach`) and detach
+# this zellij so it drops back there; auto-attach.zsh execs the staged handoff. Net effect:
+# detach local zellij → mosh → attach remote zellij, no nesting. Outside a local zellij (e.g.
+# run as a cmux workspace --command) it just execs, exactly as before.
+ssh::durable::go() {
+    emulate -L zsh
+    local cmdline="$1"
+    if [[ -n $ZELLIJ && -n $ZELLIJ_SESSION_NAME ]]; then
+        local logdir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
+        [[ -d $logdir ]] || mkdir -p "$logdir"
+        print -r -- "$cmdline" > "$logdir/durable-handoff-${ZELLIJ_SESSION_NAME}"
+        print -r -- "ssh::durable: detaching local zellij (${ZELLIJ_SESSION_NAME}) → durable hop …"
+        zellij action detach
+        return 0
+    fi
+    eval "exec ${cmdline}"
+}
+
+# Attach an exact session by name (mosh + zellij attach). De-nests via ssh::durable::go when
+# inside a local zellij, else execs — so it's still safe as a cmux workspace --command.
+# Trailing args are passed to mosh.
 ssh::durable::attach() {
     emulate -L zsh
     local host="$1" sess="$2"; shift 2
     print -r -- "ssh::durable: attaching ${sess} on ${host} …"
     ssh::durable::write_live_ids "$host" "$sess"
-    exec mosh "$@" "$host" -- zellij attach "$sess"
+    ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- zellij attach ${(q)sess}"
 }
 
 # Legacy fallback: mosh in, forward cmux ids, let the remote auto-attach the designated
@@ -93,9 +117,7 @@ ssh::durable::fresh() {
             return 1
         fi
     fi
-    exec mosh "$@" "$host" -- \
-        env CMUX_WORKSPACE_ID="$ws" CMUX_SURFACE_ID="$sf" CMUX_REMOTE_TRANSPORT=mosh \
-        zsh -l
+    ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- env CMUX_WORKSPACE_ID=${(q)ws} CMUX_SURFACE_ID=${(q)sf} CMUX_REMOTE_TRANSPORT=mosh zsh -l"
 }
 
 # Persist THIS cmux surface's live ids on the remote so remote cmux tools (cmux-session-tab /

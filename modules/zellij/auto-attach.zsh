@@ -136,6 +136,13 @@
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
 
+    # Durable de-nest handoff: when `ssh::durable` is invoked from *inside* this local zellij,
+    # it stages a mosh command in $handoff and detaches us, so on return we replace the surface
+    # with that durable hop instead of nesting mosh inside zellij. Cleared first so a stale one
+    # never fires; consumed below.
+    local handoff="$logdir/durable-handoff-$session"
+    rm -f "$handoff" 2>/dev/null
+
     if [[ -n $CMUX_REMOTE_TRANSPORT ]]; then
         # cmux ssh relay impersonates tmux; zellij would talk tmux passthrough.
         _log attach "session=$session tmpdir=$short_tmp ssh-relay term-override=xterm-256color"
@@ -144,6 +151,15 @@
     else
         _log attach "session=$session tmpdir=$short_tmp"
         TMPDIR="$short_tmp" zellij attach -c "$session"
+    fi
+
+    # If ssh::durable staged a durable hop, replace the surface with it (de-nest: detach local
+    # zellij → mosh → attach remote). Otherwise fall through to the plain-shell behaviour below.
+    if [[ -f $handoff ]]; then
+        local hop="$(<"$handoff")"
+        rm -f "$handoff" 2>/dev/null
+        _log durable-hop "session=$session"
+        eval "exec ${hop}"
     fi
 
     # Intentionally NOT `exec`: on detach (Ctrl+O d / `zellij action detach`) or
