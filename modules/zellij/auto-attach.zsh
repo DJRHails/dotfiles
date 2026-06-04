@@ -12,6 +12,11 @@
 # Logs every invocation to ~/.cache/cmux-zellij/attempts.log.
 # Circuit-breaker: if we tried to attach the same session within the last
 # CMUX_ZELLIJ_MIN_INTERVAL seconds (default 3), abort instead of looping.
+#
+# Escape hatches (so a non-zellij shell is always reachable):
+#   - CMUX_NO_ZELLIJ=1  -> skip auto-attach entirely for this surface.
+#   - Detach/quit returns to a plain shell in the same surface (we don't
+#     `exec` zellij), instead of closing the window.
 
 () {
     local logdir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
@@ -31,6 +36,13 @@
 
     if [[ -z $CMUX_WORKSPACE_ID ]]; then
         _log skip not-cmux
+        return 0
+    fi
+
+    # Opt-out: set CMUX_NO_ZELLIJ=1 (globally, or per workspace/surface env) for a
+    # plain, zellij-free shell in this surface.
+    if [[ -n $CMUX_NO_ZELLIJ ]]; then
+        _log skip opt-out-no-zellij
         return 0
     fi
 
@@ -128,9 +140,15 @@
         # cmux ssh relay impersonates tmux; zellij would talk tmux passthrough.
         _log attach "session=$session tmpdir=$short_tmp ssh-relay term-override=xterm-256color"
         TMPDIR="$short_tmp" TERM=xterm-256color TERM_PROGRAM= TERM_PROGRAM_VERSION= \
-            exec zellij attach -c "$session"
+            zellij attach -c "$session"
     else
         _log attach "session=$session tmpdir=$short_tmp"
-        TMPDIR="$short_tmp" exec zellij attach -c "$session"
+        TMPDIR="$short_tmp" zellij attach -c "$session"
     fi
+
+    # Intentionally NOT `exec`: on detach (Ctrl+O d / `zellij action detach`) or
+    # quit, control returns here, the rest of zshrc runs, and you land in a plain
+    # non-zellij shell in the SAME surface instead of the window closing.
+    # Re-attach with `zja` / `zellij attach -c "$session"`.
+    _log detached "session=$session"
 }
