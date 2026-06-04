@@ -158,6 +158,7 @@ ssh::durable() {
                 return 2
             fi
             ssh::durable::attach "$host" "$sess" "$@"
+            return
             ;;
         --query|-q)
             shift
@@ -170,9 +171,11 @@ ssh::durable() {
             line=$(ssh::durable::menu "$host" | grep -i -m1 -- "$query")
             if [[ -n $line ]]; then
                 ssh::durable::attach "$host" "${line%%$'\t'*}" "$@"
+                return
             fi
             print -u2 "ssh::durable: no session matching '${query}' on ${host} — starting fresh"
             ssh::durable::fresh "$host" "$@"
+            return
             ;;
     esac
 
@@ -196,6 +199,7 @@ ssh::durable() {
                 --bind "ctrl-r:reload($reload)")
             if [[ -n $chosen ]]; then
                 ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
+                return
             fi
             # Esc / no pick → fall through to a fresh session.
         fi
