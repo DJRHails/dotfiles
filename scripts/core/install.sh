@@ -34,9 +34,11 @@ install::cask() {
   install::with "brew" "$1" "$2" "$3" "--cask"
 }
 
-# Install a single executable from a GitHub release. Use on Linux for tools that
-# ship no apt package; on macOS the caller should use brew instead. URL_TEMPLATE
-# may contain these placeholders, substituted before download:
+# Install a developer CLI tool, preferring Homebrew (macOS always; Linux only
+# when Linuxbrew is present) and falling back to a prebuilt GitHub-release binary
+# only when brew is unavailable — e.g. a bare Linux box where the tool has no apt
+# package. URL_TEMPLATE may contain these placeholders, substituted before the
+# fallback download:
 #   @TAG@       full release tag       (e.g. v3.13.1)
 #   @VER@       tag without leading v  (e.g. 3.13.1)
 #   @ARCH_DEB@  amd64 | arm64          (Go / dpkg arch naming)
@@ -54,6 +56,11 @@ install::release_binary() {
   if platform::command_exists "$cmd"; then
     log::success "$readable_name"
     return 0
+  fi
+
+  if platform::command_exists brew; then
+    log::execute "brew install $cmd" "$readable_name"
+    return $?
   fi
 
   if [ -z "$tag" ]; then
