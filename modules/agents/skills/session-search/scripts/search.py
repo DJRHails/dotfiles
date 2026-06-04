@@ -28,17 +28,20 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 AGENTS_DIR = Path.home() / ".agents"
-CLAUDE_DIR = Path.home() / ".claude"
 PI_DIR = Path.home() / ".pi"
+
+# Every `~/.claude*` config dir (`.claude`, `.claude-ant`, future variants) shares
+# the same `history.jsonl` + `projects/` layout, so discover them by glob.
+CLAUDE_DIRS = sorted(p for p in Path.home().glob(".claude*") if p.is_dir())
 
 HISTORY_PATHS = [
     AGENTS_DIR / "history.jsonl",
-    CLAUDE_DIR / "history.jsonl",
+    *(d / "history.jsonl" for d in CLAUDE_DIRS),
 ]
 
 PROJECTS_DIRS = [
     AGENTS_DIR / "projects",
-    CLAUDE_DIR / "projects",
+    *(d / "projects" for d in CLAUDE_DIRS),
 ]
 
 PI_SESSIONS_DIR = PI_DIR / "agent" / "sessions"
