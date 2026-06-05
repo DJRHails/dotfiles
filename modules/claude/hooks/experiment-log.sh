@@ -157,22 +157,18 @@ write_entry() { # <title> <body>
   } >>"$LOG"
 }
 
-STAMP=$(date '+%Y-%m-%d %H:%M')
-
 # --- Stage 1: Haiku draft ---
 SYS_DRAFT='You write a DETAILED, operational lab-notebook draft for ONE work turn. The input is the turn transcript (a user request, then the assistant'"'"'s actions and final reply, with [tool:Name] markers for tool calls). Capture what actually happened, blow-by-blow and warts-and-all: the request/intent; concrete actions (files created/edited with paths, commands run, key code/config/prompt changes); decisions and the reasoning behind them; bugs, errors, dead-ends and how they were resolved; results and measurements (numbers, AUROCs, pass/fail); and anything left open. Be specific — paths, flags, identifiers, error messages, figures. Output Markdown: line 1 a short title (max 70 chars, no leading "#"), then a blank line, then as many "- " bullets as the work needs (sub-bullets allowed). Prefer completeness over brevity here; a later pass will distil it. No preamble, no sign-off.'
 
 DRAFT=""
 [[ -n "$KEY" && -n "$TURN" ]] && DRAFT=$(anthropic_call "$DRAFT_MODEL" "$SYS_DRAFT" "$TURN" 1500)
 
-# Offline / no-draft fallback: naive trimmed stub, then done.
+# No draft (no API key, or the summariser call failed/returned empty — e.g.
+# rate-limited during a heavy sweep): skip silently. Emitting a naive stub here
+# produced low-value "Auto-stub" entries that had to be cleaned up by hand;
+# recording nothing is better than recording junk. State still advances so the
+# turn isn't reprocessed on the next Stop.
 if [[ -z "$DRAFT" ]]; then
-  {
-    printf '\n## %s — %s\n\n' "$STAMP" "$(trim "${USER_MSG:-session turn}" 80)"
-    printf '_Auto-stub (no summariser) — flesh out warts-and-all._\n\n'
-    printf -- '- Request: %s\n' "$(trim "${USER_MSG:-(none captured)}")"
-    printf -- '- Outcome: %s\n' "$(trim "${ASSISTANT_MSG:-(none captured)}")"
-  } >>"$LOG"
   save_state
   exit 0
 fi
