@@ -64,8 +64,12 @@ install::release_binary() {
   fi
 
   if [ -z "$tag" ]; then
-    tag="$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" \
-      | grep -m1 '"tag_name"' \
+    # Buffer the API response before matching: piping curl straight into
+    # `grep -m1` makes grep close the pipe on the first match, leaving curl to
+    # die with SIGPIPE ("curl: (23) Failure writing output to destination").
+    local api
+    api="$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null)"
+    tag="$(printf '%s' "$api" | grep -m1 '"tag_name"' \
       | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')"
   fi
   if [ -z "$tag" ]; then
