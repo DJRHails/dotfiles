@@ -205,6 +205,34 @@ When the answer is a single point or value on an image (crop coordinate, boundin
 - Minimum viable picker: one static HTML page, `python3 -m http.server` in `/tmp/<tool>/`, click handler that writes the chosen value to `window.__RESULT__`. Playwriter reads it back, or the user pastes a generated bash command.
 - Persist the originals somewhere stable (`/tmp/<tool>-backup/`) so you can re-crop non-destructively after the user adjusts.
 
+## Hand me one command, never a procedure
+
+**Any time you'd ask me to run more than a short one-liner, stop and collapse it into a single
+copy-paste command.** If your instruction to me is shaping up to be a numbered list of shell steps
+(or one long chained pipeline I'm meant to assemble), you're not done — stage everything yourself
+and hand me exactly one invocation. This is most common when a step needs my *interactive* session
+that you can't reach headlessly: macOS Keychain-backed browser cookies, an authenticated browser, a
+desktop-app socket, a TTY, `sudo`.
+
+**Why:** a multi-step manual procedure is slow, error-prone, and shoves the work I delegated back
+onto me — one vetted command is the whole point of delegating. (The Slack case: Keychain decryption
+is blocked over your ssh, so instead of "do X, then Y, then Z in your terminal" you scp'd the
+figures, wrote a self-contained runner, and added the missing `channels create` subcommand to the
+skill — leaving me a single `bash …/post_touchstone.sh`.)
+
+**How to apply:**
+- **Stage, don't enumerate.** scp assets to the host that has the session, write a self-contained
+  runner script there, and add any missing CLI subcommand to the relevant skill — so the
+  human-facing surface is one command.
+- **Don't bypass the boundary.** Never dump Keychain/cookies or otherwise work around the auth wall
+  (it gets blocked anyway and isn't yours to cross) — run the sanctioned tool where the session
+  already lives, via the one command.
+- **Make the command robust:** idempotent / safe to re-run, an obvious env override
+  (`BROWSER=chrome …`), parse whatever it needs from intermediate output, and degrade gracefully
+  (skip-and-continue on a soft failure, never half-finish).
+- **State the one boundary in one line** (why it can't be fully headless), then give the command,
+  and offer to show me the staged script if I want to eyeball it first.
+
 ## Session Insights & Memory
 
 - After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to AGENTS.md

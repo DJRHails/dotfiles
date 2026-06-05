@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Upload local file(s) to cdn.hails.info (Cloudflare R2) and print their public URLs.
+#
+# Mirrors the kb project's r2_upload.py scheme: content-addressed keys
+# `img/<sha256[:32]><ext>` in the `r2:cdn-hails-info` bucket, with an immutable
+# cache header. Identical bytes collapse to one object (idempotent re-uploads).
+#
+# rclone + the `r2:` remote are configured on `trifle` (the user's Mac). This script
+# uses a local `rclone` if the `r2:` remote exists, otherwise it scps each file to
+# trifle and runs rclone there — so it works from any tailnet host.
+#
+# Usage:
+#   cdn-upload figure.png chart.svg ...     # prints one https://cdn.hails.info/... per file
+set -euo pipefail
+
+REMOTE="r2:cdn-hails-info"
+BASE="https://cdn.hails.info"
+CACHE_HEADER="Cache-Control: public, max-age=31536000, immutable"
+emit_url() { printf '%s/%s\n' "$BASE" "$1"; }
+
+if [ "$#" -eq 0 ]; then
+  echo "usage: cdn-upload <file> [file...]" >&2
+  exit 2
+fi
+
+have_local_r2() { command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "r2:"; }
+
+content_key() { # <file> -> img/<sha256[:32]><.ext>
+  local f="$1" sha ext
+  sha="$(sha256sum "$f" | cut -c1-32)"
+  ext=".${f##*.}"
+  [ "$ext" = ".$f" ] && ext=".bin"
+  printf 'img/%s%s' "$sha" "$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
+}
+
+upload_local() { # <file> <key>
+  rclone copyto "$1" "${REMOTE}/$2" --header-upload "$CACHE_HEADER"
+}
+
+upload_via_trifle() { # <file> <key>
+  local f="$1" key="$2" tmp
+  tmp="/tmp/cdn-upload.$$/$(basename "$key")"
+  ssh trifle "mkdir -p /tmp/cdn-upload.$$"
+  scp -q "$f" "trifle:$tmp"
+  # Login shell so trifle's rclone (in /usr/local/bin) is on PATH.
+  ssh trifle "bash -lc \"rclone copyto '$tmp' '${REMOTE}/$key' --header-upload '$CACHE_HEADER'\""
+}
+
+if have_local_r2; then UPLOAD=upload_local; else UPLOAD=upload_via_trifle; fi
+
+for f in "$@"; do
+  [ -f "$f" ] || { echo "not a file: $f" >&2; exit 1; }
+  key="$(content_key "$f")"
+  "$UPLOAD" "$f" "$key" >&2
+  emit_url "$key"
+done
