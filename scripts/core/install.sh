@@ -34,6 +34,24 @@ install::cask() {
   install::with "brew" "$1" "$2" "$3" "--cask"
 }
 
+# Install a CLI via `uv tool install` (idempotent). Do NOT route uv tools through
+# install::with: with an empty EXTRA it back-fills the system package-manager
+# flags (on Linux, apt's `--allow-unauthenticated -qqy`), which `uv tool install`
+# rejects — silently breaking ruff/ty/etc on Linux while working on macOS (brew's
+# args are empty). Args: readable name, command to probe, package (default name).
+install::uv_tool() {
+  local -r readable_name="$1"
+  local -r cmd="$2"
+  local -r pkg="${3:-$2}"
+  if platform::command_exists "$cmd"; then
+    log::success "$readable_name"
+  elif platform::command_exists uv; then
+    log::execute "uv tool install $pkg" "$readable_name"
+  else
+    log::warning "$readable_name: uv not on PATH; skipping uv tool install"
+  fi
+}
+
 # Install a developer CLI tool, preferring Homebrew (macOS always; Linux only
 # when Linuxbrew is present) and falling back to a prebuilt GitHub-release binary
 # only when brew is unavailable — e.g. a bare Linux box where the tool has no apt
