@@ -175,22 +175,51 @@ else
   mkdir -p "$scdir"
   printf '%s %s\n' "${LIVE_WS:-unknown}" "$NEW" >"$scdir/live-$forksess"
 
-  # --new-session-with-layout *creates* a named session (plain --session attaches and errors
-  # if it doesn't exist). The split's login shell takes a beat to reach a prompt and input
-  # typed too early is dropped, so retry the send until the session actually comes up — we run
-  # on the fork's own host, so a local list-sessions is the authoritative readiness check, and
-  # checking before each (re)send avoids typing the hop into an already-attached mosh pane.
+  # --new-session-with-layout *creates* a named session (plain --session attaches and errors if
+  # it doesn't exist). Three robustness rules, learned the hard way under load:
+  #   (1) The new split's login shell takes a beat to reach a prompt, and input typed too early is
+  #       silently dropped. So FIRST confirm the shell is live with an idempotent marker echo
+  #       (safe to resend) — the split runs on the app host, so the marker file appearing there is
+  #       proof input is being consumed. Only then send the hop.
+  #   (2) The hop is `exec mosh …`, which REPLACES the split shell with mosh on the first send — a
+  #       resend would then be typed as keystrokes into the live mosh/zellij pane, not a shell. So
+  #       send the hop exactly ONCE; never resend after the exec.
+  #   (3) mosh bootstrap + zellij create can take a while under load, so poll generously (~36s)
+  #       for the session to come up (we run on the fork's own host → local list-sessions is
+  #       authoritative). The old "resend every 3s for 18s" both under-waited and corrupted the
+  #       pane with stray keystrokes.
   hop="exec mosh ${DURABLE_HOST} -- env TMPDIR=/tmp zsh -lc 'TMPDIR=/tmp zellij --new-session-with-layout ${layout} --session ${forksess}'"
+
+  # (1) shell-ready handshake
+  marker="/tmp/cmux-fork-ready-${forksess}"
+  ready=""
+  for _ in $(seq 1 12); do
+    run_cmux rpc surface.send_text \
+      "$(jq -nc --arg s "$NEW" --arg t "echo ready > $marker"$'\n' '{surface_id:$s,text:$t}')" \
+      >/dev/null 2>&1 || true
+    sleep 2
+    if [ "$MODE" = remote ]; then
+      ssh "$APP_HOST" "[ -f '$marker' ]" 2>/dev/null && ready=ok && break
+    else
+      [ -f "$marker" ] && ready=ok && break
+    fi
+  done
+  [ "$MODE" = remote ] && ssh "$APP_HOST" "rm -f '$marker'" 2>/dev/null || rm -f "$marker" 2>/dev/null
+  [ -n "$ready" ] || die "new split's shell never reached a prompt on ${APP_HOST}"
+
+  # (2) launch the fork — send the exec hop exactly once
+  run_cmux rpc surface.send_text \
+    "$(jq -nc --arg s "$NEW" --arg t "$hop"$'\n' '{surface_id:$s,text:$t}')" >/dev/null 2>&1 || true
+
+  # (3) poll-only for the durable session (no resend)
   launched=""
-  for _ in 1 2 3 4 5 6; do
-    sleep 3
+  for _ in $(seq 1 18); do
     if zellij list-sessions 2>/dev/null | sed -E 's/\x1b\[[0-9;]*m//g' |
       awk -v s="$forksess" '$1==s{f=1} END{exit f?0:1}'; then
       launched=ok
       break
     fi
-    run_cmux rpc surface.send_text \
-      "$(jq -nc --arg s "$NEW" --arg t "$hop"$'\n' '{surface_id:$s,text:$t}')" >/dev/null 2>&1 || true
+    sleep 2
   done
   [ -n "$launched" ] || die "fork hop sent but session '$forksess' never came up on ${DURABLE_HOST}"
 fi
