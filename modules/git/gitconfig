@@ -262,17 +262,6 @@
     # REuse REcorded REsolution: keep on disk the resolution of a merge conflict so you don't have to replay them
 	enabled = true
 
-[include]
-
-    # Load local configs.
-    # https://git-scm.com/docs/git-config#_includes
-    #
-    # [!] The following needs to remain at the end of this file in
-    #     order to allow any of the above configs to be overwritten
-    #     by the local ones
-
-    path = ~/.gitconfig.local
-
 [maintenance]
 	repo = /Users/dh/Projects/github.com/DJRHails/kb
 	repo = /Users/dh/.files
@@ -282,5 +271,17 @@
 	helper = 
 	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
-	helper = 
+	helper =
 	helper = !gh auth git-credential
+
+[include]
+
+    # Load local configs.
+    # https://git-scm.com/docs/git-config#_includes
+    #
+    # [!] This MUST stay the LAST section in the file: git processes
+    #     include.path inline, so the local config can only override the
+    #     sections above it. Anything appended below this would instead
+    #     override the local config. Keep new sections above here.
+
+    path = ~/.gitconfig.local
