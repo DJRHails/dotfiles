@@ -11,3 +11,5 @@ for i in ${fpath[@]}; do
 done
 
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+
+[[ -d "$HOME/.foundry/bin" ]] && export PATH="$PATH:$HOME/.foundry/bin"
