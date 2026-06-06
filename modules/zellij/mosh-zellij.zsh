@@ -29,6 +29,12 @@
 # outer login shell and detaches the local zellij, so you end up with just the remote zellij
 # (detach local → mosh → attach remote), not local-outer + remote-inner.
 #
+# Project-dir matching: when invoked from a directory under your local $PROJECTS, a *fresh*
+# durable session lands in the matching project on the remote — the subpath relative to
+# $PROJECTS is forwarded as CMUX_DURABLE_CD and resolved by auto-attach.zsh against the remote's
+# own $PROJECTS (which may differ). A warning prints on the remote if the subpath isn't there.
+# Only the fresh path cds; picking an existing session resumes it wherever it already is.
+#
 # Config (override in ~/.zshrc.local):
 #   DURABLE_SUMMARY_MODEL   summariser model. Default: claude-haiku-4-5
 #   DURABLE_SUMMARY_TTL     seconds before a cached summary is refreshed. Default: 300
@@ -102,8 +108,28 @@ ssh::durable::attach() {
     ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- zellij attach ${(q)sess}"
 }
 
+# If the local cwd is under $PROJECTS, echo its path relative to $PROJECTS (e.g.
+# "github.com/DJRHails/touchstone"); else echo nothing. $PROJECTS may be a colon-separated
+# list of roots; the first one that prefixes $PWD wins. The remote resolves this subpath
+# against ITS OWN $PROJECTS, so a fresh durable session lands in the matching project even
+# when the project root differs across machines.
+ssh::durable::project_subpath() {
+    emulate -L zsh
+    [[ -n $PROJECTS ]] || return 0
+    local root
+    for root in ${(s.:.)PROJECTS}; do
+        root="${root%/}"
+        [[ -n $root ]] || continue
+        case $PWD in
+            "$root"/*) print -r -- "${PWD#"$root"/}"; return 0 ;;
+        esac
+    done
+}
+
 # Legacy fallback: mosh in, forward cmux ids, let the remote auto-attach the designated
-# session (creating it if needed). Used when nothing is picked or no sessions exist.
+# session (creating it if needed). Used when nothing is picked or no sessions exist. Also
+# forwards the $PROJECTS-relative subpath so a freshly-created session lands in the matching
+# project dir on the remote (see ssh::durable::project_subpath / auto-attach.zsh).
 ssh::durable::fresh() {
     emulate -L zsh
     local host="$1"; shift
@@ -117,7 +143,10 @@ ssh::durable::fresh() {
             return 1
         fi
     fi
-    ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- env CMUX_WORKSPACE_ID=${(q)ws} CMUX_SURFACE_ID=${(q)sf} CMUX_REMOTE_TRANSPORT=mosh zsh -l"
+    local env_prefix="CMUX_WORKSPACE_ID=${(q)ws} CMUX_SURFACE_ID=${(q)sf} CMUX_REMOTE_TRANSPORT=mosh"
+    local sub; sub=$(ssh::durable::project_subpath)
+    [[ -n $sub ]] && env_prefix="CMUX_DURABLE_CD=${(q)sub} ${env_prefix}"
+    ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- env ${env_prefix} zsh -l"
 }
 
 # Persist THIS cmux surface's live ids on the remote so remote cmux tools (cmux-session-tab /

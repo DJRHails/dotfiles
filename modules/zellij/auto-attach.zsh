@@ -76,6 +76,28 @@
         return 0
     fi
 
+    # ssh::durable forwards the local cwd's path relative to the local $PROJECTS as
+    # CMUX_DURABLE_CD so a *fresh* durable session lands in the matching project here.
+    # Resolve it against THIS host's $PROJECTS (which may be a colon-separated list and may
+    # differ from the origin's); cd before zellij starts so the new session's first pane
+    # inherits the dir. Warn (don't fail) if the subpath isn't present on this host. Only the
+    # top-level durable shell reaches this — nested panes already returned at the $ZELLIJ check.
+    if [[ -n $CMUX_DURABLE_CD ]]; then
+        local sub="$CMUX_DURABLE_CD"; unset CMUX_DURABLE_CD
+        local root target='' first=''
+        for root in ${(s.:.)PROJECTS}; do
+            root="${root%/}"; [[ -n $root ]] || continue
+            [[ -z $first ]] && first="$root"
+            if [[ -d $root/$sub ]]; then target="$root/$sub"; break; fi
+        done
+        if [[ -n $target ]]; then
+            cd -- "$target"; _log durable-cd "target=$target"
+        elif [[ -n $first ]]; then
+            print -P "%F{yellow}warning:%f ssh::durable: '${sub}' not found under \$PROJECTS (${first}) on this host" >&2
+            _log durable-cd-missing "sub=$sub"
+        fi
+    fi
+
     local host_label="${HOST%%.*}"
     [[ -z $host_label ]] && host_label=$(hostname -s 2>/dev/null)
     host_label="${(L)host_label}"
