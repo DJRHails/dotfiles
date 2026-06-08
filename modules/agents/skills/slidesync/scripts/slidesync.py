@@ -77,6 +77,7 @@ TEMPLATE_TAG_RE = re.compile(r"<!--\s*s2g:template\s+(?P<name>\S+)\s*-->")
 EMU_PER_PX = 9525  # 96 dpi
 EMU_PER_IN = 914400
 SLIDE_W = 9144000
+SLIDE_H = 5143500  # 16:9 slide height (5.625in)
 BODY_X, BODY_Y = 457200, 1143000
 BODY_W, BODY_H = 8229600, 3771900
 
@@ -607,9 +608,36 @@ def _fit2(px, max_w, max_h):
     return int(w * scale), int(h * scale)
 
 
+def _graph_requests(slide: Slide, image_url, image_px) -> list[dict]:
+    """Full-bleed graph: a single image maximised to fill the page, no text.
+
+    For `template: graph` / `full` slides — the figure is self-titled, so the
+    slide carries no kicker, headline, or body. The image is scaled to fit the
+    slide (aspect preserved) with a thin margin and centred both ways.
+    """
+    sid = slide.object_id
+    reqs = [{"createSlide": {"objectId": sid,
+                             "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
+            _bg(sid, LIGHT_BG)]
+    if slide.image and image_url:
+        margin = _emu(0.1)
+        w, h = _fit2(image_px, SLIDE_W - 2 * margin, SLIDE_H - 2 * margin)
+        reqs.append({"createImage": {
+            "objectId": sid + "_img", "url": image_url,
+            "elementProperties": {"pageObjectId": sid,
+                "size": {"width": {"magnitude": w, "unit": "EMU"},
+                         "height": {"magnitude": h, "unit": "EMU"}},
+                "transform": {"scaleX": 1, "scaleY": 1, "unit": "EMU",
+                              "translateX": (SLIDE_W - w) // 2,
+                              "translateY": (SLIDE_H - h) // 2}}}})
+    return reqs
+
+
 def slide_requests(slide: Slide, image_url, image_px,
                    layouts=None, templates=None) -> list[dict]:
     tpl = (slide.template_name or "").lower()
+    if tpl in ("graph", "full"):
+        return _graph_requests(slide, image_url, image_px)
     if tpl in STYLES:
         return _styled_requests(slide, STYLES[tpl], image_url, image_px)
     if templates and tpl in templates:
@@ -703,6 +731,8 @@ def _body(bid: str, paras: list[Para], align: str = "START") -> list[dict]:
     for line, p in zip(lines, paras):
         cbase = off + _u16("\t" * max(p.depth, 0))
         for r in p.runs:
+            if r.style == "link" and r.link.startswith("#"):
+                continue  # internal slide links: resolved in _apply_internal_links
             s = cbase + _u16(p.text[:r.start])
             e = cbase + _u16(p.text[:r.end])
             reqs.append(_style(bid, s, e, r))
@@ -872,8 +902,55 @@ def push(slides_api, drive, deck, source, anchor, prune, base_dir=Path(".")) -> 
         _batch(slides_api, deck, reqs)
     _apply_notes(slides_api, deck, creates)
     _reorder(slides_api, deck, source, anchor)
+    _apply_internal_links(slides_api, deck, source)
     return {"create": len(creates), "skip": len(skips),
             "replace": len(deletes), "prune": len(pruned)}
+
+
+# Templates with no body region, so they cannot host an internal-link run.
+NOBODY_TEMPLATES = {"dark", "title", "appendix", "graph", "full"}
+
+
+def _apply_internal_links(slides_api, deck, source) -> None:
+    """Resolve `[text](#key)` body links to native Slides slide links.
+
+    Runs over ALL source slides on every push (not only created ones) so a link
+    stays valid even when its *target* slide's content — hence objectId —
+    changes while the linking slide is unchanged. Title links are dropped at
+    parse time, so only body (`_b`) runs carry internal links.
+    """
+    key_to_oid = {s.key: s.object_id for s in source}
+    reqs = []
+    for s in source:
+        if (s.template_name or "").lower() in NOBODY_TEMPLATES:
+            _warn_orphan_links(s)
+            continue
+        bid = s.object_id + "_b"
+        off = 0
+        for p in s.paras:
+            for r in p.runs:
+                if r.style == "link" and r.link.startswith("#"):
+                    oid = key_to_oid.get(r.link[1:])
+                    if not oid:
+                        logger.warning(f"internal link {r.link} on '{s.key}' "
+                                       "has no matching slide id")
+                        continue
+                    reqs.append({"updateTextStyle": {"objectId": bid,
+                        "textRange": {"type": "FIXED_RANGE",
+                                      "startIndex": off + _u16(p.text[:r.start]),
+                                      "endIndex": off + _u16(p.text[:r.end])},
+                        "style": {"link": {"pageObjectId": oid}},
+                        "fields": "link"}})
+            off += _u16(p.text) + 1
+    if reqs:
+        _batch(slides_api, deck, reqs)
+
+
+def _warn_orphan_links(slide: Slide) -> None:
+    if any(r.style == "link" and r.link.startswith("#")
+           for p in slide.paras for r in p.runs):
+        logger.warning(f"internal link on '{slide.key}' ignored: template "
+                       f"'{slide.template_name}' has no body region")
 
 
 def _resolve_image(drive, slide: Slide, base_dir=Path(".")):

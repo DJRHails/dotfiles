@@ -69,6 +69,11 @@ may have its own frontmatter (`id:`, `template:`, `layout:`).
   `**bold**` / `*italic*` / `` `code` `` / `[link](url)`. GFM tables. `![](path)`
   images (uploaded to Drive). Blank lines preserved as spacing. `<!-- notes -->`
   become speaker notes. `<v-clicks>`/`<div>` are stripped.
+- **Internal links:** `[text](#slide-id)` becomes a native Slides link that jumps
+  to the slide whose `id:` (or title slug) is `slide-id`. Resolved against the
+  whole push set and re-applied on every push, so links survive a target's
+  content change. Only body links work (title links are dropped); a target on a
+  no-body template (`dark`/`title`/`appendix`/`graph`) is warned and skipped.
 
 ### Built-in brand kit (IBM Plex; red #C0392B kicker)
 
@@ -81,6 +86,7 @@ Select per slide via `template:` — native styled boxes, no in-deck templates:
 | `question` / `label` | kicker + headline + **centred** body |
 | `topic` | kicker + headline + **left** body (and/or image) |
 | `content` | red kicker-as-title + left body |
+| `graph` / `full` | **text-free**: a single image scaled to fill the page (aspect preserved, centred, thin margin); title/body ignored — for self-titled figures |
 
 Slides with no `template:` fall back to a generative path (section /
 TITLE_AND_BODY / table / image) that also brands bg + IBM Plex.
