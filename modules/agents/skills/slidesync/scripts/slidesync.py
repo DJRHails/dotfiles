@@ -543,9 +543,30 @@ STYLES = {
 
 
 def _est_lines(text: str, pt: int, width_in: float = 9.32) -> int:
-    """Estimate wrapped line count for a headline (rough, font-metric free)."""
-    chars_per_line = max(1, int(width_in * 72 / (pt * 0.52)))
+    """Estimate wrapped line count for a bold headline (font-metric free).
+
+    The 0.64 average-glyph-width factor is measured from IBM Plex Bold and is
+    deliberately conservative: it slightly over-counts lines so the reserved
+    headline height never falls short of what renders (which would overlap the
+    body below it).
+    """
+    chars_per_line = max(1, int(width_in * 72 / (pt * 0.64)))
     return max(1, math.ceil(len(text) / chars_per_line))
+
+
+def _fit_headline_pt(text: str, base_pt: int, max_lines: int = 2,
+                     width_in: float = 9.32) -> int:
+    """Shrink a headline's font so it wraps to at most `max_lines` lines.
+
+    Steps down from `base_pt` (never below ~55% of it) until the estimated
+    wrapped line count fits — so a long title shrinks to stay on the slide
+    instead of overflowing or pushing the body off the page.
+    """
+    floor = max(20, int(base_pt * 0.55))
+    pt = base_pt
+    while pt > floor and _est_lines(text, pt, width_in) > max_lines:
+        pt -= 2
+    return pt
 
 
 def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[dict]:
@@ -558,9 +579,10 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
     else:
         kicker_text, headline_text = slide.kicker, slide.title
     head_h = 0.0
+    head_pt = style.headline_pt
     if headline_text:
-        head_h = _est_lines(headline_text, style.headline_pt) \
-            * style.headline_pt * 1.25 / 72 + 0.1
+        head_pt = _fit_headline_pt(headline_text, style.headline_pt)
+        head_h = _est_lines(headline_text, head_pt) * head_pt * 1.25 / 72 + 0.1
     # Title cards (no body, no image) vertically centre the kicker+headline.
     if (style.body_align is None or not slide.paras) and not slide.image:
         block = (0.62 if kicker_text else 0) + head_h
@@ -573,8 +595,7 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
         y += 0.62
     if headline_text:
         reqs += _text_box(sid, sid + "_h", (0.34, y, 9.32, head_h),
-                          headline_text, style.headline_pt, style.headline_rgb,
-                          True)
+                          headline_text, head_pt, style.headline_rgb, True)
         y += head_h + 0.15
     if style.body_align and slide.paras:
         bid = sid + "_b"
@@ -871,13 +892,15 @@ def _layout_map(slides_api, deck) -> dict[str, dict]:
     return out
 
 
-def plan_sync(source: list[Slide], managed: dict, prune: bool):
+def plan_sync(source: list[Slide], managed: dict, prune: bool, force: bool = False):
     creates, deletes, skips = [], [], []
     for s in source:
         if s.key_hash in managed:
             old_id, old_ch = managed[s.key_hash]
-            (skips if old_ch == s.content_hash else creates).append(s)
-            if old_ch != s.content_hash:
+            if old_ch == s.content_hash and not force:
+                skips.append(s)
+            else:                       # changed, or force-re-render
+                creates.append(s)
                 deletes.append(old_id)
         else:
             creates.append(s)
@@ -886,11 +909,12 @@ def plan_sync(source: list[Slide], managed: dict, prune: bool):
     return creates, deletes, skips, pruned
 
 
-def push(slides_api, drive, deck, source, anchor, prune, base_dir=Path(".")) -> dict:
+def push(slides_api, drive, deck, source, anchor, prune, base_dir=Path("."),
+         force=False) -> dict:
     managed = managed_slides(slides_api, deck)
     layouts = _layout_map(slides_api, deck)
     templates = _template_index(slides_api, deck)
-    creates, deletes, skips, pruned = plan_sync(source, managed, prune)
+    creates, deletes, skips, pruned = plan_sync(source, managed, prune, force)
     reqs = [{"deleteObject": {"objectId": oid}} for oid in deletes + pruned]
     create_set = set(id(s) for s in creates)
     for s in source:
@@ -1422,7 +1446,7 @@ def cmd_push(args):
     if not deck:
         sys.exit("no target deck: pass --deck/--new or add `deck:` frontmatter")
     stats = push(slides_api, drive, deck, source, args.anchor, args.prune,
-                 base_dir=args.source.parent)
+                 base_dir=args.source.parent, force=args.force)
     logger.success(f"{stats} -> https://docs.google.com/presentation/d/{deck}/edit")
 
 
@@ -1511,6 +1535,8 @@ def main():
     p.add_argument("--new")
     p.add_argument("--anchor")
     p.add_argument("--prune", action="store_true")
+    p.add_argument("--force", action="store_true",
+                   help="re-render all slides, ignoring the skip optimisation")
     p.set_defaults(func=cmd_push)
 
     p = sub.add_parser("pull")
