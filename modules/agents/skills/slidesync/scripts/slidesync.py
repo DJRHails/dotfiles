@@ -823,12 +823,22 @@ def _body(bid: str, paras: list[Para], align: str = "START") -> list[dict]:
     return reqs
 
 
+_LINK_FIELDS = "link,foregroundColor,underline"
+
+
+def _link_style(link: dict) -> dict:
+    """Brand-red, underlined link styling — overrides the theme hyperlink colour."""
+    return {"link": link,
+            "foregroundColor": {"opaqueColor": {"rgbColor": RED}},
+            "underline": True}
+
+
 def _style(obj_id, start, end, run: Run) -> dict:
     rng = {"type": "FIXED_RANGE", "startIndex": start, "endIndex": end}
     if run.style == "link":
         return {"updateTextStyle": {"objectId": obj_id, "textRange": rng,
-                                    "style": {"link": {"url": run.link}},
-                                    "fields": "link"}}
+                                    "style": _link_style({"url": run.link}),
+                                    "fields": _LINK_FIELDS}}
     style, fields = STYLE[run.style]
     return {"updateTextStyle": {"objectId": obj_id, "textRange": rng,
                                 "style": style, "fields": fields}}
@@ -1022,8 +1032,8 @@ def _apply_internal_links(slides_api, deck, source) -> None:
                         "textRange": {"type": "FIXED_RANGE",
                                       "startIndex": off + _u16(p.text[:r.start]),
                                       "endIndex": off + _u16(p.text[:r.end])},
-                        "style": {"link": {"pageObjectId": oid}},
-                        "fields": "link"}})
+                        "style": _link_style({"pageObjectId": oid}),
+                        "fields": _LINK_FIELDS}})
             off += _u16(p.text) + 1
     if reqs:
         _batch(slides_api, deck, reqs)
