@@ -644,7 +644,7 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
         head_h = _est_lines(headline_text, head_pt) * head_pt * 1.25 / 72 + 0.1
     # Title cards (no body, no image) vertically centre the kicker+headline.
     if (style.body_align is None or not slide.paras) and not slide.image:
-        block = (0.62 if kicker_text else 0) + head_h
+        block = (0.36 if kicker_text else 0) + head_h
         y = max(0.4, (5.63 - block) / 2)
     else:
         y = style.top
@@ -654,7 +654,7 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
     if kicker_text:
         reqs += _text_box(sid, sid + "_k", (0.34, y, 9.32, 0.5),
                           kicker_text, 18, RED, False, halign=head_align)
-        y += 0.62
+        y += 0.36  # tight kicker -> headline gap (kicker text is ~0.31in tall)
     if headline_text:
         reqs += _text_box(sid, sid + "_h", (0.34, y, 9.32, head_h),
                           headline_text, head_pt, style.headline_rgb, True,
