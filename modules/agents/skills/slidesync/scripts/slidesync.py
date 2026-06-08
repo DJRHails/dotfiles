@@ -648,13 +648,17 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
         y = max(0.4, (5.63 - block) / 2)
     else:
         y = style.top
+    # Headings align with the body: left for START-body templates (topic/content),
+    # centred for centred-body templates (question/label) and title cards.
+    head_align = "START" if style.body_align == "START" else "CENTER"
     if kicker_text:
         reqs += _text_box(sid, sid + "_k", (0.34, y, 9.32, 0.5),
-                          kicker_text, 18, RED, False)
+                          kicker_text, 18, RED, False, halign=head_align)
         y += 0.62
     if headline_text:
         reqs += _text_box(sid, sid + "_h", (0.34, y, 9.32, head_h),
-                          headline_text, head_pt, style.headline_rgb, True)
+                          headline_text, head_pt, style.headline_rgb, True,
+                          halign=head_align)
         y += head_h + 0.15
     if style.body_align and slide.paras:
         bid = sid + "_b"
@@ -1550,7 +1554,8 @@ def _emu(inches: float) -> int:
     return int(inches * EMU_PER_IN)
 
 
-def _text_box(slide_id, box_id, box, text, size, rgb, bold, valign=None) -> list[dict]:
+def _text_box(slide_id, box_id, box, text, size, rgb, bold, valign=None,
+              halign="CENTER") -> list[dict]:
     x, y, w, h = box
     reqs = [
         {"createShape": {"objectId": box_id, "shapeType": "TEXT_BOX",
@@ -1566,7 +1571,7 @@ def _text_box(slide_id, box_id, box, text, size, rgb, bold, valign=None) -> list
                       "foregroundColor": {"opaqueColor": {"rgbColor": rgb}}},
             "fields": "fontFamily,bold,fontSize,foregroundColor"}},
         {"updateParagraphStyle": {"objectId": box_id, "textRange": {"type": "ALL"},
-            "style": {"alignment": "CENTER"}, "fields": "alignment"}},
+            "style": {"alignment": halign}, "fields": "alignment"}},
     ]
     if valign:
         reqs.append({"updateShapeProperties": {"objectId": box_id,
