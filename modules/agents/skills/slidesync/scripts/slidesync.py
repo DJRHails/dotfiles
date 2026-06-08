@@ -176,6 +176,7 @@ class Slide:
     template_name: str | None = None  # explicit `template:` — tagged styled slide
     vars: dict = field(default_factory=dict)  # extra frontmatter -> {{token}} values
     custom: str | None = None  # ```gslides``` literal Slides API requests (JSON)
+    verbatim: str | None = None  # ``` ``` fenced body for prompt/code slides
     key_hash: str = ""
     content_hash: str = ""
     object_id: str = ""
@@ -271,6 +272,9 @@ def build_slides(chunks: list[tuple[dict, str]]) -> list[Slide]:
 
 def build_slide(meta: dict, body: str, index: int) -> Slide:
     custom, body = _extract_custom(body)
+    verbatim = None
+    if (meta.get("template") or "").lower() in ("prompt", "code"):
+        verbatim, body = _extract_verbatim(body)
     headings, paras, image, table, notes = parse_body(body)
     h1, h2 = headings.get(1), headings.get(2)
     title = h1 or h2 or ""           # h1 is the headline; a lone h2 is the title
@@ -283,6 +287,7 @@ def build_slide(meta: dict, body: str, index: int) -> Slide:
     slide.template_name = "custom" if custom is not None else meta.get("template")
     slide.vars = {k: v for k, v in meta.items() if k not in RESERVED_KEYS}
     slide.custom = custom
+    slide.verbatim = verbatim
     return _finalize(slide)
 
 
@@ -353,6 +358,23 @@ def _extract_custom(body: str) -> tuple[str | None, str]:
     if not m:
         return None, body
     return m.group("json").strip(), body[:m.start()] + body[m.end():]
+
+
+VERBATIM_RE = re.compile(  # any fenced block — captures the literal body, no parsing
+    r"""(?msx)
+    ^```[^\n]*\n
+    (?P<text>.*?)
+    \n```[ ]*$
+    """
+)
+
+
+def _extract_verbatim(body: str) -> tuple[str | None, str]:
+    """Pull a fenced block out of the body verbatim (for prompt/code slides)."""
+    m = VERBATIM_RE.search(body)
+    if not m:
+        return None, body
+    return m.group("text"), body[:m.start()] + body[m.end():]
 
 
 def _parse_para(line: str, hm) -> Para:
@@ -436,6 +458,15 @@ def to_slidev(slide: Slide, include_id: bool = True) -> str:
         out += ["---"] + [f"{k}: {v}" for k, v in fm.items()] + ["---"]
     if slide.custom is not None:
         out += ["```gslides", slide.custom, "```"]
+        if slide.notes:
+            out.append(f"<!-- {slide.notes} -->")
+        return "\n".join(out).strip() + "\n"
+    if slide.verbatim is not None:
+        if slide.title:
+            out.append(("# " if slide.kicker else "## ") + slide.title)
+        if slide.kicker:
+            out.append("## " + slide.kicker)
+        out += ["```text", slide.verbatim, "```"]
         if slide.notes:
             out.append(f"<!-- {slide.notes} -->")
         return "\n".join(out).strip() + "\n"
@@ -706,6 +737,56 @@ def _custom_requests(slide: Slide) -> list[dict]:
     return reqs
 
 
+def _fit_body_pt(text: str, base: int = 11, floor: int = 6,
+                 width_in: float = 9.32, height_in: float = 4.65) -> int:
+    """Largest mono size (base..floor) at which the verbatim text fits the box."""
+    src = text.split("\n")
+    for pt in range(base, floor - 1, -1):
+        cpl = max(1, int(width_in * 72 / (pt * 0.62)))   # mono glyph ~0.62*pt wide
+        rows = sum(max(1, math.ceil(len(ln) / cpl)) for ln in src)
+        if rows * pt * 1.18 / 72 <= height_in:  # ~90% line spacing (see _prompt_requests)
+            return pt
+    return floor
+
+
+def _prompt_requests(slide: Slide) -> list[dict]:
+    """Verbatim prompt/code slide: red kicker title + the fenced body in mono.
+
+    For `template: prompt` / `code`. The ``` ``` block is rendered byte-for-byte
+    (no markdown parsing, so numbered lists / bullets survive) at the largest
+    Roboto Mono size that fits the slide, so even a long system prompt stays on
+    one slide.
+    """
+    sid = slide.object_id
+    reqs = [{"createSlide": {"objectId": sid,
+                             "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
+            _bg(sid, LIGHT_BG)]
+    if slide.title:
+        reqs += _text_box(sid, sid + "_k", (0.34, 0.28, 9.32, 0.5),
+                          slide.title, 16, RED, True)
+    body = slide.verbatim if slide.verbatim is not None else \
+        "\n\n".join(p.text for p in slide.paras if p.text)
+    if body:
+        bid = sid + "_b"
+        reqs.append({"createShape": {"objectId": bid, "shapeType": "TEXT_BOX",
+            "elementProperties": {"pageObjectId": sid,
+                "size": {"width": {"magnitude": _emu(9.32), "unit": "EMU"},
+                         "height": {"magnitude": _emu(4.65), "unit": "EMU"}},
+                "transform": {"scaleX": 1, "scaleY": 1, "translateX": _emu(0.34),
+                              "translateY": _emu(0.85), "unit": "EMU"}}}})
+        reqs.append({"insertText": {"objectId": bid, "text": body}})
+        reqs.append({"updateTextStyle": {"objectId": bid, "textRange": {"type": "ALL"},
+            "style": {"fontFamily": "Roboto Mono",
+                      "fontSize": {"magnitude": _fit_body_pt(body), "unit": "PT"},
+                      "foregroundColor": {"opaqueColor": {"rgbColor": BODY_INK}}},
+            "fields": "fontFamily,fontSize,foregroundColor"}})
+        reqs.append({"updateParagraphStyle": {"objectId": bid, "textRange": {"type": "ALL"},
+            "style": {"lineSpacing": 90, "spaceAbove": {"magnitude": 0, "unit": "PT"},
+                      "spaceBelow": {"magnitude": 0, "unit": "PT"}},
+            "fields": "lineSpacing,spaceAbove,spaceBelow"}})
+    return reqs
+
+
 def slide_requests(slide: Slide, image_url, image_px,
                    layouts=None, templates=None) -> list[dict]:
     if slide.custom is not None:
@@ -713,6 +794,8 @@ def slide_requests(slide: Slide, image_url, image_px,
     tpl = (slide.template_name or "").lower()
     if tpl in ("graph", "full"):
         return _graph_requests(slide, image_url, image_px)
+    if tpl in ("prompt", "code"):
+        return _prompt_requests(slide)
     if tpl in STYLES:
         return _styled_requests(slide, STYLES[tpl], image_url, image_px)
     if templates and tpl in templates:
@@ -919,8 +1002,8 @@ def _table(slide) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def managed_slides(slides_api, deck) -> dict[str, tuple[str, str]]:
-    pres = slides_api.presentations().get(presentationId=deck).execute()
+def managed_slides(slides_api, deck, pres=None) -> dict[str, tuple[str, str]]:
+    pres = pres or slides_api.presentations().get(presentationId=deck).execute()
     out = {}
     for s in pres.get("slides", []):
         if MANAGED_RE.match(s["objectId"]):
@@ -929,9 +1012,9 @@ def managed_slides(slides_api, deck) -> dict[str, tuple[str, str]]:
     return out
 
 
-def _template_index(slides_api, deck) -> dict[str, str]:
+def _template_index(slides_api, deck, pres=None) -> dict[str, str]:
     """name(lower) -> objectId for slides tagged `<!-- s2g:template NAME -->`."""
-    pres = slides_api.presentations().get(presentationId=deck).execute()
+    pres = pres or slides_api.presentations().get(presentationId=deck).execute()
     out = {}
     for s in pres.get("slides", []):
         m = TEMPLATE_TAG_RE.search(_read_notes(s))
@@ -940,9 +1023,9 @@ def _template_index(slides_api, deck) -> dict[str, str]:
     return out
 
 
-def _layout_map(slides_api, deck) -> dict[str, dict]:
+def _layout_map(slides_api, deck, pres=None) -> dict[str, dict]:
     """displayName(lower) -> {id, ph:[(type,index)]} for the deck's master layouts."""
-    pres = slides_api.presentations().get(presentationId=deck).execute()
+    pres = pres or slides_api.presentations().get(presentationId=deck).execute()
     out = {}
     for lay in pres.get("layouts", []):
         name = lay.get("layoutProperties", {}).get("displayName")
@@ -980,10 +1063,13 @@ def plan_sync(source: list[Slide], managed: dict, prune: bool, force: bool = Fal
 
 def push(slides_api, drive, deck, source, anchor, prune, base_dir=Path("."),
          force=False) -> dict:
-    managed = managed_slides(slides_api, deck)
-    layouts = _layout_map(slides_api, deck)
-    templates = _template_index(slides_api, deck)
+    pres = slides_api.presentations().get(presentationId=deck).execute()
+    managed = managed_slides(slides_api, deck, pres)
     creates, deletes, skips, pruned = plan_sync(source, managed, prune, force)
+    if not (creates or deletes or pruned):  # nothing changed — skip reorder/links/gets
+        return {"create": 0, "skip": len(skips), "replace": 0, "prune": 0}
+    layouts = _layout_map(slides_api, deck, pres)
+    templates = _template_index(slides_api, deck, pres)
     reqs = [{"deleteObject": {"objectId": oid}} for oid in deletes + pruned]
     create_set = set(id(s) for s in creates)
     for s in source:

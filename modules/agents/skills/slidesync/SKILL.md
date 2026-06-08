@@ -88,6 +88,7 @@ Select per slide via `template:` — native styled boxes, no in-deck templates:
 | `topic` | kicker + headline + **left** body (and/or image) |
 | `content` | red kicker-as-title + left body |
 | `graph` / `full` | **text-free**: a single image scaled to fill the page (aspect preserved, centred, thin margin); title/body ignored — for self-titled figures |
+| `prompt` / `code` | red kicker title + full body in **11pt Roboto Mono** filling the slide — for verbatim system prompts / code; one source line per paragraph, wraps naturally |
 
 Slides with no `template:` fall back to a generative path (section /
 TITLE_AND_BODY / table / image) that also brands bg + IBM Plex.
