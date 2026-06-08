@@ -175,6 +175,7 @@ class Slide:
     layout_name: str | None = None  # explicit `layout:` — section kw or theme layout
     template_name: str | None = None  # explicit `template:` — tagged styled slide
     vars: dict = field(default_factory=dict)  # extra frontmatter -> {{token}} values
+    custom: str | None = None  # ```gslides``` literal Slides API requests (JSON)
     key_hash: str = ""
     content_hash: str = ""
     object_id: str = ""
@@ -211,6 +212,13 @@ HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 LIST_RE = re.compile(r"^(?P<indent>\s*)(?P<marker>[-*]|\d+\.)\s+(?P<text>.*)$")
 IMAGE_RE = re.compile(r"^!\[(?P<alt>[^\]]*)\]\((?P<url>[^)]+)\)\s*$")
 COMMENT_RE = re.compile(r"<!--(?P<body>.*?)-->", re.S)
+CUSTOM_RE = re.compile(
+    r"""(?msx)              # multiline, dotall, verbose
+    ^```\ *g?slides\ *\n    # fence opening with a gslides/slides lang tag
+    (?P<json>.*?)           # the literal Slides API requests (JSON)
+    \n```\ *$               # fence close
+    """
+)
 TABLE_SEP_RE = re.compile(r"^\s*\|?[\s:|-]+\|?\s*$")
 INLINE_RE = re.compile(
     r"""(?x)
@@ -262,6 +270,7 @@ def build_slides(chunks: list[tuple[dict, str]]) -> list[Slide]:
 
 
 def build_slide(meta: dict, body: str, index: int) -> Slide:
+    custom, body = _extract_custom(body)
     headings, paras, image, table, notes = parse_body(body)
     h1, h2 = headings.get(1), headings.get(2)
     title = h1 or h2 or ""           # h1 is the headline; a lone h2 is the title
@@ -271,14 +280,20 @@ def build_slide(meta: dict, body: str, index: int) -> Slide:
                   table, notes)
     slide.kicker = kicker
     slide.layout_name = meta.get("layout")
-    slide.template_name = meta.get("template")
+    slide.template_name = "custom" if custom is not None else meta.get("template")
     slide.vars = {k: v for k, v in meta.items() if k not in RESERVED_KEYS}
+    slide.custom = custom
     return _finalize(slide)
 
 
 def _finalize(slide: Slide) -> Slide:
     slide.key_hash = _sha10(slide.key)
     slide.content_hash = _sha10(to_slidev(slide, include_id=False))
+    if slide.custom is not None:
+        # Stable id keyed only on `id:` — native drawing edits (which never touch
+        # the markdown) must not orphan the slide, since custom slides are
+        # pull-authoritative and only (re)pushed when missing.
+        slide.content_hash = slide.key_hash
     slide.object_id = f"s2g_{slide.key_hash}_{slide.content_hash}"
     return slide
 
@@ -330,6 +345,14 @@ def _extract_notes(body: str) -> str:
     parts = [m.group("body").strip() for m in COMMENT_RE.finditer(body)]
     joined = "\n".join(p for p in parts if p)
     return MARKER_RE.sub("", joined).strip()
+
+
+def _extract_custom(body: str) -> tuple[str | None, str]:
+    """Pull a ```gslides``` literal-requests block out of the body, if present."""
+    m = CUSTOM_RE.search(body)
+    if not m:
+        return None, body
+    return m.group("json").strip(), body[:m.start()] + body[m.end():]
 
 
 def _parse_para(line: str, hm) -> Para:
@@ -411,6 +434,11 @@ def to_slidev(slide: Slide, include_id: bool = True) -> str:
     out = []
     if fm:
         out += ["---"] + [f"{k}: {v}" for k, v in fm.items()] + ["---"]
+    if slide.custom is not None:
+        out += ["```gslides", slide.custom, "```"]
+        if slide.notes:
+            out.append(f"<!-- {slide.notes} -->")
+        return "\n".join(out).strip() + "\n"
     if slide.kicker:  # h1 headline + h2 kicker
         out.append("# " + slide.title)
         out.append("## " + slide.kicker)
@@ -654,8 +682,34 @@ def _graph_requests(slide: Slide, image_url, image_px) -> list[dict]:
     return reqs
 
 
+def _custom_requests(slide: Slide) -> list[dict]:
+    """Build a custom slide by replaying its literal Slides API requests.
+
+    The ```gslides``` block holds either a list of requests or `{"requests":
+    [...]}`. The page is created blank; `__PAGE__` in the JSON is substituted
+    with this slide's objectId (so element ids embedding it stay unique).
+    """
+    sid = slide.object_id
+    reqs = [{"createSlide": {"objectId": sid,
+                             "slideLayoutReference": {"predefinedLayout": "BLANK"}}}]
+    try:
+        payload = json.loads(slide.custom)
+    except json.JSONDecodeError as exc:
+        logger.error(f"custom slide '{slide.key}': invalid JSON ({exc}); left blank")
+        return reqs
+    body = payload.get("requests", payload) if isinstance(payload, dict) else payload
+    if not isinstance(body, list):
+        logger.error(f"custom slide '{slide.key}': expected a list of requests "
+                     "or {{'requests': [...]}}; left blank")
+        return reqs
+    reqs += json.loads(json.dumps(body).replace("__PAGE__", sid))
+    return reqs
+
+
 def slide_requests(slide: Slide, image_url, image_px,
                    layouts=None, templates=None) -> list[dict]:
+    if slide.custom is not None:
+        return _custom_requests(slide)
     tpl = (slide.template_name or "").lower()
     if tpl in ("graph", "full"):
         return _graph_requests(slide, image_url, image_px)
@@ -895,6 +949,11 @@ def _layout_map(slides_api, deck) -> dict[str, dict]:
 def plan_sync(source: list[Slide], managed: dict, prune: bool, force: bool = False):
     creates, deletes, skips = [], [], []
     for s in source:
+        if s.custom is not None:
+            # Pull-authoritative: keep the live (hand-drawn) slide if it exists;
+            # only (re)push when it's missing. Never clobbered, even with --force.
+            (skips if s.key_hash in managed else creates).append(s)
+            continue
         if s.key_hash in managed:
             old_id, old_ch = managed[s.key_hash]
             if old_ch == s.content_hash and not force:
@@ -1096,6 +1155,8 @@ def _slide_from_native(s) -> Slide:
     notes_raw = _read_notes(s)
     marker = _read_marker(notes_raw)
     notes = MARKER_RE.sub("", notes_raw).strip()
+    if marker.get("template") == "custom":
+        return _custom_slide_from_native(s, marker, notes)
     if marker.get("template"):
         return _slide_from_marker(marker, notes)
     title, paras, image_el, table = "", [], None, None
@@ -1116,6 +1177,144 @@ def _slide_from_native(s) -> Slide:
     slide.layout_name = marker.get("tpl") or ("section" if layout == "section"
                                               else None)
     return slide
+
+
+def _custom_slide_from_native(s, marker: dict, notes: str) -> Slide:
+    """Capture a hand-drawn slide's live elements into a ```gslides``` block.
+
+    The Google Slides copy is authoritative; this snapshot lets the slide be
+    recreated if it is ever deleted. Geometry, text (with first-run style),
+    shape fill/outline, images and lines are captured; richer styling is
+    approximate (and irrelevant while the live slide exists, which is the norm).
+    """
+    reqs = _elements_to_requests(s.get("pageElements", []))
+    slide = Slide(marker["id"], "custom", notes=notes)
+    slide.template_name = "custom"
+    slide.custom = json.dumps({"requests": reqs}, indent=2)
+    return slide
+
+
+# Writable subfields copied verbatim from the get-response back into update
+# requests (the two schemas share these). Connections are intentionally dropped
+# (they reference sibling element ids we renumber) — see _line_prop_requests.
+# `shadow` and `autofit` carry read-only/computed subfields (fontScale,
+# lineSpacingReduction) the API refuses in an update mask, so they are not
+# captured — recreated slides inherit the defaults. The rest is writable and
+# copied verbatim from the get-response.
+_SHAPE_PROP_FIELDS = ("shapeBackgroundFill", "outline",
+                      "contentAlignment", "link")
+_LINE_PROP_FIELDS = ("lineFill", "weight", "dashStyle", "startArrow",
+                     "endArrow", "link")
+_IMAGE_PROP_FIELDS = ("cropProperties", "outline", "brightness",
+                      "contrast", "transparency", "recolor", "link")
+_TEXT_STYLE_FIELDS = ("bold", "italic", "underline", "strikethrough", "smallCaps",
+                      "backgroundColor", "foregroundColor", "weightedFontFamily",
+                      "fontFamily", "fontSize", "baselineOffset", "link")
+_PARA_STYLE_FIELDS = ("alignment", "lineSpacing", "direction", "spacingMode",
+                      "spaceAbove", "spaceBelow", "indentStart", "indentEnd",
+                      "indentFirstLine")
+
+
+def _present(obj: dict, fields: tuple[str, ...]) -> dict:
+    return {k: obj[k] for k in fields if k in obj}
+
+
+def _update(req: str, eid: str, prop_key: str, props: dict) -> list[dict]:
+    if not props:
+        return []
+    return [{req: {"objectId": eid, prop_key: props, "fields": ",".join(props)}}]
+
+
+def _elements_to_requests(elements: list[dict]) -> list[dict]:
+    """Convert a slide's live page elements into faithful create+update requests.
+
+    Captures geometry, the full writable property set (fills, outline, shadow,
+    crop, line weight/arrows/dash), and per-run + per-paragraph text styling, so
+    `pull -> push -> pull` is a fixed point. Element connections and unsupported
+    element kinds (groups, video, etc.) are dropped with a warning.
+    """
+    reqs: list[dict] = []
+    for i, el in enumerate(elements):
+        eid = f"__PAGE___el{i}"
+        props = {"pageObjectId": "__PAGE__"}
+        if el.get("size"):
+            props["size"] = el["size"]
+        if el.get("transform"):
+            # get can omit a scale component; create needs both.
+            props["transform"] = {"scaleX": 1, "scaleY": 1, **el["transform"]}
+        if "shape" in el:
+            sh = el["shape"]
+            reqs.append({"createShape": {"objectId": eid,
+                "shapeType": sh.get("shapeType", "TEXT_BOX"),
+                "elementProperties": props}})
+            reqs += _text_requests(eid, sh.get("text", {}))
+            reqs += _update("updateShapeProperties", eid, "shapeProperties",
+                            _present(sh.get("shapeProperties", {}), _SHAPE_PROP_FIELDS))
+        elif "image" in el:
+            url = el["image"].get("contentUrl") or el["image"].get("sourceUrl")
+            if not url:
+                logger.warning(f"custom pull: image {eid} has no URL; skipped")
+                continue
+            reqs.append({"createImage": {"objectId": eid, "url": url,
+                                         "elementProperties": props}})
+            reqs += _update("updateImageProperties", eid, "imageProperties",
+                            _present(el["image"].get("imageProperties", {}),
+                                     _IMAGE_PROP_FIELDS))
+        elif "line" in el:
+            reqs.append({"createLine": {"objectId": eid,
+                "category": el["line"].get("lineCategory", "STRAIGHT"),
+                "elementProperties": props}})
+            reqs += _line_prop_requests(eid, el["line"])
+        else:
+            logger.warning(f"custom pull: unsupported element {list(el)}; skipped")
+    return reqs
+
+
+def _line_prop_requests(eid: str, line: dict) -> list[dict]:
+    return _update("updateLineProperties", eid, "lineProperties",
+                   _present(line.get("lineProperties", {}), _LINE_PROP_FIELDS))
+
+
+def _text_requests(eid: str, text: dict) -> list[dict]:
+    """Reconstruct shape text exactly: content, per-paragraph and per-run styles."""
+    els = text.get("textElements", [])
+    content = "".join((te.get("textRun") or {}).get("content", "") for te in els)
+    body = content.rstrip("\n")  # shapes carry an implicit final paragraph
+    if not body:
+        return []
+    total = _u16(body)
+    reqs = [{"insertText": {"objectId": eid, "text": body}}]
+
+    def clamp(te):  # range intersected with the inserted text
+        s, e = te.get("startIndex", 0), te.get("endIndex", te.get("startIndex", 0) + 1)
+        return s, min(e, total)
+
+    for te in els:  # paragraph styles + bullets
+        pm = te.get("paragraphMarker")
+        if not pm:
+            continue
+        s, e = clamp(te)
+        if s >= e:
+            continue
+        rng = {"type": "FIXED_RANGE", "startIndex": s, "endIndex": e}
+        ps = _present(pm.get("style", {}), _PARA_STYLE_FIELDS)
+        if ps:
+            reqs.append({"updateParagraphStyle": {"objectId": eid, "textRange": rng,
+                                                  "style": ps, "fields": ",".join(ps)}})
+        if pm.get("bullet"):
+            reqs.append({"createParagraphBullets": {"objectId": eid, "textRange": rng,
+                "bulletPreset": "BULLET_DISC_CIRCLE_SQUARE"}})
+    for te in els:  # run styles
+        tr = te.get("textRun")
+        if not tr:
+            continue
+        s, e = clamp(te)
+        st = _present(tr.get("style", {}), _TEXT_STYLE_FIELDS)
+        if s < e and st:
+            reqs.append({"updateTextStyle": {"objectId": eid,
+                "textRange": {"type": "FIXED_RANGE", "startIndex": s, "endIndex": e},
+                "style": st, "fields": ",".join(st)}})
+    return reqs
 
 
 def _slide_from_marker(marker: dict, notes: str) -> Slide:

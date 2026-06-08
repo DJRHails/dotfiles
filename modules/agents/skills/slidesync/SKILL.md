@@ -91,6 +91,40 @@ Select per slide via `template:` — native styled boxes, no in-deck templates:
 Slides with no `template:` fall back to a generative path (section /
 TITLE_AND_BODY / table / image) that also brands bg + IBM Plex.
 
+## Custom slides (diagrams) — pull-authoritative
+
+For hand-drawn diagrams, give a slide a fenced ```` ```gslides ```` block holding
+the **literal Slides API requests** (a JSON list, or `{"requests": [...]}`). Use
+`__PAGE__` for the slide page id (element ids embedding it stay unique):
+
+````markdown
+---
+id: my-diagram
+---
+```gslides
+{"requests": [
+  {"createShape": {"objectId": "__PAGE___box", "shapeType": "ROUND_RECTANGLE",
+    "elementProperties": {"pageObjectId": "__PAGE__", "size": {...}, "transform": {...}}}},
+  {"insertText": {"objectId": "__PAGE___box", "text": "Summariser"}}
+]}
+```
+````
+
+Sync is **pull-authoritative / push-if-missing**: the Google Slides copy is the
+source of truth. `push` **creates** the slide from the block only when it is
+**missing**; if it already exists it is **never overwritten** (even with
+`--force`) — so you draw/edit natively in Slides and it survives every push.
+`pull` **captures** the live drawing back into the ```` ```gslides ```` block as
+requests, so `pull -> push -> pull` is a faithful fixed point (object id is keyed
+on `id:` only, so native edits never orphan it).
+
+Captured fidelity covers shapes (fill/outline/content-alignment), per-run +
+per-paragraph **text** styling, **lines** (weight/dash/arrows), and images.
+Inherent limits (the API forbids setting them, so they inherit defaults on a
+*recreate-from-missing* only — the live slide is never degraded): `shadow` and
+`autofit` are read-only; element **connections** are dropped; image `contentUrl`s
+expire, so a long-after recreate may lose the image.
+
 ## Notes & footguns
 
 - `createParagraphBullets` consumes the leading tabs used for nesting — bullet
