@@ -90,6 +90,7 @@ RED = {"red": 0.7529412, "green": 0.22352941, "blue": 0.16862746}   # #C0392B
 INK = {"red": 0.011764706, "green": 0.02745098, "blue": 0.07058824}  # #03070F
 BODY_INK = {"red": 0.11764706, "green": 0.1254902, "blue": 0.14117648}  # #1E2024
 PAPER = {"red": 0.98039216, "green": 0.98039216, "blue": 0.98039216}  # #FAFAFA
+WHITE = {"red": 1.0, "green": 1.0, "blue": 1.0}                       # #FFFFFF
 LIGHT_BG, DARK_BG = PAPER, BODY_INK
 
 # ---------------------------------------------------------------------------
@@ -704,7 +705,7 @@ def _graph_requests(slide: Slide, image_url, image_px) -> list[dict]:
     sid = slide.object_id
     reqs = [{"createSlide": {"objectId": sid,
                              "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
-            _bg(sid, LIGHT_BG)]
+            _bg(sid, WHITE)]
     if slide.image and image_url:
         margin = _emu(0.1)
         w, h = _fit2(image_px, SLIDE_W - 2 * margin, SLIDE_H - 2 * margin)
