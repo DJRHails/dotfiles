@@ -587,6 +587,7 @@ class Style:
     headline_rgb: dict
     body_align: str | None    # CENTER | START | None (no body region)
     top: float                # starting y (inches) of the kicker/headline block
+    head_lines: int = 2       # max headline lines before auto-fit shrinks the font
 
 
 # Built-in brand kit matching the Reliable Monitors deck (no in-deck templates).
@@ -596,7 +597,7 @@ STYLES = {
     "appendix": Style(LIGHT_BG, 72, INK, None, 2.0),       # light title card
     "label":    Style(LIGHT_BG, 50, INK, "CENTER", 1.5),   # question + centered body
     "question": Style(LIGHT_BG, 50, INK, "CENTER", 1.5),
-    "topic":    Style(LIGHT_BG, 40, INK, "START", 0.6),    # headline + left body
+    "topic":    Style(LIGHT_BG, 40, INK, "START", 0.6, head_lines=1),  # 1-line headline
     "content":  Style(LIGHT_BG, None, INK, "START", 0.4),  # kicker-as-title + left body
 }
 
@@ -621,7 +622,7 @@ def _fit_headline_pt(text: str, base_pt: int, max_lines: int = 2,
     wrapped line count fits — so a long title shrinks to stay on the slide
     instead of overflowing or pushing the body off the page.
     """
-    floor = max(20, int(base_pt * 0.55))
+    floor = 20 if max_lines == 1 else max(20, int(base_pt * 0.55))
     pt = base_pt
     while pt > floor and _est_lines(text, pt, width_in) > max_lines:
         pt -= 2
@@ -640,7 +641,8 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
     head_h = 0.0
     head_pt = style.headline_pt
     if headline_text:
-        head_pt = _fit_headline_pt(headline_text, style.headline_pt)
+        head_pt = _fit_headline_pt(headline_text, style.headline_pt,
+                                   max_lines=style.head_lines)
         head_h = _est_lines(headline_text, head_pt) * head_pt * 1.25 / 72 + 0.1
     # Title cards (no body, no image) vertically centre the kicker+headline.
     if (style.body_align is None or not slide.paras) and not slide.image:
