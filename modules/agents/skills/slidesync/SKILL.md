@@ -67,8 +67,10 @@ may have its own frontmatter (`id:`, `template:`, `layout:`).
 - `# h1` = headline, `## h2` above an h1 = kicker; a lone `##` is the title.
 - Bullets `-`/`*`; ordered `1.` (nest with 2-space indent). Inline
   `**bold**` / `*italic*` / `` `code` `` / `[link](url)` (rendered brand-red +
-  underlined). GFM tables. `![](path)`
-  images (uploaded to Drive). Blank lines preserved as spacing. `<!-- notes -->`
+  underlined). GFM tables. `![alt](path)`
+  images (uploaded to Drive; `alt` becomes the image's accessibility
+  description via `updatePageElementAltText`, round-tripped on pull). Blank
+  lines preserved as spacing. `<!-- notes -->`
   become speaker notes. `<v-clicks>`/`<div>` are stripped.
 - **Internal links:** `[text](#slide-id)` becomes a native Slides link that jumps
   to the slide whose `id:` (or title slug) is `slide-id`. Resolved against the

@@ -170,6 +170,7 @@ class Slide:
     title: str = ""
     paras: list[Para] = field(default_factory=list)
     image: str | None = None
+    image_alt: str = ""  # ![alt](path) -> image description / accessibility alt text
     table: list[list[str]] | None = None
     notes: str = ""
     kicker: str = ""  # h2 above an h1 -> {{h2}} kicker
@@ -189,7 +190,8 @@ class Slide:
         table = tuple(map(tuple, self.table)) if self.table else None
         return (self.key, self.layout_name, self.template_name,
                 tuple(sorted(self.vars.items())), self.layout, self.title,
-                self.kicker, paras, table, self.image, self.notes)
+                self.kicker, paras, table, self.image, self.image_alt,
+                self.notes)
 
 
 def _u16(text: str) -> int:
@@ -276,13 +278,13 @@ def build_slide(meta: dict, body: str, index: int) -> Slide:
     verbatim = None
     if (meta.get("template") or "").lower() in ("prompt", "code"):
         verbatim, body = _extract_verbatim(body)
-    headings, paras, image, table, notes = parse_body(body)
+    headings, paras, image, image_alt, table, notes = parse_body(body)
     h1, h2 = headings.get(1), headings.get(2)
     title = h1 or h2 or ""           # h1 is the headline; a lone h2 is the title
     kicker = h2 if (h1 and h2) else ""  # an h2 above an h1 is the kicker
     key = meta.get("id") or _slug(title) or f"slide{index}"
     slide = Slide(key, _layout_of(meta, image, table), title, paras, image,
-                  table, notes)
+                  image_alt, table, notes)
     slide.kicker = kicker
     slide.layout_name = meta.get("layout")
     slide.template_name = "custom" if custom is not None else meta.get("template")
@@ -320,7 +322,7 @@ def parse_body(body: str):
     body = COMMENT_RE.sub("", body)
     body = VCLICK_RE.sub("", DIV_RE.sub("", body))
     lines = body.splitlines()
-    headings, paras, image, table = {}, [], None, None
+    headings, paras, image, table, image_alt = {}, [], None, None, ""
     i = 0
     while i < len(lines):
         line, stripped = lines[i], lines[i].strip()
@@ -335,7 +337,7 @@ def parse_body(body: str):
             headings[level] = parse_inline(hm.group(2).strip())[0]
             i += 1
         elif (im := IMAGE_RE.match(stripped)):
-            image, i = im.group("url"), i + 1
+            image, image_alt, i = im.group("url"), im.group("alt"), i + 1
         elif "|" in line and i + 1 < len(lines) and TABLE_SEP_RE.match(lines[i + 1]):
             table, i = _parse_table(lines, i)
         else:
@@ -344,7 +346,7 @@ def parse_body(body: str):
     while paras and not paras[-1].text and paras[-1].depth < 0 \
             and not paras[-1].runs:
         paras.pop()
-    return headings, paras, image, table, notes
+    return headings, paras, image, image_alt, table, notes
 
 
 def _extract_notes(body: str) -> str:
@@ -478,7 +480,7 @@ def to_slidev(slide: Slide, include_id: bool = True) -> str:
         out.append(("# " if slide.layout == "section" else "## ") + slide.title)
     out += [_render_para(p) for p in slide.paras]
     if slide.image:
-        out.append(f"![]({slide.image})")
+        out.append(f"![{slide.image_alt}]({slide.image})")
     if slide.table:
         out += _render_table(slide.table)
     if slide.notes:
@@ -523,6 +525,8 @@ def _marker(slide: Slide) -> str:
     data = {"id": slide.key}
     if slide.image:
         data["img"] = slide.image
+        if slide.image_alt:
+            data["alt"] = slide.image_alt
     if slide.template_name:
         data["template"] = slide.template_name
         if slide.title:
@@ -684,6 +688,8 @@ def _styled_requests(slide: Slide, style: Style, image_url, image_px) -> list[di
                 "transform": {"scaleX": 1, "scaleY": 1, "unit": "EMU",
                               "translateX": (SLIDE_W - w) // 2,
                               "translateY": _emu(y)}}}})
+        if slide.image_alt:
+            reqs.append(_alt_req(sid + "_img", slide.image_alt))
     return reqs
 
 
@@ -717,6 +723,8 @@ def _graph_requests(slide: Slide, image_url, image_px) -> list[dict]:
                 "transform": {"scaleX": 1, "scaleY": 1, "unit": "EMU",
                               "translateX": (SLIDE_W - w) // 2,
                               "translateY": (SLIDE_H - h) // 2}}}})
+        if slide.image_alt:
+            reqs.append(_alt_req(sid + "_img", slide.image_alt))
     return reqs
 
 
@@ -826,6 +834,8 @@ def slide_requests(slide: Slide, image_url, image_px,
         reqs += [_bg(slide.object_id, LIGHT_BG)] + _kicker(tid)
         if slide.layout == "image" and image_url:
             reqs.append(_image(slide, image_url, image_px))
+            if slide.image_alt:
+                reqs.append(_alt_req(slide.object_id + "_img", slide.image_alt))
         elif slide.layout == "table" and slide.table:
             reqs += _table(slide)
     return reqs
@@ -957,6 +967,11 @@ def _merge(spans):
         else:
             merged.append((s, e, ordered))
     return merged
+
+
+def _alt_req(object_id: str, alt: str) -> dict:
+    """Set an image element's accessibility alt text (its description)."""
+    return {"updatePageElementAltText": {"objectId": object_id, "description": alt}}
 
 
 def _image(slide, url, px) -> dict:
@@ -1422,10 +1437,11 @@ def _text_requests(eid: str, text: dict) -> list[dict]:
 
 def _slide_from_marker(marker: dict, notes: str) -> Slide:
     """Reconstruct a tagged-template slide from its notes marker (source of truth)."""
-    _headings, paras, _, _, _ = parse_body(marker.get("body", ""))
+    _headings, paras, _, _, _, _ = parse_body(marker.get("body", ""))
     img = marker.get("img")
     slide = Slide(marker["id"], "image" if img else "content",
                   marker.get("h1", ""), paras, image=img, notes=notes)
+    slide.image_alt = marker.get("alt", "")
     slide.kicker = marker.get("h2", "")
     slide.template_name = marker["template"]
     slide.vars = marker.get("vars", {})
