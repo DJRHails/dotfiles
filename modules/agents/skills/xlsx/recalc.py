@@ -157,7 +157,7 @@ def recalc(filename, timeout=30):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python recalc.py <excel_file> [timeout_seconds]")
+        print("Usage: python3 recalc.py <excel_file> [timeout_seconds]")
         print("\nRecalculates all formulas in an Excel file using LibreOffice")
         print("\nReturns JSON with error details:")
         print("  - status: 'success' or 'errors_found'")

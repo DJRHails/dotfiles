@@ -1,6 +1,6 @@
 ---
 name: chrome-cdp
-description: Interact with local Chrome browser session (only on explicit user approval after being asked to inspect, debug, or interact with a page open in Chrome)
+description: Interact with local Chrome browser session (only on explicit user approval after being asked to inspect, debug, or interact with a page open in Chrome). Requires Node.js 22+ and a local Chromium-family browser with remote debugging enabled — check `node --version` before relying on this skill.
 ---
 
 # Chrome CDP

@@ -1,6 +1,6 @@
 ---
 name: blogwatcher
-description: Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI. Add blogs, scan for new articles, and track what you've read.
+description: Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI. Add blogs, scan for new articles, and track what you've read. Requires the blogwatcher CLI on PATH (installed via Go) — check `command -v blogwatcher` first and skip if it is not installed.
 version: 1.0.0
 author: community
 license: MIT

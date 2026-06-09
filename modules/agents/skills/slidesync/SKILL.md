@@ -1,6 +1,6 @@
 ---
 name: slidesync
-description: Bidirectional sync between a Slidev markdown deck and Google Slides as native, editable objects (not images). Push markdown -> Slides, pull Slides -> markdown, and round-trip. Use when the user wants to author/version a Google Slides deck from markdown, replicate a deck's styling, or keep a .slidev.md in sync with a presentation. Auth is borrowed from the `gog` CLI (no separate OAuth setup).
+description: Bidirectional sync between a Slidev markdown deck and Google Slides as native, editable objects (not images). Push markdown -> Slides, pull Slides -> markdown, and round-trip. Use when the user wants to author/version a Google Slides deck from markdown, replicate a deck's styling, or keep a .slidev.md in sync with a presentation. Auth is borrowed from the `gog` CLI (no separate OAuth setup). Requires `gog` with stored credentials — currently macOS-only (reads gog's macOS Application Support path), so skip on Linux hosts.
 version: 1.0.0
 metadata:
   hermes:

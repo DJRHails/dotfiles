@@ -116,19 +116,29 @@ def _to_uuid(page_id: str) -> str:
 
 # Chromium-based browsers: bc3 only reads the first profile via its glob. Enumerate
 # them ourselves so multi-profile setups (Arc spaces, Chrome profiles) work.
+# Patterns cover both macOS (~/Library) and Linux (~/.config) data dirs.
 _CHROMIUM_PROFILE_GLOBS = {
-    Browser.arc: "~/Library/Application Support/Arc/User Data/{Default,Profile *}/Cookies",
-    Browser.chrome: "~/Library/Application Support/Google/Chrome/{Default,Profile *}/Cookies",
-    Browser.chromium: "~/Library/Application Support/Chromium/{Default,Profile *}/Cookies",
-    Browser.brave: "~/Library/Application Support/BraveSoftware/Brave-Browser/{Default,Profile *}/Cookies",
-    Browser.edge: "~/Library/Application Support/Microsoft Edge/{Default,Profile *}/Cookies",
+    Browser.arc: ("~/Library/Application Support/Arc/User Data/{Default,Profile *}/Cookies",),
+    Browser.chrome: (
+        "~/Library/Application Support/Google/Chrome/{Default,Profile *}/Cookies",
+        "~/.config/google-chrome/{Default,Profile *}/Cookies",
+    ),
+    Browser.chromium: (
+        "~/Library/Application Support/Chromium/{Default,Profile *}/Cookies",
+        "~/.config/chromium/{Default,Profile *}/Cookies",
+    ),
+    Browser.brave: (
+        "~/Library/Application Support/BraveSoftware/Brave-Browser/{Default,Profile *}/Cookies",
+        "~/.config/BraveSoftware/Brave-Browser/{Default,Profile *}/Cookies",
+    ),
+    Browser.edge: (
+        "~/Library/Application Support/Microsoft Edge/{Default,Profile *}/Cookies",
+        "~/.config/microsoft-edge/{Default,Profile *}/Cookies",
+    ),
 }
 
 
-def _profile_cookie_files(browser: Browser) -> list[str]:
-    pattern = _CHROMIUM_PROFILE_GLOBS.get(browser)
-    if not pattern:
-        return []
+def _expand_brace_glob(pattern: str) -> list[str]:
     # glob doesn't understand brace expansion; split manually.
     parts = re.match(r"^(.*)\{(.+)\}(.*)$", pattern)
     if not parts:
@@ -138,6 +148,11 @@ def _profile_cookie_files(browser: Browser) -> list[str]:
     for alt in alts:
         files.extend(glob.glob(os.path.expanduser(f"{prefix}{alt}{suffix}")))
     return sorted(files)
+
+
+def _profile_cookie_files(browser: Browser) -> list[str]:
+    patterns = _CHROMIUM_PROFILE_GLOBS.get(browser, ())
+    return [f for pattern in patterns for f in _expand_brace_glob(pattern)]
 
 
 def _cookies_per_profile(browser: Browser) -> list[tuple[str, http.cookiejar.CookieJar]]:

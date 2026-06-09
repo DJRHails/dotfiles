@@ -1,6 +1,6 @@
 ---
 name: cmux-fork-session
-description: "Fork the current Claude Code session into a new cmux split pane (or tab) — opens a split beside the caller, resumes this session with --fork-session, titles it 'fork: <name>', and keeps that title. Use when the user asks to fork/duplicate/branch the current session into a new split or tab. Works whether the session is local on the cmux UI host or running on a durable/mosh remote (e.g. bonbon)."
+description: "Fork the current Claude Code session into a new cmux split pane (or tab) — opens a split beside the caller, resumes this session with --fork-session, titles it 'fork: <name>', and keeps that title. Use when the user asks to fork/duplicate/branch the current session into a new split or tab. Works whether the session is local on the cmux UI host or running on a durable/mosh remote (e.g. bonbon). Requires the macOS cmux app on the UI host — skip if the session was not started from cmux."
 ---
 
 # cmux: fork this session into a new split (or tab)

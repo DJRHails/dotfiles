@@ -1,6 +1,6 @@
 ---
 name: cmux-workspace
-description: "Work inside the current cmux workspace and terminal. Use for cmux workspace, current workspace, caller surface, panes, surfaces, socket targeting, and non-interfering cmux automation."
+description: "Work inside the current cmux workspace and terminal. Use for cmux workspace, current workspace, caller surface, panes, surfaces, socket targeting, and non-interfering cmux automation. Requires the macOS cmux app — skip on hosts without a reachable cmux socket."
 ---
 
 # cmux Workspace

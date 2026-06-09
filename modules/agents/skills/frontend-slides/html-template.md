@@ -256,7 +256,7 @@ document.addEventListener('keydown', (e) => {
 
 If user chose "No images" in Phase 1, skip this entirely. If images were provided, process them before generating HTML.
 
-**Dependency:** `pip install Pillow`
+**Dependency:** Pillow — run the snippet with `uv run --with Pillow python3 ...` (or `uv pip install Pillow` into the active venv)
 
 ### Image Processing
 
