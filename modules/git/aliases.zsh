@@ -18,8 +18,9 @@ ghopen() {
 genignore() {
   local language=$1
 
-  # fetch the gitignore file from gitignore.io
-  curl -L -s "https://www.gitignore.io/api/$language" | grep -v toptal >> .gitignore
+  # fetch the gitignore file from gitignore.io (-f: never append an error page)
+  curl -fLs "https://www.gitignore.io/api/$language" | grep -v toptal >> .gitignore \
+    || { echo "genignore: no template for '$language'" >&2; return 1; }
 }
 
 # Specifies the clipboard output format is html
@@ -46,8 +47,9 @@ find_in_path() {
 # Extract GitHub org/repo from URL
 parse_github_url() {
     local url=$1
-    # Use sed for better compatibility across shells
-    local org_repo=$(echo "$url" | sed -E 's/.*github\.com[:/]([^/]+\/[^/]+)(\.git)?$/\1/')
+    # Use sed for better compatibility across shells. Strip .git in a second
+    # step: a greedy ([^/]+)(\.git)? never matches the suffix group.
+    local org_repo=$(echo "$url" | sed -E 's/.*github\.com[:/]([^/]+\/[^/]+)$/\1/; s/\.git$//')
     
     # Verify we got a valid result
     if [[ -n "$org_repo" && "$org_repo" != "$url" ]]; then
@@ -169,6 +171,13 @@ gwtb() {
         stashed=1
     fi
     
+    # Resolve the worktree path once, up front (gwta derives the same path);
+    # the final cd needs it on the no-stash path too.
+    local remote_url=$(git remote get-url origin)
+    local org_repo=$(parse_github_url "$remote_url")
+    local github_root=$(find_in_path "github.com" "$repo_root")
+    local worktree_path="$github_root/$org_repo/$branch"
+
     # Create the new branch
     echo "Creating branch '$branch' from '$base_branch'..."
     git fetch origin "$base_branch" 2>/dev/null || true
@@ -194,12 +203,6 @@ gwtb() {
     
     # If we stashed changes, apply them in the new worktree
     if [[ $stashed -eq 1 ]]; then
-        # Get the worktree path from gwt's output
-        local remote_url=$(git remote get-url origin)
-        local org_repo=$(parse_github_url "$remote_url")
-        local github_root=$(find_in_path "github.com" "$repo_root")
-        local worktree_path="$github_root/$org_repo/$branch"
-        
         echo "Applying stashed changes in new worktree..."
         cd "$worktree_path" && git stash pop
         cd - > /dev/null
