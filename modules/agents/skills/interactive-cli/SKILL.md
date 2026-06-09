@@ -3,7 +3,7 @@ name: interactive-cli
 description: Control interactive CLI processes across multiple turns using tmux. Use when a command requires interactive input (y/n prompts, confirmations, menu selection, pdb, REPL, etc.) — any program that reads from stdin and cannot be run non-interactively. If a command fails with EOFError or hangs waiting for input, use this skill.
 argument-hint: <command>
 allowed-tools:
-  - Bash(tmux *)
+  - Bash(tmux:*)
 ---
 
 # Interactive CLI Process Control

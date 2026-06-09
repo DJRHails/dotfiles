@@ -17,8 +17,8 @@ Use the bundled helper for every read/write. It strips JSONC comments, writes at
 # From a cmux checkout
 skills/cmux-settings/scripts/cmux-settings <subcommand>
 
-# From an installed Codex skill
-~/.codex/skills/cmux-settings/scripts/cmux-settings <subcommand>
+# From the installed skill
+~/.agents/skills/cmux-settings/scripts/cmux-settings <subcommand>
 ```
 
 For brevity in the rest of this doc, assume the script is on `$PATH` as `cmux-settings`. To make it so for a session from a checkout: `export PATH="$PWD/skills/cmux-settings/scripts:$PATH"`.

@@ -21,7 +21,7 @@ For each PDF in `research/dump/`:
 
    - Title (full, not truncated)
    - Authors (first few primary authors)
-   - Year (infer from content or use 2024/2025 for recent papers)
+   - Year (infer from content or use the current year for recent papers)
    - Venue (if clearly stated: conference/journal)
 
 3. **Generate citation key** using format: `firstauthorYEARkeyword`

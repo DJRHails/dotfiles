@@ -85,8 +85,9 @@ Edit the file. Do NOT commit or push automatically.
 gh api "repos/$REPO/pulls/$PR_NUM/comments/$COMMENT_ID/replies" \
   -f body="$REPLY_TEXT"
 
-# Reply to a general PR comment
-gh pr comment "$PR_NUM" --body "$REPLY_TEXT" --reply-to "$COMMENT_ID"
+# Reply to a general PR comment (issue comments are not threaded —
+# post a new comment, quoting the original if context is needed)
+gh pr comment "$PR_NUM" --body "$REPLY_TEXT"
 ```
 
 ### Resolve threads (after fixes are pushed)

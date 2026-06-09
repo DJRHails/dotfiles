@@ -13,7 +13,7 @@ are blocked by the camo proxy).
 ## Use it
 
 ```bash
-"$(dirname "")"/scripts/cdn-upload path/to/figure.png [more.png ...]
+~/.agents/skills/cdn-upload/scripts/cdn-upload path/to/figure.png [more.png ...]
 # prints one https://cdn.hails.info/img/<sha256[:32]>.png per file on stdout
 ```
 

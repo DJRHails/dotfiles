@@ -38,7 +38,7 @@ What are you doing?
 | [ruff](https://docs.astral.sh/ruff/) | Linting and formatting | flake8, black, isort, pyupgrade, pydocstyle |
 | [ty](https://github.com/astral-sh/ty) | Type checking | mypy, pyright |
 | [pytest](https://docs.pytest.org/) | Testing with coverage | unittest |
-| [prek](https://github.com/jdx/prek) | Pre-commit hooks | pre-commit (faster, Rust-native) |
+| [prek](https://github.com/j178/prek) | Pre-commit hooks | pre-commit (faster, Rust-native) |
 | `uv_build` | Build backend | hatchling, setuptools |
 | [Loguru](https://github.com/Delgan/loguru) | Logging | stdlib logging |
 
