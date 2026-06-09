@@ -25,8 +25,17 @@ ensure you are working with up-to-date code.
 
 Check out the PR branch locally.
 
-Execute every step below sequentially. Do not stop or ask for
-confirmation at any step.
+**Shared-repo guard:** determine whether the canonical repo is a
+solo personal repo — owned by `github.com/DJRHails` with no other
+collaborators. Concretely: solo means the owner is DJRHails and `gh api repos/<owner>/<repo>/collaborators --jq length` returns 1. On solo personal repos, run fully autonomously. On
+any other repo (a shared org, or any repo with other
+collaborators), pause before each action that reaches other people
+— inline review comments (§1), thread replies and resolves (§4),
+and the summary comment (§5) — post a short summary of what you
+are about to send, and wait for explicit user confirmation.
+
+Execute every step below sequentially without pausing for
+confirmation, except where the shared-repo guard requires it.
 
 ## 1. Review
 
