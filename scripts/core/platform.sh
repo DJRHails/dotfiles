@@ -1,5 +1,3 @@
-
-
 #!/usr/bin/env bash
 
 platform::command_exists() {
@@ -118,8 +116,9 @@ platform::open() {
 }
 
 platform::relink() {
-  local readonly original_path="$(which $1)"
-  local readonly new_path="$(dirname "$original_path")/$2"
+  local original_path new_path
+  original_path="$(which "$1")"
+  new_path="$(dirname "$original_path")/$2"
 
   platform::sudo ln -fsn "$original_path" "$new_path"
   #        |||
@@ -219,7 +218,7 @@ platform::sudo_prefix() {
 
 platform::main_package_args() {
   if [ "$(platform::main_package_manager)" == "apt" ]; then
-    echo "--allow-unauthenticated -qqy"
+    echo "-qqy"
   else
     echo ""
   fi
