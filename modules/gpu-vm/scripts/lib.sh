@@ -75,7 +75,8 @@ create_pod() {
         return 1
     fi
 
-    local name="gpu-${gpu}-$(date +%s)"
+    local name
+    name="gpu-${gpu}-$(date +%s)"
 
     # Create pod with SSH support using REST API
     # Note: Network volume locks to US-TX-3 which is often congested, so we skip it
@@ -139,12 +140,29 @@ clear_active_pod() {
     rm -f "${STATE_DIR}/${gpu}.pod"
 }
 
-# Check if a pod is still running and SSH-accessible
+# Check if a pod is still running.
+# Returns 0 if RUNNING, 1 if definitively not running (stopped or not
+# found), 2 if liveness is unknown (API/transport failure). Callers must
+# not treat 2 as dead: the pod may still be alive and billing.
 is_pod_alive() {
     local pod_id="$1"
+    local response
+    response=$(get_pod_status "$pod_id")
+    [ -n "$response" ] || return 2
+
     local status
-    status=$(get_pod_status "$pod_id" | jq -r '.desiredStatus // "UNKNOWN"')
-    [ "$status" = "RUNNING" ]
+    status=$(echo "$response" | jq -r '.desiredStatus // empty' 2>/dev/null)
+    if [ -n "$status" ]; then
+        [ "$status" = "RUNNING" ] && return 0
+        return 1
+    fi
+
+    # No desiredStatus: API returned an error payload. A 404 means the
+    # pod is gone; anything else (auth, rate limit, 5xx) is unknown.
+    local http_status
+    http_status=$(echo "$response" | jq -r '.status // empty' 2>/dev/null)
+    [ "$http_status" = "404" ] && return 1
+    return 2
 }
 
 # Get or create a pod, wait for SSH, return "ip port"
@@ -159,21 +177,40 @@ get_or_create_pod() {
 
     if [ -n "$pod_id" ]; then
         # Verify it's still running
-        if is_pod_alive "$pod_id"; then
-            local ssh_addr
-            ssh_addr=$(get_pod_ssh "$pod_id")
-            if [ -n "$ssh_addr" ] && [ "$ssh_addr" != "null" ]; then
-                local ip port
-                ip=$(echo "$ssh_addr" | cut -d: -f1)
-                port=$(echo "$ssh_addr" | cut -d: -f2)
-                echo "$ip $port"
-                echo "[gpu-vm] Reusing existing pod ${pod_id}" >&2
-                return 0
-            fi
-        else
-            echo "[gpu-vm] Previous pod ${pod_id} is no longer running" >&2
-            clear_active_pod "$gpu"
-        fi
+        local alive
+        is_pod_alive "$pod_id"
+        alive=$?
+        case "$alive" in
+            0)
+                local ssh_addr
+                ssh_addr=$(get_pod_ssh "$pod_id")
+                if [ -n "$ssh_addr" ] && [ "$ssh_addr" != "null" ]; then
+                    local ip port
+                    ip=$(echo "$ssh_addr" | cut -d: -f1)
+                    port=$(echo "$ssh_addr" | cut -d: -f2)
+                    echo "$ip $port"
+                    echo "[gpu-vm] Reusing existing pod ${pod_id}" >&2
+                    return 0
+                fi
+                # RUNNING but SSH not exposed yet: refuse to replace it.
+                # A second pod would orphan this one while it still bills.
+                echo "[gpu-vm] Pod ${pod_id} is RUNNING but SSH is not ready; retry shortly or run: ctl.sh terminate ${gpu}" >&2
+                return 1
+                ;;
+            1)
+                # Definitively not running: terminate before replacing so a
+                # stopped pod doesn't keep billing for storage.
+                echo "[gpu-vm] Previous pod ${pod_id} is no longer running; terminating it" >&2
+                terminate_pod "$pod_id" > /dev/null 2>&1
+                clear_active_pod "$gpu"
+                ;;
+            *)
+                # Liveness unknown (API/transport failure): do not replace,
+                # the pod may still be alive and billing. Retry later.
+                echo "[gpu-vm] Cannot verify pod ${pod_id} (API unreachable); refusing to replace it" >&2
+                return 1
+                ;;
+        esac
     fi
 
     # Create a new pod
