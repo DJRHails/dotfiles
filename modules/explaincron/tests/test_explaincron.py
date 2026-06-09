@@ -8,12 +8,20 @@ from ..explaincron import convert_aws_cron_to_crontab_guru_link, get_crontab_gur
         ("3/5 * * * *", "https://crontab.guru/#3/5_*_*_*_*"),
         ("cron(30 * * * ? *)", "https://crontab.guru/#30_*_*_*_*"),
         ("cron(0 9-17 * * 1-5)", "https://crontab.guru/#0_9-17_*_*_1-5"),
-        ("0 */2 * * *", "https://crontab.guru/#0_*/2_*_*_*")
+        ("0 */2 * * *", "https://crontab.guru/#0_*/2_*_*_*"),
+        ("0 0 1,15 * *", "https://crontab.guru/#0_0_1,15_*_*"),
+        ("0 9 * * MON-FRI", "https://crontab.guru/#0_9_*_*_MON-FRI"),
     ]
 )
 def test_convert_aws_cron_to_crontab_guru_link(cron, link):
     assert convert_aws_cron_to_crontab_guru_link(cron) == link
 
+@pytest.mark.parametrize("cron", ["0 0 1 *", "0 0 1 * * * *", ""])
+def test_convert_rejects_wrong_field_count(cron):
+    with pytest.raises(ValueError, match="cron fields"):
+        convert_aws_cron_to_crontab_guru_link(cron)
+
+@pytest.mark.integration
 @pytest.mark.parametrize(
     ("cron", "english_explanation"),
     [

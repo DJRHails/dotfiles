@@ -3,8 +3,14 @@
 ##? Provides a quick interface to explaincron
 ##?
 ##? USAGE:
-##?    explaincron <file>
+##?    explaincron "<cron expression>"
+##?    echo "<cron expression>" | explaincron
 ##?    explaincron -h|--help
+
+. "$DOTFILES/scripts/core/main.sh"
+
+doc::maybe_help "$@"
+[[ $? == 1 ]] && exit
 
 # Setup the venv if it doesn't exist
 if [[ ! -d "$DOTFILES/modules/explaincron/.venv" ]]; then
