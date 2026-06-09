@@ -11,8 +11,10 @@ claude() { command claude --allow-dangerously-skip-permissions "$@"; }
 _claude_aliases_dir="${${(%):-%x}:A:h}"
 
 claude::jnj() {
+  local env_file="${_claude_aliases_dir}/.env.jnj"
+  [[ -f $env_file ]] || { echo "claude::jnj: missing $env_file — refusing to launch on the default account" >&2; return 1; }
   set -a
-  source "${_claude_aliases_dir}/.env.jnj"
+  source "$env_file"
   set +a
   claude "$@"
 }

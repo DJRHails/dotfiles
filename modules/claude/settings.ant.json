@@ -168,7 +168,7 @@
       "Source control: github.com/DJRHails and all repos under it are trusted push targets",
       "Trusted cloud buckets: rclone remote drive.google.com:papers (personal Google Drive bucket)",
       "Trusted internal domains: docs.google.com and drive.google.com (accessed via gog CLI), hails.info (personal domain)",
-      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd, gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)",
+      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd, gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, figma-dev-mode)",
       "**Organization**: Anthropic Fellows program",
       "**Current user**: `djrhails` — this is the fellow's cluster username. Paths under `/workspace-vast/djrhails/`, `/workspace/djrhails/`, and `/home/djrhails/` belong to this user; any other `/workspace-vast/<name>/` directory belongs to a DIFFERENT fellow.",
       "**Primary use of Claude Code**: ML/AI research — training, fine-tuning, evaluation, and data processing on a shared Slurm GPU cluster",
@@ -183,5 +183,5 @@
       "**Classifier visibility**: The classifier sees user messages, CLAUDE.md, and prior tool CALLS (command strings, file paths, script bodies) — but NOT tool RESULTS (sbatch output, squeue output, echo output), and NOT runtime state (env vars, hostname, disk usage, process ownership). If a SOFT rule's applicability depends on something the user has stated in the transcript (e.g. 'I'm inside an srun shell', 'job 12345 is mine', 'that PID is mine'), treat that as user intent."
     ]
   },
-  "// NOTE": "This file goes in ~/.claude/settings.json (user-level), NOT .claude/settings.json in a repo. Auto-mode config is deliberately not read from project settings (a malicious repo could otherwise inject classifier rules). REPLACE <your-username> below with your actual cluster username before use — the classifier uses it to tell your own storage apart from other fellows'."
+  "// NOTE": "User-level settings for the ant profile: symlinked to ~/.claude-ant/settings.json (see symlinks.conf; self-healed by claude::ant in aliases.zsh), which claude::ant selects via CLAUDE_CONFIG_DIR=$HOME/.claude-ant. Keep auto-mode config here at user level, NOT in a repo's .claude/settings.json — a malicious repo could otherwise inject classifier rules."
 }
