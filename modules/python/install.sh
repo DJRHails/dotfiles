@@ -28,5 +28,16 @@ install::uv_tool "pre-commit" "pre-commit"
 if cmd_exists pre-commit; then
   mkdir -p "$HOME/.git-hooks"
   pre-commit init-templatedir "$HOME/.git-hooks" >/dev/null
-  log::success "pre-commit templatedir initialised at ~/.git-hooks"
+  # init-templatedir only populates the directory — git must also be pointed at
+  # it via init.templateDir, or new clones silently get no hooks. That setting
+  # is machine-local, so it lives in gitconfig.local (see modules/git/gitconfig),
+  # which the git module generates before this script runs.
+  if [ -f "$HOME/.gitconfig.local" ]; then
+    # shellcheck disable=SC2088 # literal ~ is intentional: git expands it, keeps the entry host-portable
+    git config --file "$HOME/.gitconfig.local" init.templateDir '~/.git-hooks'
+    log::success "pre-commit templatedir initialised at ~/.git-hooks"
+  else
+    # shellcheck disable=SC2088 # ~ is display text in a log message, not a path to expand
+    log::warning "~/.gitconfig.local missing — run the git module, then set init.templateDir=~/.git-hooks"
+  fi
 fi
