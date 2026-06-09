@@ -2,10 +2,11 @@
 # Minimal `trash`: move paths into a trash directory instead of deleting them,
 # so an accidental removal stays recoverable. The macOS `trash` (macos-trash)
 # uses the real Finder Trash; on Linux this is the dependency-free equivalent.
-# Override the destination with $TRASH_DIR (default: /tmp/trash).
+# Override the destination with $TRASH_DIR (default: ~/.local/share/Trash/files,
+# the XDG trash location: user-private and persistent across reboots).
 set -euo pipefail
 
-dest="${TRASH_DIR:-/tmp/trash}"
+dest="${TRASH_DIR:-$HOME/.local/share/Trash/files}"
 mkdir -p "$dest"
 
 if [ "$#" -eq 0 ]; then

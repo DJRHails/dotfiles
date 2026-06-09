@@ -68,6 +68,14 @@
           },
           {
             "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/block-force-push-main.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/check-encryption.sh"
+          },
+          {
+            "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/enforce-package-manager.sh"
           },
           {
@@ -83,7 +91,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js session-start",
+            "command": "[ ! -e /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js ] || node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js session-start",
             "async": true
           }
         ]
@@ -95,7 +103,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js stop",
+            "command": "[ ! -e /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js ] || node /Users/dh/.agent-session-bridge/runtime/packages/claude-code/dist/claude-code/src/hook-cli.js stop",
             "async": true
           },
           {

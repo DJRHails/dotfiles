@@ -44,7 +44,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5",
+  "model": "opus",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
@@ -69,6 +69,14 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/block-rm-rf.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/block-force-push-main.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/check-encryption.sh"
           },
           {
             "type": "command",

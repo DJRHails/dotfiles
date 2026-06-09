@@ -37,21 +37,33 @@ fi
 # Get list of currently encrypted files (decrypted in worktree)
 ENCRYPTED_FILES=$(git ls-crypt 2>/dev/null || true)
 
-# Build content signatures of encrypted files (first 100 chars of each, normalized)
+# Signature of a file's content (first 500 chars, whitespace-stripped, first
+# 100 chars), hashed per-platform: md5 on darwin, md5sum elsewhere.
+content_signature() {
+    local normalized
+    normalized=$(head -c 500 "$1" 2>/dev/null | tr -d '[:space:]' | head -c 100)
+    if [[ "$(uname)" == "Darwin" ]]; then
+        printf '%s' "$normalized" | md5 -q
+    else
+        printf '%s' "$normalized" | md5sum | cut -d' ' -f1
+    fi
+}
+
+# Build content signatures of encrypted files
 declare -A ENCRYPTED_SIGNATURES
 while IFS= read -r file; do
     [[ -z "$file" || ! -f "$file" ]] && continue
-    # Create a signature from file content (ignoring whitespace)
-    sig=$(head -c 500 "$file" 2>/dev/null | tr -d '[:space:]' | head -c 100 | md5 -q 2>/dev/null || md5sum | cut -d' ' -f1)
+    sig=$(content_signature "$file")
     ENCRYPTED_SIGNATURES["$sig"]="$file"
 done <<< "$ENCRYPTED_FILES"
 
 # Function to check if path matches any crypt pattern
 matches_crypt_pattern() {
     local filepath="$1"
+    local regex
     for pattern in "${CRYPT_PATTERNS[@]}"; do
         # Convert glob to regex
-        local regex=$(echo "$pattern" | sed 's/\*\*/.*/g' | sed 's/\*/[^\/]*/g')
+        regex=$(echo "$pattern" | sed 's/\*\*/.*/g' | sed 's/\*/[^\/]*/g')
         if [[ "$filepath" =~ ^$regex$ ]]; then
             return 0
         fi
@@ -73,16 +85,13 @@ while IFS= read -r file; do
     fi
 
     # Check if this file's content matches any encrypted file
-    sig=$(head -c 500 "$file" 2>/dev/null | tr -d '[:space:]' | head -c 100 | md5 -q 2>/dev/null || md5sum | cut -d' ' -f1)
+    sig=$(content_signature "$file")
 
-    if [[ -n "${ENCRYPTED_SIGNATURES[$sig]}" ]]; then
+    if [[ -n "${ENCRYPTED_SIGNATURES[$sig]:-}" ]]; then
         original="${ENCRYPTED_SIGNATURES[$sig]}"
         ERRORS+=("'$file' appears to contain content from encrypted file '$original' but is not in an encrypted path")
     fi
 done <<< "$STAGED_FILES"
-
-# Check for moved/renamed encrypted directories
-STAGED_DIRS=$(git diff --cached --name-only 2>/dev/null | xargs -I{} dirname {} 2>/dev/null | sort -u || true)
 
 # Report errors
 if [[ ${#ERRORS[@]} -gt 0 ]]; then
