@@ -46,6 +46,7 @@ fi
 
 # 2. Resolve branch from the actual target directory.
 CD_PATH=$(echo "$CMD" | sed -nE 's/^[[:space:]]*cd[[:space:]]+("[^"]+"|[^[:space:]&|;]+).*/\1/p' | tr -d '"' | head -1)
+CD_PATH=${CD_PATH/#\~/$HOME}  # the shell never expands ~ for us here
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 
 BRANCH=""
