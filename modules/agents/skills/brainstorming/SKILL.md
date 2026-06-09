@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+description: "You MUST use this before designing genuinely new features, components, or capabilities where the requirements are still open. Explores user intent, requirements and design before implementation. Not for bug fixes, refactors, or small well-specified changes — bias toward action applies there."
 source: https://github.com/obra/superpowers
 ---
 
@@ -29,7 +29,7 @@ You MUST create a task for each of these items and complete them in order:
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
 4. **Present design** — in sections scaled to their complexity, get user approval after each section
 5. **Write design doc** — save to `docs/plans/YYYY-MM-DD-<topic>-design.md` and commit
-6. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+6. **Transition to implementation** — draft a step-by-step implementation plan and get user confirmation before coding (use plan mode if the harness supports it)
 
 ## Process Flow
 
@@ -41,7 +41,7 @@ digraph brainstorming {
     "Present design sections" [shape=box];
     "User approves design?" [shape=diamond];
     "Write design doc" [shape=box];
-    "Invoke writing-plans skill" [shape=doublecircle];
+    "Draft implementation plan" [shape=doublecircle];
 
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -49,11 +49,11 @@ digraph brainstorming {
     "Present design sections" -> "User approves design?";
     "User approves design?" -> "Present design sections" [label="no, revise"];
     "User approves design?" -> "Write design doc" [label="yes"];
-    "Write design doc" -> "Invoke writing-plans skill";
+    "Write design doc" -> "Draft implementation plan";
 }
 ```
 
-**The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
+**The terminal state is the implementation plan.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The only step after brainstorming is drafting a step-by-step implementation plan and getting the user's confirmation (plan mode, if the harness supports it).
 
 ## The Process
 
@@ -84,8 +84,8 @@ digraph brainstorming {
 - Commit the design document to git
 
 **Implementation:**
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
+- Draft a detailed implementation plan and present it for user confirmation before writing code (use plan mode if the harness supports it)
+- Do NOT invoke any other skill. The plan-then-confirm handoff is the next step.
 
 ## Key Principles
 

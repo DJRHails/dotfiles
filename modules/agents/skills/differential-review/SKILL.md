@@ -119,9 +119,10 @@ Before delivering:
 - Pre-Analysis: Build baseline context
 - Phase 4: Deep context on HIGH RISK changes
 
-**issue-writer skill:**
-- Transform findings into formal audit reports
-- Command: `issue-writer --input DIFFERENTIAL_REVIEW_REPORT.md --format audit-report`
+**GitHub issue tracking:**
+- File findings as tracked issues so they can be triaged and closed independently
+- Command: `gh issue create --title "<finding title>" --body-file DIFFERENTIAL_REVIEW_REPORT.md`
+- Confirm with the user before posting to repos with other collaborators
 
 ---
 
