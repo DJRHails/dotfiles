@@ -35,17 +35,17 @@ Run two review passes in parallel, then merge findings.
 ### Pass A — pr-review-toolkit agents
 
 Launch these Task tool agents **in parallel** (single message,
-multiple tool calls), each with `subagent_type` from the
-pr-review-toolkit plugin. Tell each agent which files changed
-(from `git diff --name-only <base>...HEAD`):
+multiple tool calls), each with the matching `subagent_type` below
+(vendored pr-review-toolkit agents). Tell each agent which files
+changed (from `git diff --name-only <base>...HEAD`):
 
 | agent | focus |
 |-------|-------|
-| `pr-review-toolkit:code-reviewer` | Code quality, style, project guidelines |
-| `pr-review-toolkit:silent-failure-hunter` | Silent failures, swallowed errors, bad fallbacks |
-| `pr-review-toolkit:pr-test-analyzer` | Test coverage gaps and missing edge cases |
-| `pr-review-toolkit:comment-analyzer` | Comment accuracy, comment rot, doc completeness |
-| `pr-review-toolkit:type-design-analyzer` | Type encapsulation, invariants, design quality |
+| `code-reviewer` | Code quality, style, project guidelines |
+| `silent-failure-hunter` | Silent failures, swallowed errors, bad fallbacks |
+| `pr-test-analyzer` | Test coverage gaps and missing edge cases |
+| `comment-analyzer` | Comment accuracy, comment rot, doc completeness |
+| `type-design-analyzer` | Type encapsulation, invariants, design quality |
 
 (`code-simplifier` is the sixth toolkit agent — it mutates code rather
 than reporting findings, so it runs as a polish step after fixes, not
@@ -191,7 +191,7 @@ trivial.
 ### Polish — code-simplifier
 
 Once all findings are addressed, launch the
-`pr-review-toolkit:code-simplifier` agent on the files changed by
+`code-simplifier` agent on the files changed by
 this PR (and by your fixes). Apply only simplifications that
 **preserve behavior** — clarity, readability, and project-standard
 adherence. Skip any that alter functionality or conflict with a
