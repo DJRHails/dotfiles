@@ -162,6 +162,29 @@ uv run --with requests --with rich script.py
 uv run script_with_metadata.py
 ```
 
+### Project Makefile
+
+Standard targets wrapping `uv run`:
+
+```makefile
+.PHONY: dev lint format test build
+
+dev:
+	uv sync --all-groups
+
+lint:
+	uv run ruff format --check && uv run ruff check && uv run ty check src/
+
+format:
+	uv run ruff format .
+
+test:
+	uv run pytest
+
+build:
+	uv build
+```
+
 ## Environment Variables
 
 | Variable | Description |

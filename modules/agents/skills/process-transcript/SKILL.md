@@ -1,6 +1,6 @@
 ---
 name: process-transcript
-description: Transform video/podcast transcripts into structured, dense notes following KB style guide. Extracts key concepts, quotes, actionable advice, and frameworks.
+description: Transform video/podcast transcripts into structured, dense notes following KB style guide. Extracts key concepts, quotes, actionable advice, and frameworks. Use when the user provides a transcript (video, podcast, interview, talk) and wants it turned into notes, a summary, or key takeaways.
 ---
 
 # Process Transcript Skill

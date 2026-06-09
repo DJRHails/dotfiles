@@ -61,8 +61,9 @@ Studies of reviewer behavior show:
 - Introduction is skimmed by 90%+ of reviewers
 - Figures are examined before methods by most reviewers
 - Full methods are read only if interest is established
+- Appendix is rarely read—put only supplementary details there
 
-**Implication**: Front-load your paper's value. Don't bury the contribution.
+**Implication**: Front-load your paper's value. Don't bury the contribution. If your abstract and intro don't hook reviewers, they may never read your brilliant methods section.
 
 ---
 
@@ -404,6 +405,30 @@ plt.style.use(['science', 'ieee'])
 # Or for Nature-style
 plt.style.use(['science', 'nature'])
 ```
+
+---
+
+## Table Design
+
+Use the `booktabs` LaTeX package for professional tables:
+
+```latex
+\usepackage{booktabs}
+\begin{tabular}{lcc}
+\toprule
+Method & Accuracy ↑ & Latency ↓ \\
+\midrule
+Baseline & 85.2 & 45ms \\
+\textbf{Ours} & \textbf{92.1} & 38ms \\
+\bottomrule
+\end{tabular}
+```
+
+**Rules:**
+- Bold best value per metric
+- Include direction symbols (↑ higher is better, ↓ lower is better)
+- Right-align numerical columns
+- Consistent decimal precision
 
 ---
 

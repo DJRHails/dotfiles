@@ -40,6 +40,64 @@ Research has documented significant issues with AI-generated citations:
 
 **Never generate citations from memory—always verify programmatically.**
 
+| Action | ✅ Correct | ❌ Wrong |
+|--------|-----------|----------|
+| Adding a citation | Search API → verify → fetch BibTeX | Write BibTeX from memory |
+| Uncertain about a paper | Mark as `[CITATION NEEDED]` | Guess the reference |
+| Can't find exact paper | Note: "placeholder - verify" | Invent similar-sounding paper |
+
+---
+
+## Recommended: Install Exa MCP for Paper Search
+
+For the best paper search experience, install **Exa MCP** which provides real-time academic search:
+
+**Claude Code:**
+```bash
+claude mcp add exa -- npx -y mcp-remote "https://mcp.exa.ai/mcp"
+```
+
+**Cursor / VS Code** (add to MCP settings):
+```json
+{
+  "mcpServers": {
+    "exa": {
+      "type": "http",
+      "url": "https://mcp.exa.ai/mcp"
+    }
+  }
+}
+```
+
+Exa MCP enables searches like:
+- "Find papers on RLHF for language models published after 2023"
+- "Search for transformer architecture papers by Vaswani"
+- "Get recent work on sparse autoencoders for interpretability"
+
+Then verify results with Semantic Scholar API and fetch BibTeX via DOI.
+
+---
+
+## When You Can't Verify a Citation
+
+If you cannot programmatically verify a citation, you MUST:
+
+```latex
+% Option 1: Explicit placeholder - requires human verification
+\cite{PLACEHOLDER_author2024_verify_this}  % TODO: Verify this citation exists
+
+% Option 2: Note in text
+... as shown in prior work [CITATION NEEDED - could not verify Smith et al. 2023].
+```
+
+**Always inform the scientist:**
+> "I could not verify the following citations and have marked them as placeholders:
+> - Smith et al. 2023 on reward hacking - could not find in Semantic Scholar
+> - Jones 2022 on scaling laws - found similar paper but different authors
+> Please verify these before submission."
+
+**NEVER invent a plausible-sounding reference.**
+
 ---
 
 ## Citation APIs Overview
