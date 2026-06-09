@@ -63,19 +63,31 @@ github::generate_ssh_keys() {
 }
 
 github::generate_gpg_keys() {
-  local local_genkey_definition=modules/git/genkey
+  local genkeyFile passphrase
 
   prompt::author
   feedback::ask ' - What is your gpg passphrase?'
   passphrase=$(feedback::get_answer)
 
-  sed -e "s/AUTHORNAME/${GIT_AUTHOR_NAME}/g" \
-    -e "s/AUTHOREMAIL/${GIT_AUTHOR_EMAIL}/g" \
-    -e "s/PASSPHRASE/${passphrase}/g" \
-    $local_genkey_definition.tmpl > $local_genkey_definition
+  # Build the batch file in-shell (printf is a builtin) so the passphrase
+  # never appears in any process argv; 600 temp file, removed on return.
+  genkeyFile="$(mktemp)"
+  chmod 600 "$genkeyFile"
+  trap 'rm -f "$genkeyFile"; trap - RETURN' RETURN
 
-  gpg --gen-key --batch $local_genkey_definition > /dev/null
-  shred -u $local_genkey_definition
+  printf '%s\n' \
+    'Key-Type: 1' \
+    'Key-Length: 4096' \
+    'Subkey-Type: 1' \
+    'Subkey-Length: 4096' \
+    "Name-Real: ${GIT_AUTHOR_NAME}" \
+    "Name-Email: ${GIT_AUTHOR_EMAIL}" \
+    'Name-Comment: git-auto' \
+    'Expire-Date: 0' \
+    "Passphrase: ${passphrase}" > "$genkeyFile"
+
+  gpg --gen-key --batch "$genkeyFile" > /dev/null
+  shred -u "$genkeyFile"
 }
 
 github::open_keys_page() {
@@ -147,17 +159,36 @@ github::set_gpg_key() {
 }
 
 github::update_local_with_gpg() {
-  local local_git_config=git/gitconfig.local
-  git config --file $local_git_config user.signingkey $gpgKeyId
+  local local_git_config=modules/git/gitconfig.local
+  git config --file "$local_git_config" user.signingkey "$gpgKeyId"
+  git config --file "$local_git_config" commit.gpgsign true
 }
 
 github::test_ssh_connection() {
-    while true; do
-        ssh -T git@github.com &> /dev/null
-        [ $? -eq 1 ] && break
+    local -r maxAttempts=12
+    local attempt exitCode
 
-        sleep 5
+    for ((attempt = 1; attempt <= maxAttempts; attempt++)); do
+        ssh -T git@github.com &> /dev/null
+        exitCode=$?
+
+        # GitHub never grants a shell: exit 1 means the key authenticated.
+        if [ "$exitCode" -eq 1 ]; then
+            log::success "GitHub SSH connection authorized"
+            return 0
+        fi
+
+        if [ "$exitCode" -eq 255 ]; then
+            log::warning "Attempt $attempt/$maxAttempts: key not yet authorized — paste the public key at https://github.com/settings/keys"
+        else
+            log::warning "Attempt $attempt/$maxAttempts: ssh to GitHub failed (exit $exitCode)"
+        fi
+
+        [ "$attempt" -lt "$maxAttempts" ] && sleep 5
     done
+
+    log::error "GitHub SSH connection not authorized after $maxAttempts attempts"
+    return 1
 }
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -193,6 +224,6 @@ github::setup() {
   then
     log::success "skipped GitHub GPG key already present ($gpgKeyId)"
   else
-    echo "why? $exitCode"
+    log::error "GPG key lookup failed (exit $exitCode)"
   fi
 }
