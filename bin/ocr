@@ -15,7 +15,7 @@ doc::maybe_help "$@"
 [[ $? == 1 ]] && exit
 
 SCR_IMG=`mktemp`
-trap "rm $SCR_IMG*" EXIT
+trap 'rm "$SCR_IMG"*' EXIT
 
 platform::screenshot $SCR_IMG.png
 
@@ -23,14 +23,14 @@ if platform::command_exists mogrify; then
     
     mogrify -modulate 100,0 -resize 400% -contrast-stretch 0 $SCR_IMG.png 
 else
-    echo "ImageMagick is not installed - `$(install::package_manager) install imagemagick`. OCR quality will be reduced" >&2
+    echo "ImageMagick is not installed - '$(install::package_manager) install imagemagick'. OCR quality will be reduced" >&2
 fi
 
 if ! platform::command_exists tesseract; then
-    echo "Tesseract is not installed - `$(install::package_manager) install tesseract-ocr`. OCR will not work" >&2
+    echo "Tesseract is not installed - '$(install::package_manager) install tesseract-ocr'. OCR will not work" >&2
     exit 1
 fi
 
-tesseract $SCR_IMG.png $SCR_IMG $@ &> /dev/null
+tesseract $SCR_IMG.png $SCR_IMG "$@" &> /dev/null
 cat $SCR_IMG.txt
 exit

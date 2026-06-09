@@ -13,10 +13,10 @@ hashify::main () {
 
   if [[ -d "$src_dir" ]]; then
     for src_file in "$src_dir"/*; do
-      local src_hash=$(sha256sum "$src_file" | cut -d' ' -f1)
+      local src_hash src_dirname
+      src_hash=$(sha256sum "$src_file" | cut -d' ' -f1)
       local src_ext=${src_file##*.}
-    #   local src_ext=$(file --mime-type "$src_file" | cut -d'/' -f2)
-      local src_dirname=$(dirname "$src_path")
+      src_dirname=$(dirname "$src_file")
       local src_new_path="$src_dirname/$src_hash.$src_ext"
 
       if [[ -f "$src_new_path" ]]; then
