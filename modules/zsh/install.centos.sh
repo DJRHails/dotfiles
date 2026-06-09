@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 # Upgrade zsh by building
@@ -7,7 +8,7 @@ install::package "GCC" "gcc"
 install::package "Autoconf" "autoconf"
 install::package "Man" "man"
 git clone https://github.com/zsh-users/zsh.git /tmp/zsh
-cd /tmp/zsh
+cd /tmp/zsh || return
 ./Util/preconfig
 ./configure
 platform::sudo make -j 20 install
@@ -17,6 +18,6 @@ install::package "Cargo & Rust" "cargo"
 
 # Build fd
 git clone https://github.com/sharkdp/fd /tmp/fd
-cd /tmp/fd
+cd /tmp/fd || return
 cargo build
 cargo install

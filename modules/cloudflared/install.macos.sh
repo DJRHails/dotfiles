@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 if cmd_exists cloudflared; then

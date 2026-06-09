@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 ##? This is a mistake! You're looking at help for the doc.sh file
 
 doc::help_msg() {

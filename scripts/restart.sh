@@ -3,7 +3,7 @@
 main() {
     log::header "Restart\n"
 
-    if [ "$skipQuestions" = true ]; then
+    if [ "${skipQuestions:-}" = true ]; then
         log::success "skipped restart (non-interactive mode)"
         return
     fi
