@@ -30,10 +30,13 @@ cdir="$HOME/.cache/durable-summaries"; mkdir -p "$cdir"
 prompt='This is the current terminal screen of a dev session. In ONE terse line (max 12 words), say what it is currently doing. No preamble.'
 now=$(date +%s)
 
+# zellij prints sessions oldest-first; reverse to newest-first in awk (no tac on
+# macOS) so the menu — and --query/resurrect, which take the first match — prefer
+# the most recent session.
 sessions=$(zellij list-sessions 2>/dev/null \
   | sed -E 's/\x1b\[[0-9;]*m//g' \
   | grep -v 'EXITED' \
-  | awk 'NF {print $1}')
+  | awk 'NF {a[++n] = $1} END {for (i = n; i > 0; i--) print a[i]}')
 [ -n "$sessions" ] || exit 0
 
 summarise() {  # $1=session  $2=cachefile
@@ -42,7 +45,12 @@ summarise() {  # $1=session  $2=cachefile
     | { if command -v timeout >/dev/null 2>&1; then timeout 60 claude -p --model "$model" "$prompt"
         else claude -p --model "$model" "$prompt"; fi; } 2>/dev/null \
     | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//' | cut -c1-90 > "$2.tmp" 2>/dev/null
-  if [ -s "$2.tmp" ]; then mv -f "$2.tmp" "$2"; else rm -f "$2.tmp"; fi
+  if [ -s "$2.tmp" ]; then
+    mv -f "$2.tmp" "$2"
+  else
+    rm -f "$2.tmp"
+    printf 'durable-remote: summary failed for %s (claude/dump-screen produced nothing)\n' "$1" >&2
+  fi
   [ "$prog" = 1 ] && printf 'DURABLE_TICK\n' >&2
 }
 

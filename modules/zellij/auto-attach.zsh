@@ -31,8 +31,8 @@
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$$" "$PPID" "${HOST:-$(hostname -s)}" \
             "${CMUX_WORKSPACE_ID:-}" "${CMUX_SURFACE_ID:-}" "${CMUX_REMOTE_TRANSPORT:-local}" \
             "${TERM:-}" "${ZELLIJ:+set}" "$([[ $- == *i* ]] && echo y || echo n)" \
-            "$1" "${2:-}" >> "$logfile" 2>/dev/null
-    }
+            "$1" "${2:-}" >> "$logfile"
+    } 2>/dev/null
 
     if [[ -z $CMUX_WORKSPACE_ID ]]; then
         _log skip not-cmux
@@ -147,13 +147,16 @@
             return 0
         fi
     fi
-    date +%s > "$stamp" 2>/dev/null
+    if ! { date +%s > "$stamp" } 2>/dev/null; then
+        _log warn "stamp-unwritable $stamp"
+        print -P "%F{yellow}warning:%f cmux+zellij: cannot write $stamp — attach-loop circuit breaker disabled" >&2
+    fi
 
     # Live cmux-ids sidecar: cmux re-mints workspace/surface UUIDs per app-restart, so the
     # forwarded $CMUX_* env goes stale. Persist the *current* ids (live on this fresh attach)
     # keyed by session name, so remote cmux tools (cmux-session-tab / fork) target the current
     # app surface regardless of the stale env. The picker re-attach path writes this too.
-    print -r -- "${CMUX_WORKSPACE_ID} ${CMUX_SURFACE_ID}" > "$logdir/live-$session" 2>/dev/null
+    { print -r -- "${CMUX_WORKSPACE_ID} ${CMUX_SURFACE_ID}" > "$logdir/live-$session" } 2>/dev/null
 
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
