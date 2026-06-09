@@ -4,10 +4,9 @@
 link::file () {
   local src=$1 dst=$2
 
-  local overwrite= backup= skip=
-  local action=
+  local overwrite='' backup='' skip=''
 
-  if [ -f "$dst" -o -d "$dst" -o -L "$dst" ]
+  if [ -f "$dst" ] || [ -d "$dst" ] || [ -L "$dst" ]
   then
     # Already linked to the correct target — return immediately.
     # Must return before the backup_all fallthrough which would
@@ -17,7 +16,8 @@ link::file () {
       return
     elif [ "$overwrite_all" == "false" ] && [ "$backup_all" == "false" ] && [ "$skip_all" == "false" ]
     then
-      local currentSrc="$(readlink $dst)"
+      local currentSrc
+      currentSrc="$(readlink "$dst")"
 
       if [ "$currentSrc" == "$src" ]
       then
@@ -76,7 +76,7 @@ link::file () {
   then
     mkdir -p "$(dirname "$2")"
     ln -s "$1" "$2"
-    log::success "linked $1 to $2"
+    log::result $? "linked $1 to $2"
   fi
 }
 

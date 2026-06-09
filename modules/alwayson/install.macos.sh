@@ -1,18 +1,20 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 BACKUP_DIR="$DOTFILES/modules/alwayson/.backup"
 
 # -- Backup existing settings ----------------------------------------------
 if [ ! -f "$BACKUP_DIR/pmset.txt" ]; then
-  mkdir -p "$BACKUP_DIR"
-  pmset -g custom > "$BACKUP_DIR/pmset.txt"
+  BACKUP_STATUS=0
+  mkdir -p "$BACKUP_DIR" || BACKUP_STATUS=$?
+  pmset -g custom > "$BACKUP_DIR/pmset.txt" || BACKUP_STATUS=$?
   launchctl print system/com.openssh.sshd > "$BACKUP_DIR/sshd-launchctl.txt" 2>/dev/null || true
   nvram AutoBoot > "$BACKUP_DIR/nvram.txt" 2>/dev/null || true
   sysctl kern.watchdog > "$BACKUP_DIR/sysctl.txt" 2>/dev/null || true
   if [ -f /etc/ssh/sshd_config ]; then
-    cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config"
+    cp /etc/ssh/sshd_config "$BACKUP_DIR/sshd_config" || BACKUP_STATUS=$?
   fi
-  log::result $? "Backed up existing settings to $BACKUP_DIR"
+  log::result "$BACKUP_STATUS" "Backed up existing settings to $BACKUP_DIR"
 else
   log::success "Backup already exists at $BACKUP_DIR"
 fi
@@ -21,7 +23,7 @@ fi
 CURRENT_PMSET="$(pmset -g)"
 
 # -- Prevent Sleep --------------------------------------------------------
-if echo "$CURRENT_PMSET" | grep -q "^ sleep.*0"; then
+if echo "$CURRENT_PMSET" | grep -qE '^ sleep +0([^0-9]|$)'; then
   log::success "Sleep already disabled"
 else
   platform::sudo pmset -a sleep 0
