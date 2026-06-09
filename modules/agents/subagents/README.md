@@ -6,8 +6,8 @@ official `pr-review-toolkit` plugin
 resolves them by bare `subagent_type` without that plugin being enabled —
 including inside gantry worker sandboxes that install these dotfiles.
 
-The `agents/` root is symlinked into `~/.claude/agents/` (see `symlinks.conf`)
-and scanned recursively; agent identity comes from the `name:` frontmatter,
-not the path, so this `subagents/` subfolder is purely organizational.
+This `subagents/` dir is symlinked to `~/.claude/agents/` (see `symlinks.conf`),
+the location Claude Code scans for subagents. It is named `subagents/` here for
+clarity; identity comes from each file's `name:` frontmatter, not the path.
 
 Re-sync: copy the updated `*.md` files from the plugin's `agents/` dir.
