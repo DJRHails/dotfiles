@@ -14,8 +14,16 @@ setup_gitconfig () {
 
     sed -e "s/AUTHORNAME/$GIT_AUTHOR_NAME/g" \
       -e "s/AUTHOREMAIL/$GIT_AUTHOR_EMAIL/g" \
-      -e "s/GIT_CREDENTIAL_HELPER/$git_credential/g" \
       $local_git_config.tmpl > $local_git_config
+
+    # Only record a credential helper when one was actually chosen. An empty
+    # `helper =` line would reset git's accumulated helper list (gitconfig.local
+    # is included last), wiping e.g. gh's helper on Linux where git_credential
+    # is unset.
+    if [ -n "${git_credential:-}" ]
+    then
+      git config --file "$local_git_config" credential.helper "$git_credential"
+    fi
 
     log::success "generated $local_git_config"
   else
