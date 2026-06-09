@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 log::error() {
     log::red "   [✖] $1 $2\n"
 }
@@ -26,7 +28,7 @@ log::spinner() {
   tput sc
 
   while kill -0 "$PID" &>/dev/null; do
-    frameNo=(i++ % NUMBER_OF_FRAMES)
+    frameNo=$(( i++ % NUMBER_OF_FRAMES ))
     frameText="   [${FRAMES:$frameNo:1}] $MSG"
     printf "%s\n" "$frameText"
     sleep $INTERVAL
@@ -54,7 +56,7 @@ log::execute() {
 
   trap 'kill_all_subprocesses' EXIT 
 
-  eval "$CMDS" &> "$TMP_STDOUT_FILE" 2> "$TMP_FILE" &
+  eval "$CMDS" > "$TMP_STDOUT_FILE" 2> "$TMP_FILE" &
   cmdsPID=$!
 
   log::spinner "$cmdsPID" "$CMDS" "$MSG"
@@ -67,7 +69,7 @@ log::execute() {
     log::error_stream < "$TMP_FILE"
   fi
 
-  rm -rf "$TMP_FILE"
+  rm -f "$TMP_FILE"
 
   return $exitCode
 }

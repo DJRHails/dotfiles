@@ -155,7 +155,6 @@ main() {
       if [[ ! -f "$module_dir/install.sh" && ! -f "$module_dir/install.$(platform::os).sh" ]]; then
         log::warning "No installer found for '${module_dir##*/}' on $(platform::os)"
       fi
-      export ${module_dir##*/}=installed
     fi
   done
 

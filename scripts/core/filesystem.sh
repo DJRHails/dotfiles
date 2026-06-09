@@ -11,6 +11,6 @@ fs::is_dir() {
 }
 
 fs::realpath() {
-   local readonly relative_path="$1"
-   echo "$(cd "$(dirname "$relative_path")"; pwd)/${relative_path##*/}"
+   local -r relative_path="$1"
+   echo "$(cd "$(dirname "$relative_path")" || exit; pwd)/${relative_path##*/}"
 }

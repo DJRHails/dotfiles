@@ -10,13 +10,14 @@ scan::find_matching_scripts() {
   done < <(find -H "$searchDir" -mindepth 1 -maxdepth 2 -name "$scriptName" -print0)
 }
 
+# shellcheck disable=SC2120  # searchDir is optional; callers rely on the default
 scan::find_modules() {
   scanned_modules=()
   local searchDir="${1:-"$DOTFILES/modules"}"
   while IFS=  read -r -d $'\0'
   do
     # Only add if new.
-    if [[ ! " ${scanned_modules[@]} " =~ " $REPLY " ]]
+    if [[ " ${scanned_modules[*]} " != *" $REPLY "* ]]
     then
       scanned_modules+=("$REPLY")
     fi
@@ -27,24 +28,24 @@ scan::find_modules() {
 # Uses skipQuestions & allModules
 scan::find_valid_modules() {
 
-  if [ "$allModules" = true ]
+  if [ "${allModules:-}" = true ]
   then
     scan::find_modules
     scanned_valid_modules=("${scanned_modules[@]}")
     return
   fi
 
-  if [ "$skipQuestions" = true ] || [ ${#scanned_valid_modules[@]} -gt 0 ]
+  if [ "${skipQuestions:-}" = true ] || [ ${#scanned_valid_modules[@]} -gt 0 ]
   then
     # Modules already specified via args (--cli, explicit list, etc.)
     return
   fi
 
   scan::find_modules
-  for moduleDir in ${scanned_modules[@]}
+  for moduleDir in "${scanned_modules[@]}"
   do
     # If it wasn't already present, ask if we want to install it
-    if [[ ! " ${scanned_valid_modules[@]} " =~ " $moduleDir " ]]
+    if [[ " ${scanned_valid_modules[*]} " != *" $moduleDir "* ]]
     then
       feedback::ask_for_confirmation "Do you want to execute '${moduleDir##*/}'"
       if feedback::answer_is_yes
