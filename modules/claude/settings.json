@@ -109,6 +109,10 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/experiment-log.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
           }
         ]
       }
@@ -137,7 +141,7 @@
     ],
     "soft_deny": [
       "$defaults",
-      "Contacting third parties on the user's behalf requires an explicit in-conversation confirmation step that follows a written summary of the exact action. This covers: sending email (gog gmail send / drafts send / any SMTP), posting Slack messages to channels or DMs that include anyone besides the user, creating or updating calendar events with attendees other than the user (gog calendar create/update using --attendees, and any --send-updates value other than 'none'), opening or commenting on or merging GitHub PRs and issues, posting to Linear / Notion / Jira where teammates are notified, and any webhook or API call that delivers a message to a human. The user's initial natural-language request (e.g. 'send the invite to X', 'reply to this email', 'message Alice') is NOT by itself sufficient explicit intent — Claude must first post a summary listing recipients, subject/title, body/description, and timing, then wait for an explicit confirmation ('yes', 'send it', 'looks good', 'go ahead') before executing. Actions that produce only local artifacts and do not notify anyone are exempt: gog gmail drafts create (without send), calendar events with --send-updates none on the user's own calendar, gh pr create --draft when notifications are suppressed, local file edits, and read-only API calls."
+      "Contacting third parties on the user's behalf requires an explicit in-conversation confirmation step that follows a written summary of the exact action. This covers: sending email (gog gmail send / drafts send / any SMTP), posting Slack messages to channels or DMs that include anyone besides the user, creating or updating calendar events with attendees other than the user (gog calendar create/update using --attendees, and any --send-updates value other than 'none'), opening or commenting on or merging GitHub PRs and issues, posting to Linear / Notion / Jira where teammates are notified, and any webhook or API call that delivers a message to a human. The user's initial natural-language request (e.g. 'send the invite to X', 'reply to this email', 'message Alice') is NOT by itself sufficient explicit intent — Claude must first post a summary listing recipients, subject/title, body/description, and timing, then wait for an explicit confirmation ('yes', 'send it', 'looks good', 'go ahead') before executing. Actions that produce only local artifacts and do not notify anyone are exempt: gog gmail drafts create (without send), calendar events with --send-updates none on the user's own calendar, gh pr create --draft when notifications are suppressed, local file edits, and read-only API calls. ALSO EXEMPT: opening, commenting on, or merging GitHub PRs and issues on the user's own personal repositories under github.com/DJRHails/* (solo repos that notify no one else) — `gh pr create`/`gh pr merge`/`gh issue create`/`gh pr comment` and equivalent API calls targeting a DJRHails/* repo need NO confirmation step. The confirmation step still applies to repos in shared orgs (e.g. safety-research) or any repo with other collaborators."
     ],
     "environment": [
       "$defaults",
@@ -145,7 +149,7 @@
       "Source control: github.com/DJRHails and all repos under it are trusted push targets",
       "Trusted cloud buckets: rclone remote drive.google.com:papers (Google Drive bucket holding KB paper PDFs; used by bin/bibify*.py and `rclone copyto/moveto`)",
       "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
-      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, serper-search)"
+      "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, figma-dev-mode)"
     ]
   },
   "skipAutoPermissionPrompt": true

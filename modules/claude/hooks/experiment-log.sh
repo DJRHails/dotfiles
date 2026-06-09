@@ -12,10 +12,11 @@ set -euo pipefail
 #                  itself auto-generated — never a hand-written one),
 #        skip    — drop it as trivial / already covered.
 #
-# Robust + safe: silent no-op without $cwd/EXPERIMENT_LOG.md; naive last-user /
-# last-assistant stub when there's no API key (offline); appends the Haiku draft
-# if the Sonnet pass fails; processes only new lines per session (no re-logging);
-# never blocks the Stop event.
+# Robust + safe: silent no-op without $cwd/EXPERIMENT_LOG.md; skips silently
+# (state still advances) when there's no API key or the Haiku draft fails;
+# falls back to a short Request/Outcome entry (never the verbose draft) if the
+# Opus curation is unusable; processes only new lines per session (no
+# re-logging); never blocks the Stop event.
 #
 # Config (env): EXPERIMENT_LOG_HOOK_{DRAFT_MODEL,CURATE_MODEL,MAXCHARS,TAILLINES}.
 # API key: $ANTHROPIC_API_KEY, else $cwd/.env (ANTHROPIC_API_KEY_BATCH|_LOW_PRIO|plain).
