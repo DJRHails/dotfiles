@@ -1,10 +1,13 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 if cmd_exists tailscale; then
   log::success "Tailscale already installed"
 else
-  curl -fsSL https://tailscale.com/install.sh | sh
+  TS_INSTALLER="$(mktemp)"
+  curl -fsSL https://tailscale.com/install.sh -o "$TS_INSTALLER" && sh "$TS_INSTALLER"
   log::result $? "Tailscale installed"
+  rm -f "$TS_INSTALLER"
 fi
 
 # Enable IP forwarding for exit node capability

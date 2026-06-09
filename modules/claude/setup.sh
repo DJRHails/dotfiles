@@ -11,8 +11,10 @@
 # Install Claude Code CLI
 if ! cmd_exists claude; then
   log::info "Installing Claude Code CLI..."
-  curl -fsSL https://claude.ai/install.sh | bash
+  CLAUDE_INSTALLER="$(mktemp)"
+  curl -fsSL https://claude.ai/install.sh -o "$CLAUDE_INSTALLER" && bash "$CLAUDE_INSTALLER"
   log::result $? "Claude Code CLI installed"
+  rm -f "$CLAUDE_INSTALLER"
 else
   log::success "Claude Code CLI already installed"
   claude --version 2>/dev/null || true
