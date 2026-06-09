@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # GPU VM configuration
 # Copy to config.sh and fill in your values
+# shellcheck disable=SC2034  # variables are consumed by lib.sh after sourcing
 
 # RunPod API Key - get from https://runpod.io/console/user/settings
 RUNPOD_API_KEY="${RUNPOD_API_KEY:-your_api_key_here}"
@@ -30,7 +31,7 @@ DEFAULT_GPU="4090"
 # How long to wait for pod to become SSH-ready (seconds)
 BOOT_TIMEOUT=300
 
-# Idle timeout before auto-shutdown (seconds) - 30 minutes default
+# Idle timeout before idle-check.sh reaps the pod (seconds) - 30 minutes default
 IDLE_TIMEOUT=1800
 
 # State directory for tracking active pods

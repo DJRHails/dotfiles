@@ -17,7 +17,7 @@ log() {
 has_active_connection() {
     local ip="$1"
     local port="$2"
-    # Check for established TCP connections to this pod from bonbon
+    # Check for established TCP connections from this host to the pod
     ss -tn state established "dst ${ip}:${port}" 2>/dev/null | grep -q "${ip}:${port}"
 }
 
@@ -30,16 +30,36 @@ for state_file in "${STATE_DIR}"/*.pod; do
     idle_file="${IDLE_DIR}/${pod_id}.idle"
 
     # Get pod connection info
+    ip="" port=""
     ssh_info=$(get_pod_ssh "$pod_id" 2>/dev/null)
-    if [ -z "$ssh_info" ] || [ "$ssh_info" = "null" ]; then
-        log "Pod ${pod_id} (${gpu}): no SSH info, might be starting or dead"
-        continue
+    if [ -n "$ssh_info" ] && [ "$ssh_info" != "null" ]; then
+        ip=$(echo "$ssh_info" | cut -d: -f1)
+        port=$(echo "$ssh_info" | cut -d: -f2)
+    else
+        # No SSH info: the pod may be booting, dead, or stuck without SSH.
+        is_pod_alive "$pod_id" 2>/dev/null
+        alive=$?
+        if [ "$alive" -eq 2 ]; then
+            log "Pod ${pod_id} (${gpu}): API unreachable, will retry next run"
+            continue
+        fi
+        if [ "$alive" -eq 1 ]; then
+            log "Pod ${pod_id} (${gpu}): not running, terminating and cleaning up state"
+            terminate_pod "$pod_id" > /dev/null 2>&1
+            rm -f "$state_file" "$idle_file"
+            continue
+        fi
+        # RUNNING with no SSH: allow a boot grace period, then run the
+        # idle timer below anyway so the pod still gets reaped.
+        pod_age=$(( $(date +%s) - $(stat -c %Y "$state_file") ))
+        if [ "$pod_age" -lt "$BOOT_TIMEOUT" ]; then
+            log "Pod ${pod_id} (${gpu}): RUNNING, no SSH yet (${pod_age}s old), in boot grace"
+            continue
+        fi
+        log "Pod ${pod_id} (${gpu}): RUNNING with no SSH after ${pod_age}s, counting as idle"
     fi
 
-    ip=$(echo "$ssh_info" | cut -d: -f1)
-    port=$(echo "$ssh_info" | cut -d: -f2)
-
-    if has_active_connection "$ip" "$port"; then
+    if [ -n "$ip" ] && has_active_connection "$ip" "$port"; then
         # Active connection - reset idle timer
         rm -f "$idle_file"
         log "Pod ${pod_id} (${gpu}): active connection to ${ip}:${port}"
@@ -65,11 +85,14 @@ for state_file in "${STATE_DIR}"/*.pod; do
     fi
 done
 
-# Clean up idle files for pods that no longer exist
+# Clean up idle files for pods that no longer exist. Only a definitive
+# "not running" (rc 1) clears the file; an API blip (rc 2) must not
+# reset a live pod's idle timer.
 for idle_file in "${IDLE_DIR}"/*.idle; do
     [ -f "$idle_file" ] || continue
     pod_id=$(basename "$idle_file" .idle)
-    if ! is_pod_alive "$pod_id" 2>/dev/null; then
+    is_pod_alive "$pod_id" 2>/dev/null
+    if [ $? -eq 1 ]; then
         rm -f "$idle_file"
     fi
 done
