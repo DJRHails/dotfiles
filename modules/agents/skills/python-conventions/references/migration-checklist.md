@@ -8,6 +8,44 @@ Comprehensive checklist for migrating Python projects to modern tooling.
 - [ ] **Decide uv.lock strategy**: app (commit) vs library (.gitignore)
 - [ ] **Backup current state**: Create a branch or tag before starting
 
+## Migration Recipes
+
+### From requirements.txt + pip
+
+**For standalone scripts**: Convert to PEP 723 inline metadata (see [pep723-scripts.md](./pep723-scripts.md))
+
+**For projects**:
+
+```bash
+uv init --bare
+# Add each dependency with uv (not by editing pyproject.toml)
+uv add requests rich
+uv sync
+```
+
+Then delete `requirements.txt`, `requirements-dev.txt`, and old virtualenvs.
+
+### From setup.py / setup.cfg
+
+1. `uv init --bare` to create pyproject.toml
+2. `uv add` each dependency from `install_requires`
+3. `uv add --group dev` for dev dependencies
+4. Copy non-dependency metadata to `[project]`
+5. Delete `setup.py`, `setup.cfg`, `MANIFEST.in`
+
+### From flake8 + black + isort
+
+1. Remove old tools, add ruff: `uv add --group dev ruff`
+2. Delete `.flake8`, `[tool.black]`, `[tool.isort]` configs
+3. Add ruff configuration (see [ruff-config.md](./ruff-config.md))
+4. Run `uv run ruff check --fix . && uv run ruff format .`
+
+### From mypy / pyright
+
+1. Remove old tools, add ty: `uv add --group dev ty`
+2. Delete `mypy.ini`, `pyrightconfig.json`, or `[tool.mypy]`/`[tool.pyright]` sections
+3. Run `uv run ty check src/`
+
 ## Cleanup Old Artifacts
 
 Find and remove legacy linter comments:

@@ -187,6 +187,23 @@ default-groups = ["dev", "test"]
 python-preference = "managed"
 ```
 
+### [tool.ty]
+
+Strict baseline for new projects (see [migration-checklist.md](./migration-checklist.md)
+for the lenient legacy-codebase variant):
+
+```toml
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+unused-ignore-comment = "warn"
+```
+
 ## Version Specifiers
 
 | Specifier | Meaning |

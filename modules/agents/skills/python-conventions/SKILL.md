@@ -7,7 +7,7 @@ source:
 
 # Python Conventions
 
-Coding conventions and modern tooling for Python projects. Apply when writing or reviewing Python code, setting up new projects, or migrating from legacy tools.
+Coding conventions and modern tooling for Python projects. Apply when writing or reviewing Python code, setting up new projects, or migrating from legacy tools. This file is the summary; worked examples and full configs live in [references/](references/).
 
 ## Decision Tree
 
@@ -44,16 +44,7 @@ What are you doing?
 
 ### Security Tools
 
-| Tool | Purpose | When |
-|------|---------|------|
-| shellcheck | Shell script linting | pre-commit |
-| detect-secrets | Secret detection | pre-commit |
-| actionlint | Workflow syntax validation | pre-commit, CI |
-| zizmor | Workflow security audit | pre-commit, CI |
-| pip-audit | Dependency vulnerability scanning | CI, manual |
-| Dependabot | Automated dependency updates | scheduled |
-
-See [security-setup.md](./references/security-setup.md) for configuration.
+shellcheck, detect-secrets, actionlint, zizmor (pre-commit); pip-audit and Dependabot for dependencies. Configuration: [security-setup.md](./references/security-setup.md) and [dependabot.md](./references/dependabot.md).
 
 ### Legacy Tool Migration
 
@@ -91,91 +82,7 @@ uv run python src/myproject/main.py
 
 ### Full Package
 
-Bootstrap with the Trail of Bits template (preconfigured tooling):
-
-```bash
-uvx cookiecutter gh:trailofbits/cookiecutter-python
-```
-
-Or manually:
-
-```bash
-uv init --package myproject && cd myproject
-```
-
-Configure pyproject.toml (see [pyproject.md](./references/pyproject.md) for complete reference):
-
-```toml
-[project]
-name = "myproject"
-version = "0.1.0"
-requires-python = ">=3.11"
-dependencies = []
-
-[dependency-groups]
-dev = [{include-group = "lint"}, {include-group = "test"}, {include-group = "audit"}]
-lint = ["ruff", "ty"]
-test = ["pytest", "pytest-cov"]
-audit = ["pip-audit"]
-
-[tool.ruff]
-line-length = 100
-target-version = "py311"
-
-[tool.ruff.lint]
-select = ["ALL"]
-ignore = ["D", "COM812", "ISC001"]
-
-[tool.pytest]
-addopts = ["--cov=myproject", "--cov-fail-under=80"]
-
-[tool.ty.terminal]
-error-on-warning = true
-
-[tool.ty.environment]
-python-version = "3.11"
-
-[tool.ty.rules]
-possibly-unresolved-reference = "error"
-unused-ignore-comment = "warn"
-```
-
-Install: `uv sync --all-groups`
-
-### Makefile
-
-```makefile
-.PHONY: dev lint format test build
-
-dev:
-	uv sync --all-groups
-
-lint:
-	uv run ruff format --check && uv run ruff check && uv run ty check src/
-
-format:
-	uv run ruff format .
-
-test:
-	uv run pytest
-
-build:
-	uv build
-```
-
-### uv Quick Reference
-
-| Command | Description |
-|---------|-------------|
-| `uv init` / `uv init --package` | Create project / distributable package |
-| `uv add <pkg>` / `uv add --group dev <pkg>` | Add dependency / dev dependency |
-| `uv remove <pkg>` | Remove dependency |
-| `uv sync` / `uv sync --all-groups` | Install deps / all groups |
-| `uv run <cmd>` | Run command in venv |
-| `uv run --with <pkg> <cmd>` | Run with temporary dependency |
-| `uv build` / `uv publish` | Build / publish package |
-
-See [uv-commands.md](./references/uv-commands.md) for complete reference.
+Bootstrap with `uvx cookiecutter gh:trailofbits/cookiecutter-python` (preconfigured Trail of Bits template) or `uv init --package myproject`. Configure pyproject.toml (complete example with ruff/ty/pytest/coverage sections: [pyproject.md](./references/pyproject.md)), then `uv sync --all-groups`. uv command reference and standard Makefile (dev/lint/format/test/build targets): [uv-commands.md](./references/uv-commands.md).
 
 ## Core Principles
 
@@ -188,56 +95,7 @@ See [uv-commands.md](./references/uv-commands.md) for complete reference.
 
 ## Refactoring Philosophy: "Flat First"
 
-### The Approach
-
-1. **Write it flat first**: Get the entire logic working in one place so you can see the flow
-2. **Then identify major sections**: Look for natural boundaries
-3. **Extract only meaningful abstractions**: If a function doesn't represent a complete, _reusable_ concept, it probably shouldn't be a function
-
-### When TO Extract Functions
-
-Extract a function when it represents:
-- **A complete business operation**: `create_order()`
-- **A reusable utility**: `validate_phone_number()`
-- **A complex algorithm**: `calculate_score()`
-- **External integration**: `upload_file_to_s3()`
-
-### When NOT to Extract Functions
-
-Don't extract when it's just:
-- **Simple data transformation**: `{item.id: item.name for item in items}`
-- **Single-use lookups**: Finding items in a list/dict
-- **Trivial operations**: Getting/setting single values
-- **Breaking up linear flow**: Operations that naturally follow each other
-
-### Example
-
-```python
-# Over-abstracted - too many tiny functions
-def get_item_to_name_mapping():
-    return {item.id: item.name for item in items}
-
-def get_name_to_detail_mapping():
-    return {name: detail for name, detail in name_details}
-
-def get_item_to_detail_mapping():
-    name_mapping = get_item_to_name_mapping()
-    detail_mapping = get_name_to_detail_mapping()
-    return combine_mappings(name_mapping, detail_mapping)
-
-# Clear, flat approach
-item_id_to_name = {item.id: item.name for item in items}
-name_to_detail = {name: detail for name, detail in name_details}
-
-results = []
-for item_id in item_ids:
-    name = item_id_to_name[item_id]
-    detail = name_to_detail.get(name)
-    if not detail:
-        logger.warning(f"No detail found for item {item_id}")
-        continue
-    results.append(process(item_id, detail))
-```
+Write it flat first, then identify major sections, then extract only meaningful abstractions. Extract a function when it's a complete business operation, reusable utility, complex algorithm, or external integration. Don't extract for simple transformations, single-use lookups, trivial operations, or to break up linear flow. Worked example: [code-style.md](./references/code-style.md).
 
 ## Type Hints
 
@@ -253,89 +111,23 @@ for item_id in item_ids:
 - **Protocols**: Preferred over ABCs for interface definitions
 - **TypedDict**: Use when dictionary keys are known and static
 - **BaseModel (Pydantic)**: Use for external API data
-- **Dataclass**: Use sparingly for internal structures; prefer `kw_only=True` and `frozen=True` when appropriate:
-  ```python
-  @dataclass(kw_only=True, frozen=True)
-  class Config:
-      host: str
-      port: int = 8080
-  ```
+- **Dataclass**: Use sparingly for internal structures; prefer `kw_only=True` and `frozen=True` (example: [code-style.md](./references/code-style.md))
 
 ## Project Structure
 
 - **`src/` layout** for packages: `src/myproject/` not `myproject/`
 - **`uv.lock` in git** for applications (reproducible deploys), `.gitignore` for libraries
-- **PEP 723** for standalone scripts with dependencies:
-  ```python
-  # /// script
-  # requires-python = ">=3.11"
-  # dependencies = ["requests>=2.28", "rich"]
-  # ///
-  ```
-  Run with `uv run script.py` — deps auto-installed, no project needed. See [pep723-scripts.md](./references/pep723-scripts.md).
-- **Dependency groups** (PEP 735) for dev tooling:
-  ```toml
-  [dependency-groups]
-  dev = [{include-group = "lint"}, {include-group = "test"}]
-  lint = ["ruff", "ty"]
-  test = ["pytest", "pytest-cov"]
-  ```
+- **PEP 723** for standalone scripts with dependencies — run with `uv run script.py`, deps auto-installed, no project needed. See [pep723-scripts.md](./references/pep723-scripts.md)
+- **Dependency groups** (PEP 735) for dev tooling: `[dependency-groups]` with `{include-group = "..."}` composition
 - **Coverage enforcement**: `--cov-fail-under=80` in pytest config
 
 ## Code Structure
 
 - **Flat is Better**: Follow the "flat first" approach
 - **Function Parameters**: Force named parameters with `*` when >3 parameters
-- **Imports**: Order as standard library -> third-party -> local, separated by blank lines
-- **Reduce Cyclomatic Complexity**: Minimize through guard clauses and early returns
+- **Imports**: Standard library -> third-party -> local, blank-line separated; absolute imports only; `TYPE_CHECKING` for circular import prevention; `from module import item` for frequently used items, `import module` for modules used sparingly (example: [code-style.md](./references/code-style.md))
+- **Guard Clauses**: Prefer early returns over nested conditionals; use `continue` for guards in loops; let the end of the function be the implicit "else" instead of long if-else chains (examples: [code-style.md](./references/code-style.md))
 - **Linear Flow**: Keep related operations together instead of extracting tiny helpers
-
-### Guard Clause Pattern
-
-Prefer guard clauses with early returns over nested conditionals:
-
-```python
-# Guard clauses reduce nesting and complexity
-def process_item(item: Item | None) -> Result:
-    if not item:
-        return Result.empty()
-
-    if not item.is_active:
-        logger.warning(f"Item {item.id} is not active")
-        return Result.skipped()
-
-    if not item.data:
-        raise ValueError(f"Item {item.id} has no data")
-
-    # Main logic at base indentation level
-    return execute(item)
-```
-
-Use `continue` for guard clauses in loops:
-
-```python
-for contact in contacts:
-    if not contact.email:
-        continue
-    if contact.is_unsubscribed:
-        continue
-    send_email(contact)
-```
-
-### Avoid Long If-Else Blocks
-
-Use guards and let the end of the function be the implicit "else":
-
-```python
-def get_status(item: Item) -> Status:
-    if item.is_cancelled:
-        return Status.CANCELLED
-    if item.is_completed:
-        return Status.COMPLETED
-    if not item.started_at:
-        return Status.PENDING
-    return Status.IN_PROGRESS
-```
 
 ## Database Patterns
 
@@ -388,35 +180,15 @@ def get_status(item: Item) -> Status:
 
 ## Code Quality
 
-- **Discourage Docstrings**: Use type hints and good naming instead
+- **Docstrings**: Google-style docstrings on non-trivial public APIs (global standard). Skip redundant docstrings on trivial, self-evident code — type hints and good naming carry that weight
 - **Comments**: Explain _why_, not _what_
 - **Path Handling**: Use `pathlib` over `os.path`
 - **No Magic Numbers**: Use named constants
 - **No Deep Inheritance**: Prefer composition
 
-## Import Conventions
-
-```python
-# Standard library
-from collections.abc import Collection, Sequence
-from typing import Any, TypeVar
-from uuid import UUID
-
-# Third-party
-from pydantic import BaseModel
-
-# Local
-from myproject.models import MyModel
-```
-
-- Use `from typing import TYPE_CHECKING` for circular import prevention
-- Always use absolute imports for local modules
-- Use `from module import specific_item` for frequently used items
-- Use `import module` for modules used sparingly
-
 ## Testing Conventions
 
-- **Runner**: pytest (see [testing.md](./references/testing.md))
+- **Runner**: pytest with coverage (setup: [testing.md](./references/testing.md))
 - **Parametrized Tests**: Heavy use of `@pytest.mark.parametrize`
 - **Test Organization**: Tests mirror source structure in `tests/` directories
 - **Fixtures**: Defined in `conftest.py` files at appropriate levels
@@ -424,74 +196,17 @@ from myproject.models import MyModel
 - **No Mock Theater**: Don't test interactions between mocked objects - test real behavior
 - **Test Naming**: `test_{function_name}_{scenario}` pattern
 - **Test Structure**: Unit tests (no DB) -> Integration tests (mocked deps) -> E2E tests
-
-### Factory Pattern with Relationships
-
-When using `factory_boy` with `SubFactory` relationships, always pass the relationship object, not the ID:
-
-```python
-# Wrong - LazyAttribute will override the ID
-parent = ParentFactory.create()
-child = ChildFactory.create(parent_id=parent.id)
-
-# Correct - Pass the object itself
-parent = ParentFactory.create()
-child = ChildFactory.create(parent=parent)
-```
+- **Factories**: With `factory_boy` `SubFactory` relationships, pass the object, not the ID (example: [code-style.md](./references/code-style.md))
 
 ## Configuration
 
-- **Settings Classes**: Use Pydantic `BaseSettings` with type validation
+- **Settings Classes**: Use Pydantic `BaseSettings` with type validation (example: [code-style.md](./references/code-style.md))
 - **Environment-based**: Support multiple environments (test, dev, staging, prod)
 - **Singleton Pattern**: Use `@lru_cache` on settings factory methods
 
-```python
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        case_sensitive=False,
-        env_file=[".env"],
-        extra="ignore",
-    )
-```
-
 ## Migration Guide
 
-When migrating from legacy tooling, see [migration-checklist.md](./references/migration-checklist.md) for comprehensive steps.
-
-### From requirements.txt + pip
-
-**For standalone scripts**: Convert to PEP 723 inline metadata (see [pep723-scripts.md](./references/pep723-scripts.md))
-
-**For projects**:
-```bash
-uv init --bare
-# Add each dependency with uv (not by editing pyproject.toml)
-uv add requests rich
-uv sync
-```
-
-Then delete `requirements.txt`, `requirements-dev.txt`, and old virtualenvs.
-
-### From setup.py / setup.cfg
-
-1. `uv init --bare` to create pyproject.toml
-2. `uv add` each dependency from `install_requires`
-3. `uv add --group dev` for dev dependencies
-4. Copy non-dependency metadata to `[project]`
-5. Delete `setup.py`, `setup.cfg`, `MANIFEST.in`
-
-### From flake8 + black + isort
-
-1. Remove old tools, add ruff: `uv add --group dev ruff`
-2. Delete `.flake8`, `[tool.black]`, `[tool.isort]` configs
-3. Add ruff configuration (see [ruff-config.md](./references/ruff-config.md))
-4. Run `uv run ruff check --fix . && uv run ruff format .`
-
-### From mypy / pyright
-
-1. Remove old tools, add ty: `uv add --group dev ty`
-2. Delete `mypy.ini`, `pyrightconfig.json`, or `[tool.mypy]`/`[tool.pyright]` sections
-3. Run `uv run ty check src/`
+Step-by-step recipes for migrating from requirements.txt + pip, setup.py/setup.cfg, flake8 + black + isort, and mypy/pyright — plus cleanup checklists, gradual ty adoption, and verification — live in [migration-checklist.md](./references/migration-checklist.md).
 
 ## Anti-Patterns to Avoid
 
@@ -505,7 +220,7 @@ Then delete `requirements.txt`, `requirements-dev.txt`, and old virtualenvs.
 - **Boolean Database Fields**: Use nullable datetimes instead
 - **N+1 Queries**: Always batch database operations
 - **Nested Conditionals**: Use guard clauses
-- **Docstring Overuse**: Let types and names document the code
+- **Docstring Overuse**: Don't restate what types and names already say; reserve docstrings for non-trivial public APIs (Google style)
 - **Race Conditions**: Ensure atomic operations for critical data
 - **Inconsistent Async/Sync**: Don't mark functions `async` unless they `await`
 - **Manual virtualenv activation**: Use `uv run` instead
@@ -518,12 +233,13 @@ Then delete `requirements.txt`, `requirements-dev.txt`, and old virtualenvs.
 
 ## Reference Docs
 
-- [pyproject.md](./references/pyproject.md) - Complete pyproject.toml reference
-- [uv-commands.md](./references/uv-commands.md) - uv command reference
+- [pyproject.md](./references/pyproject.md) - Complete pyproject.toml reference (incl. ruff/ty/pytest config)
+- [uv-commands.md](./references/uv-commands.md) - uv command reference and project Makefile
+- [code-style.md](./references/code-style.md) - Flat-first, guard clauses, imports, factories, settings (worked examples)
 - [ruff-config.md](./references/ruff-config.md) - Ruff linting/formatting configuration
 - [testing.md](./references/testing.md) - pytest and coverage setup
 - [pep723-scripts.md](./references/pep723-scripts.md) - PEP 723 inline script metadata
 - [prek.md](./references/prek.md) - Fast pre-commit hooks with prek
 - [security-setup.md](./references/security-setup.md) - Security hooks and dependency scanning
 - [dependabot.md](./references/dependabot.md) - Automated dependency updates
-- [migration-checklist.md](./references/migration-checklist.md) - Step-by-step migration cleanup
+- [migration-checklist.md](./references/migration-checklist.md) - Migration recipes and cleanup checklist
