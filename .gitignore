@@ -3,3 +3,6 @@
 .agents/settings.local.json
 .claude/settings.local.json
 .agents/worktrees/
+__pycache__/
+.ruff_cache/
+.pytest_cache/
