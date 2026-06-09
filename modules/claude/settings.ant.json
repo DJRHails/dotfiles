@@ -44,7 +44,12 @@
     ],
     "defaultMode": "auto"
   },
+  "model": "claude-fable-5",
   "enableAllProjectMcpServers": false,
+  "skillOverrides": {
+    "code-review": "off",
+    "simplify": "off"
+  },
   "hooks": {
     "Notification": [
       {
@@ -99,10 +104,6 @@
   "enabledPlugins": {
     "swift-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true
-  },
-  "skillOverrides": {
-    "code-review": "off",
-    "simplify": "off"
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
@@ -174,6 +175,5 @@
       "**Classifier visibility**: The classifier sees user messages, CLAUDE.md, and prior tool CALLS (command strings, file paths, script bodies) — but NOT tool RESULTS (sbatch output, squeue output, echo output), and NOT runtime state (env vars, hostname, disk usage, process ownership). If a SOFT rule's applicability depends on something the user has stated in the transcript (e.g. 'I'm inside an srun shell', 'job 12345 is mine', 'that PID is mine'), treat that as user intent."
     ]
   },
-  "// NOTE": "This file goes in ~/.claude/settings.json (user-level), NOT .claude/settings.json in a repo. Auto-mode config is deliberately not read from project settings (a malicious repo could otherwise inject classifier rules). REPLACE <your-username> below with your actual cluster username before use — the classifier uses it to tell your own storage apart from other fellows'.",
-  "model": "claude-fable-5"
+  "// NOTE": "This file goes in ~/.claude/settings.json (user-level), NOT .claude/settings.json in a repo. Auto-mode config is deliberately not read from project settings (a malicious repo could otherwise inject classifier rules). REPLACE <your-username> below with your actual cluster username before use — the classifier uses it to tell your own storage apart from other fellows'."
 }

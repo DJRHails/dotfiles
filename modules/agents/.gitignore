@@ -1,2 +1,7 @@
 # Local settings may contain sensitive permissions
 settings.local.json
+
+# Machine-local skill links created by setup.sh from skills.local.conf
+/skills/cua-driver
+/skills/find-crop
+/skills/gog
