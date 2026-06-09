@@ -9,8 +9,22 @@ source "${SCRIPT_DIR}/lib.sh"
 IDLE_DIR="${STATE_DIR}/idle"
 mkdir -p "$IDLE_DIR"
 
+LOG_FILE="${STATE_DIR}/idle-check.log"
+LOG_MAX_BYTES=$((5 * 1024 * 1024))
+
 log() {
-    echo "[idle-check] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "${STATE_DIR}/idle-check.log"
+    # Rotate once the log passes 5MB so it can't grow without bound
+    # (it previously reached 26MB). One previous generation is kept.
+    # wc -c (not stat -c %s): portable across GNU and BSD/macOS.
+    if [ -f "$LOG_FILE" ] && [ "$(wc -c < "$LOG_FILE")" -ge "$LOG_MAX_BYTES" ]; then
+        mv -f "$LOG_FILE" "${LOG_FILE}.1"
+    fi
+    echo "[idle-check] $(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"
+}
+
+# File mtime in epoch seconds, portable across GNU (stat -c) and BSD (stat -f).
+file_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
 }
 
 # Check if there's an active SSH connection to a pod
@@ -51,7 +65,7 @@ for state_file in "${STATE_DIR}"/*.pod; do
         fi
         # RUNNING with no SSH: allow a boot grace period, then run the
         # idle timer below anyway so the pod still gets reaped.
-        pod_age=$(( $(date +%s) - $(stat -c %Y "$state_file") ))
+        pod_age=$(( $(date +%s) - $(file_mtime "$state_file") ))
         if [ "$pod_age" -lt "$BOOT_TIMEOUT" ]; then
             log "Pod ${pod_id} (${gpu}): RUNNING, no SSH yet (${pod_age}s old), in boot grace"
             continue

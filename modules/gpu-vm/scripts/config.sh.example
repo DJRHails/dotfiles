@@ -6,15 +6,6 @@
 # RunPod API Key - get from https://runpod.io/console/user/settings
 RUNPOD_API_KEY="${RUNPOD_API_KEY:-your_api_key_here}"
 
-# Network Volume ID (create at https://runpod.io/console/user/storage)
-NETWORK_VOLUME_ID="your_volume_id"
-
-# Template ID (create at https://runpod.io/console/user/templates)
-TEMPLATE_ID="your_template_id"
-
-# Region for all resources
-REGION="US-TX-3"
-
 # GPU type configurations: gpu_id -> RunPod GPU type string
 declare -A GPU_TYPES=(
     ["3090"]="NVIDIA GeForce RTX 3090"
