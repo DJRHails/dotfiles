@@ -1,6 +1,6 @@
 ---
 name: commit
-description: "Read this skill before making git commits"
+description: "Read this skill before making git commits and pushing"
 ---
 
 Create a git commit for the current changes using a concise Conventional Commits-style subject.
@@ -18,7 +18,8 @@ Create a git commit for the current changes using a concise Conventional Commits
 - Body is OPTIONAL. If needed, add a blank line after the subject and write short paragraphs.
 - Do NOT include breaking-change markers or footers.
 - Do NOT add sign-offs (no `Signed-off-by`).
-- Only commit; do NOT push.
+- After committing, push to the current branch. Never push to `main`/the default branch — if you are on it (and the repo's AGENTS.md/CLAUDE.md doesn't forbid branching), create a feature branch (`<github-username>/<feature-name>`) first, then push with `-u`.
+- Skip files containing secrets (`.env`, credentials, tokens) and warn if any are staged. Skip `.agents/settings.local.json` / `.claude/settings.local.json` — add them to `.gitignore` if not already ignored.
 - If it is unclear whether a file should be included, ask the user which files to commit.
 - Treat any caller-provided arguments as additional commit guidance. Common patterns:
   - Freeform instructions should influence scope, summary, and body.
@@ -31,5 +32,7 @@ Create a git commit for the current changes using a concise Conventional Commits
 2. Review `git status` and `git diff` to understand the current changes (limit to argument-specified files if provided).
 3. (Optional) Run `git log -n 50 --pretty=format:%s` to see commonly used scopes.
 4. If there are ambiguous extra files, ask the user for clarification before committing.
-5. Stage only the intended files (all changes if no files specified).
-6. Run `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+5. Check the current branch. If it is `main`/the default branch (and the repo's AGENTS.md/CLAUDE.md doesn't forbid branching), create a feature branch (`<github-username>/<feature-name>`) first.
+6. Stage only the intended files by name (all changes if no files specified). Do not blindly `git add -A` — exclude secrets and `*.local.json`.
+7. Run `git commit -m "<subject>"` (and `-m "<body>"` if needed).
+8. Push the current branch with `git push -u origin HEAD`.

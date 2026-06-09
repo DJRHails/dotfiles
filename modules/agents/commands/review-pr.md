@@ -37,11 +37,17 @@ pr-review-toolkit plugin. Tell each agent which files changed
 | `pr-review-toolkit:code-reviewer` | Code quality, style, project guidelines |
 | `pr-review-toolkit:silent-failure-hunter` | Silent failures, swallowed errors, bad fallbacks |
 | `pr-review-toolkit:pr-test-analyzer` | Test coverage gaps and missing edge cases |
+| `pr-review-toolkit:comment-analyzer` | Comment accuracy, comment rot, doc completeness |
+| `pr-review-toolkit:type-design-analyzer` | Type encapsulation, invariants, design quality |
+
+(`code-simplifier` is the sixth toolkit agent — it mutates code rather
+than reporting findings, so it runs as a polish step after fixes, not
+in this read-only pass. See step 2.)
 
 ### Pass B — external second opinion
 
 Launch these Task tool agents **in parallel with Pass A** — all
-5 agents in a single message, multiple tool calls. Each uses
+7 agents in a single message, multiple tool calls. Each uses
 `subagent_type: general-purpose`.
 
 **Codex reviewer** — tell the agent to run:
@@ -94,7 +100,7 @@ cat /tmp/pr-review-prompt.txt | gemini -p - \
 
 ### Merge findings
 
-Collect results from all 5 sources (3 toolkit agents + Codex +
+Collect results from all 7 sources (5 toolkit agents + Codex +
 Gemini). Deduplicate overlapping findings — if multiple sources
 flag the same issue, keep the most specific description and note
 the consensus. Rank every finding by severity:
@@ -103,6 +109,61 @@ the consensus. Rank every finding by severity:
 - **P2** — important (missing error handling, test gaps, logic flaws)
 - **P3** — nice to have (style, naming, minor simplifications)
 - **P4** — informational (observations, suggestions for future work)
+
+### Post inline review comments
+
+Post every P1–P3 finding as an **inline review comment** anchored to
+the file and line it concerns, so each issue becomes its own
+resolvable thread on the PR. (P4 findings stay in the §5 summary
+only.)
+
+Capture the PR head commit (the inline comments anchor to it):
+
+```bash
+HEAD_SHA=$(gh pr view $PR_NUMBER --repo <owner/name> \
+  --json headRefOid -q .headRefOid)
+```
+
+Build a single review payload so the comments post atomically. Give
+every comment a hidden, stable token (`<!-- finding:F<n> -->`) so the
+resolve step can match threads back to findings even after line
+numbers shift. Write it to a file to avoid shell-escaping issues with
+code in the bodies — `/tmp/pr-inline-review.json`:
+
+```json
+{
+  "commit_id": "<HEAD_SHA>",
+  "event": "COMMENT",
+  "body": "Automated review — findings posted inline. Each thread is resolved as its fix lands.",
+  "comments": [
+    {
+      "path": "src/foo.py",
+      "line": 42,
+      "side": "RIGHT",
+      "body": "**P1 — correctness:** <description and suggested fix>\n\n<!-- finding:F1 -->"
+    }
+  ]
+}
+```
+
+Then create the review:
+
+```bash
+gh api --method POST \
+  repos/<owner>/<name>/pulls/$PR_NUMBER/reviews \
+  --input /tmp/pr-inline-review.json
+```
+
+Rules:
+
+- Only lines present in the `base...HEAD` diff can carry an inline
+  comment. For a multi-line range add `start_line`/`start_side`. If a
+  finding's line is **not** in the diff, drop it from the payload and
+  record it for the §5 summary instead.
+- Use `event: COMMENT` — you cannot request changes on a PR you are
+  about to push to.
+- Keep the `finding:F<n>` token in every body; the resolve step
+  depends on it.
 
 ## 2. Fix findings
 
@@ -119,6 +180,16 @@ for solutions rather than guessing.
 
 P4 findings are informational — note them but do not fix unless
 trivial.
+
+### Polish — code-simplifier
+
+Once all findings are addressed, launch the
+`pr-review-toolkit:code-simplifier` agent on the files changed by
+this PR (and by your fixes). Apply only simplifications that
+**preserve behavior** — clarity, readability, and project-standard
+adherence. Skip any that alter functionality or conflict with a
+deliberate decision in the PR; note those as P4 instead. This is
+the toolkit's "after passing review" polish step.
 
 After addressing all findings, review your own fixes: read the
 diff of changes made in this step and verify each fix is correct,
@@ -230,6 +301,46 @@ failing the pipeline.
     (with brief reasoning), and confirmation that the quality
     pipeline passes
 - Push the branch (regular push, not force-push)
+
+### Resolve fixed comment threads
+
+After the fixes are pushed, close the loop on every inline thread
+from §1. Fetch the threads and their hidden tokens with `gh`:
+
+```bash
+gh api graphql -f query='
+  query($owner:String!,$repo:String!,$pr:Int!){
+    repository(owner:$owner,name:$repo){
+      pullRequest(number:$pr){
+        reviewThreads(first:100){ nodes{
+          id isResolved
+          comments(first:1){ nodes{ databaseId body } }
+        }}
+      }
+    }
+  }' -f owner=<owner> -f repo=<name> -F pr=$PR_NUMBER
+```
+
+For each thread, read the `<!-- finding:F<n> -->` token from its first
+comment and look up that finding's disposition:
+
+- **Fixed** — reply with the fix commit, then resolve the thread:
+
+  ```bash
+  gh api --method POST \
+    repos/<owner>/<name>/pulls/$PR_NUMBER/comments \
+    -f body='Fixed in <commit-sha>.' -F in_reply_to=<databaseId>
+
+  gh api graphql -f query='
+    mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){
+      thread{ id isResolved } } }' -f id=<thread-node-id>
+  ```
+
+- **Dismissed (false positive)** — reply with the reasoning but leave
+  the thread **open** for the author to adjudicate. Only fixes
+  auto-resolve.
+
+Leave threads with no `finding:` token untouched — they are not ours.
 
 ## 5. PR comment
 
