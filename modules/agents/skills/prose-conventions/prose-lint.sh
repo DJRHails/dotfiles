@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # prose-lint.sh — scan text files for AI writing patterns
-# Usage: prose-lint.sh [file ...] or pipe via stdin
+# Usage: prose-lint.sh <file ...>
 # Requires: rg (ripgrep)
 
 RED='\033[0;31m'

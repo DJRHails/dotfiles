@@ -20,8 +20,8 @@ find_cmux_settings() {
   root="$(git -C "$(pwd)" rev-parse --show-toplevel 2>/dev/null || pwd)"
   for candidate in \
     "$root/skills/cmux-settings/scripts/cmux-settings" \
-    "${CODEX_HOME:-$HOME/.codex}/skills/cmux-settings/scripts/cmux-settings" \
-    "$HOME/.agents/skills/cmux-settings/scripts/cmux-settings"; do
+    "$HOME/.agents/skills/cmux-settings/scripts/cmux-settings" \
+    "$HOME/.claude/skills/cmux-settings/scripts/cmux-settings"; do
     if [[ -x "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return 0

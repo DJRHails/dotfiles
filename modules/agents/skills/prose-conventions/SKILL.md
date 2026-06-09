@@ -258,6 +258,15 @@ The author has a penchant for semi-colons; leave them be.
 
 Ask: does this change make the writing better, or just more uniform?
 
+## Scripts
+
+Two helpers ship in this skill's directory:
+
+- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, superficial "-ing" openers, vague attribution, rule-of-three). Word lists are kept in sync with this guide. Requires `rg`; exits non-zero when it finds hits.
+- `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences.
+
+Run both before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
+
 ## References
 
 - [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) — comprehensive catalogue of AI text patterns, maintained by WikiProject AI Cleanup

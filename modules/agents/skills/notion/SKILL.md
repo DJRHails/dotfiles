@@ -10,7 +10,7 @@ Read Notion via the unofficial `/api/v3` endpoint using `token_v2` from the user
 ## Prerequisites
 
 - User signed into Notion web in a Chromium-family browser (Arc, Chrome, Chromium, Brave, Edge, Firefox, Safari)
-- `uv` installed — the script is PEP 723 so `uv run` self-resolves dependencies (`browser-cookie3`, `chromium-reader`, `diskcache`, `pydantic`, `requests`, `rich`, `typer`)
+- `uv` installed — the script is PEP 723 so `uv run` self-resolves dependencies (`browser-cookie3`, `diskcache`, `emboss`, `pydantic`, `requests`, `rich`, `typer`)
 
 ## Commands
 

@@ -144,4 +144,3 @@ Copied:   12 node_modules (CoW) across 3 worktrees
 - Detached HEAD worktrees: check if the commit is an ancestor of `main`
 - If `gh` is unavailable, fall back to git-only merge checks
 - Always place worktrees under `.data/worktrees/` to keep the repo root clean
-</content>

@@ -98,7 +98,25 @@ LIGHT_BG, DARK_BG = PAPER, BODY_INK
 # ---------------------------------------------------------------------------
 
 
+def _ensure_gog_keyring_password() -> None:
+    """Load gog's file-keyring password lazily for our gog subprocesses.
+
+    Shells no longer export GOG_KEYRING_PASSWORD globally; read it from the
+    600-mode password file only when slidesync actually invokes gog.
+    """
+    if os.environ.get("GOG_KEYRING_PASSWORD"):
+        return
+    for p in (
+        Path.home() / ".config/gogcli/keyring-password",
+        Path.home() / "Library/Application Support/gogcli/keyring-password",
+    ):
+        if p.exists():
+            os.environ["GOG_KEYRING_PASSWORD"] = p.read_text().strip()
+            return
+
+
 def get_services(account: str | None):
+    _ensure_gog_keyring_password()
     creds = _credentials(account or _default_account())
     slides = build("slides", "v1", credentials=creds, cache_discovery=False)
     drive = build("drive", "v3", credentials=creds, cache_discovery=False)
