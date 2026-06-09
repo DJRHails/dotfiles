@@ -191,7 +191,6 @@
     autocrlf = input
     editor = vim
     excludesfile = ~/.gitignore
-	hooksPath = /Users/dh/.git-hooks
 
 [diff]
 
@@ -240,6 +239,11 @@
     # [!] DO NOT store sensitive information such as the Git user
     # credentials (`name` / `email`), or things such as the `signingkey`
     # in this file, add them in `~/.gitconfig.local`!
+    #
+    # The same goes for machine-specific absolute paths such as
+    # `core.hooksPath`, `init.templateDir`, or `maintenance.repo`
+    # entries — they break on other hosts, so keep them in
+    # `~/.gitconfig.local` too.
 
 [filter "lfs"]
     clean = git-lfs clean -- %f
@@ -249,7 +253,6 @@
 
 [init]
     defaultBranch = main
-	templateDir = /Users/dh/.git-hooks
 
 [fetch]
     prune = true
@@ -262,9 +265,6 @@
     # REuse REcorded REsolution: keep on disk the resolution of a merge conflict so you don't have to replay them
 	enabled = true
 
-[maintenance]
-	repo = /Users/dh/Projects/github.com/DJRHails/kb
-	repo = /Users/dh/.files
 [pull]
 	rebase = true
 [credential "https://github.com"]
