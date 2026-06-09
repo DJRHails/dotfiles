@@ -15,7 +15,8 @@
 #   ssh::durable <host> --list                 print "<session>\t<summary>" lines, no fzf, no attach
 #   ssh::durable <host> --attach <session>     attach an exact session name, skip the picker
 #   ssh::durable <host> --query <str> [mosh…]  attach the most-recent session whose menu line
-#                                              matches <str> (case-insensitive); no match → fresh
+#                                              contains <str> (case-insensitive fixed string,
+#                                              not a regex); no match → fresh
 # --attach/--query exec mosh when run outside a local zellij (via ssh::durable::go), so they
 # still work as a cmux workspace --command; inside one they de-nest like the interactive path.
 #
@@ -197,7 +198,9 @@ ssh::durable() {
                 return 2
             fi
             local line
-            line=$(ssh::durable::menu "$host" | grep -i -m1 -- "$query")
+            # -F: fixed-string match — without it a '.' over-matches and a '[' in the
+            # query is a regex error (grep exit 2), silently falling through to fresh.
+            line=$(ssh::durable::menu "$host" | grep -iF -m1 -- "$query")
             if [[ -n $line ]]; then
                 ssh::durable::attach "$host" "${line%%$'\t'*}" "$@"
                 return
