@@ -52,6 +52,24 @@ install::uv_tool() {
   fi
 }
 
+# Install a CLI via `cargo install` (idempotent). Same trap as install::uv_tool:
+# routing cargo through install::with back-fills the system package-manager flags
+# (on Linux, apt's `--allow-unauthenticated -qqy`), which `cargo install` rejects
+# — silently skipping every cargo tool on Linux while working on macOS (brew's
+# args are empty). Args: readable name, command to probe, package (default name).
+install::cargo_tool() {
+  local -r readable_name="$1"
+  local -r cmd="$2"
+  local -r pkg="${3:-$2}"
+  if platform::command_exists "$cmd"; then
+    log::success "$readable_name"
+  elif platform::command_exists cargo; then
+    log::execute "cargo install $pkg" "$readable_name"
+  else
+    log::warning "$readable_name: cargo not on PATH; skipping cargo install"
+  fi
+}
+
 # Install a developer CLI tool, preferring Homebrew (macOS always; Linux only
 # when Linuxbrew is present) and falling back to a prebuilt GitHub-release binary
 # only when brew is unavailable — e.g. a bare Linux box where the tool has no apt
