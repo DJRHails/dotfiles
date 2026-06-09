@@ -1,6 +1,6 @@
 ---
 name: import-papers
-description: Process PDFs in research/dump/, extract metadata, generate bibtex entries, and move files to research/papers/. Use when importing research papers or managing a paper bibliography.
+description: Process PDFs in research/dump/, extract metadata, generate bibtex entries, and move files to research/papers/. Use when importing research papers or managing a paper bibliography. Only applies inside a checkout that has research/dump/ and research/papers.bib, and requires the pdftotext CLI (poppler-utils) — skip on hosts without them.
 ---
 
 # Import Papers Skill

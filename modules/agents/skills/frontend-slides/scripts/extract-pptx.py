@@ -4,9 +4,9 @@ Extract all content from a PowerPoint file (.pptx).
 Returns a JSON structure with slides, text, and images.
 
 Usage:
-    python extract-pptx.py <input.pptx> [output_dir]
+    python3 extract-pptx.py <input.pptx> [output_dir]
 
-Requires: pip install python-pptx
+Requires: python-pptx (e.g. `uv run --with python-pptx extract-pptx.py ...`)
 """
 
 import json
@@ -77,7 +77,7 @@ def extract_pptx(file_path, output_dir="."):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python extract-pptx.py <input.pptx> [output_dir]")
+        print("Usage: python3 extract-pptx.py <input.pptx> [output_dir]")
         sys.exit(1)
 
     input_file = sys.argv[1]
