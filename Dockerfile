@@ -21,6 +21,7 @@ RUN useradd -m -s /bin/bash dev \
 USER dev
 WORKDIR /home/dev
 
+# .dockerignore must exclude all transcrypt-covered paths (see .gitattributes) — the tree is decrypted.
 COPY --chown=dev:dev . .files/
 
 RUN cd .files && ./bootstrap.sh --cli --yes
