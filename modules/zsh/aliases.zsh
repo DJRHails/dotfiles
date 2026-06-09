@@ -45,7 +45,7 @@ alias te='tree'
 
 alias :q="exit"
 alias q="exit"
-alias ch="history -c && > ~/.bash_history"
+ch() { fc -p "$HISTFILE"; : > "$HISTFILE"; fc -P; }  # clear zsh history (history -c is bash-only)
 alias path='printf "%b\n" "${PATH//:/\\n}"'
 alias ll="ls -l"
 alias la="ls -la"
@@ -181,7 +181,8 @@ fkillport() {
 
 
 # Gets the current ip address
-alias ip="dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
+# Public IP lookup. Named myip so iproute2's `ip` keeps working on Linux.
+alias myip="dig -4 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 alias ipv6="dig -6 TXT +short o-o.myaddr.l.google.com @ns1.google.com"
 
 # List of commands used most often in the last month, grouped by the first N words
@@ -258,8 +259,9 @@ candidates() {
     column -t -s $'\t'
 }
 
-# Capture takes over the std ouput of a process
+# Capture takes over the std ouput of a process (dtrace: macOS only)
 capture() {
+    [[ $OSTYPE == darwin* ]] || { echo "capture: requires dtrace (macOS only)" >&2; return 1; }
     sudo dtrace -p "$1" -qn '
         syscall::write*:entry
         /pid == $target && arg0 == 1/ {

@@ -36,7 +36,7 @@ export FZF_CTRL_T_OPTS="
 
 # ALT-C: cd into selected directory
 export FZF_ALT_C_OPTS="
-  --preview 'tree -C {} | head -200'
+  --preview '(tree -C {} 2>/dev/null || ls -1A {}) | head -200'
 "
 
 # CTRL-R: Search history
@@ -114,7 +114,7 @@ fnpm() {
 # Interactive cd with preview
 fcd() {
   local dir
-  dir=$(find ${1:-.} -path '*/\.*' -prune -o -type d -print 2>/dev/null | fzf +m --preview 'tree -C {} | head -100') &&
+  dir=$(find ${1:-.} -path '*/\.*' -prune -o -type d -print 2>/dev/null | fzf +m --preview '(tree -C {} 2>/dev/null || ls -1A {}) | head -100') &&
   cd "$dir"
 }
 

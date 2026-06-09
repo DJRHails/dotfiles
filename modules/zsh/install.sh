@@ -5,6 +5,7 @@
 [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && export PATH="$HOME/.local/bin:$PATH"
 
 install::package "ZSH" "zsh"
+install::package "tree" "tree"  # t1-t3/te aliases + fzf previews (already in install.macos.sh)
 
 # Set as default shell
 ZSH_SHELL_LOC=$(which zsh)
