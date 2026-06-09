@@ -54,6 +54,12 @@
 ##?    gpt-4.1:     $2.00 / $8.00
 ##?    gpt-4o:      $2.50 / $10.00
 
+# Fail fast if the submodule has not been initialized
+if [[ ! -f "$DOTFILES/modules/askllm/requirements.txt" ]]; then
+    echo "askllm submodule is not initialized - run: git -C \"\$DOTFILES\" submodule update --init modules/askllm" >&2
+    exit 1
+fi
+
 # Setup the venv if it doesn't exist
 if [[ ! -d "$DOTFILES/modules/askllm/.venv" ]]; then
     echo "First execution, creating venv..."
@@ -67,9 +73,11 @@ source "$DOTFILES/modules/askllm/.venv/bin/activate"
 # The location of this file is defined in the $DOTFILES variable
 # which is set in the .bashrc file.
 
-cd "$DOTFILES/modules/askllm"
+cd "$DOTFILES/modules/askllm" || exit
 # Run with unbuffered output for real-time streaming
 PYTHONUNBUFFERED=1 python3 -u -m askllm "$@"
+status=$?
 
-# Deactivate the venv
+# Deactivate the venv, preserving the exit status of askllm
 deactivate
+exit $status
