@@ -7,8 +7,13 @@ source "${SCRIPT_DIR}/lib.sh"
 
 GPU="${1:-$DEFAULT_GPU}"
 
-# Capture stdout to temp file while stderr flows to terminal in real-time
-OUTFILE="${STATE_DIR}/.connect_out_$$"
+# Capture stdout to temp file while stderr flows to terminal in real-time.
+# Clean up even when ssh kills the ProxyCommand mid-boot (HUP/INT/TERM);
+# the exec below replaces the process, by which point the file is removed.
+OUTFILE=$(mktemp "${STATE_DIR}/.connect_out.XXXXXX") || exit 1
+trap 'rm -f "$OUTFILE"' EXIT
+trap 'exit 1' HUP INT TERM
+
 get_or_create_pod "$GPU" > "$OUTFILE"
 STATUS=$?
 

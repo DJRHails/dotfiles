@@ -80,8 +80,15 @@ create_pod() {
 
     # Create pod with SSH support using REST API
     # Note: Network volume locks to US-TX-3 which is often congested, so we skip it
+    # Fail fast on a missing key BEFORE creating a pod that would bill unreachable.
+    local pub_key_file="${HOME}/.ssh/id_ed25519_runpod.pub"
+    if [ ! -r "$pub_key_file" ]; then
+        echo "[gpu-vm] Error: SSH public key not found: ${pub_key_file}" >&2
+        echo "[gpu-vm] Generate it with: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_runpod" >&2
+        return 1
+    fi
     local pub_key
-    pub_key=$(cat ~/.ssh/id_ed25519_runpod.pub 2>/dev/null || echo '')
+    pub_key=$(cat "$pub_key_file")
 
     local result
     result=$(runpod_api POST "/pods" "{

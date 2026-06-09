@@ -14,8 +14,15 @@ fi
 # Create state directory
 mkdir -p "${SCRIPTS_DIR}/.state"
 
-# Make scripts executable
-chmod +x "${SCRIPTS_DIR}"/*.sh
+# Make scripts executable, except config.sh (holds credentials; sourced, never executed)
+for script in "${SCRIPTS_DIR}"/*.sh; do
+    if [ "$(basename "${script}")" != "config.sh" ]; then
+        chmod +x "${script}"
+    fi
+done
+if [ -f "${SCRIPTS_DIR}/config.sh" ]; then
+    chmod 600 "${SCRIPTS_DIR}/config.sh"
+fi
 
 echo "[gpu-vm] Setup complete"
 echo "[gpu-vm] Available commands:"

@@ -15,14 +15,15 @@ case "$CMD" in
             exit 1
         fi
         echo "Creating ${GPU} pod..."
-        RESULT=$(get_or_create_pod "$GPU")
-        if [ $? -eq 0 ]; then
-            IP=$(echo "$RESULT" | awk '{print $1}')
-            PORT=$(echo "$RESULT" | awk '{print $2}')
-            POD_ID=$(get_active_pod "$GPU")
-            echo "Pod ready: ${POD_ID}"
-            echo "SSH: ssh -p ${PORT} root@${IP}"
+        if ! RESULT=$(get_or_create_pod "$GPU"); then
+            echo "Failed to create ${GPU} pod (see errors above)." >&2
+            exit 1
         fi
+        IP=$(echo "$RESULT" | awk '{print $1}')
+        PORT=$(echo "$RESULT" | awk '{print $2}')
+        POD_ID=$(get_active_pod "$GPU")
+        echo "Pod ready: ${POD_ID}"
+        echo "SSH: ssh -p ${PORT} root@${IP}"
         ;;
     terminate|stop)
         if [ "$GPU" = "all" ]; then
@@ -44,16 +45,21 @@ case "$CMD" in
     status)
         echo "GPU Pod Status:"
         echo "==============="
-        for gpu in "${!GPU_TYPES[@]}"; do
-            pod_id=$(get_active_pod "$gpu")
-            if [ -n "$pod_id" ]; then
-                status=$(get_pod_status "$pod_id" | jq -r '.desiredStatus // "UNKNOWN"')
-                ssh_info=$(get_pod_ssh "$pod_id")
-                printf "  %-8s %-20s %-12s %s\n" "$gpu" "$pod_id" "$status" "${ssh_info:-N/A}"
-            else
-                printf "  %-8s %-20s %-12s\n" "$gpu" "-" "NOT_CREATED"
-            fi
+        # Iterate state files (like terminate-all/idle-check) so slot pods
+        # such as 4090-a are visible, not just GPU_TYPES base names.
+        found=0
+        for state_file in "${STATE_DIR}"/*.pod; do
+            [ -f "$state_file" ] || continue
+            found=1
+            gpu=$(basename "$state_file" .pod)
+            pod_id=$(cat "$state_file")
+            status=$(get_pod_status "$pod_id" | jq -r '.desiredStatus // "UNKNOWN"')
+            ssh_info=$(get_pod_ssh "$pod_id")
+            printf "  %-8s %-20s %-12s %s\n" "$gpu" "$pod_id" "$status" "${ssh_info:-N/A}"
         done
+        if [ "$found" -eq 0 ]; then
+            echo "  (no active pods)"
+        fi
         ;;
     ssh-info)
         POD_ID=$(get_active_pod "$GPU")
