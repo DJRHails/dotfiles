@@ -72,10 +72,6 @@
           },
           {
             "type": "command",
-            "command": "bash ~/.files/modules/claude/hooks/block-force-push-main.sh"
-          },
-          {
-            "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/check-encryption.sh"
           },
           {
