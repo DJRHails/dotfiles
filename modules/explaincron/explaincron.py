@@ -7,37 +7,39 @@
 from datetime import datetime
 import re
 import sys
-import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
-CRON_PART_REGEX = r"""
-(?:             # Start of non-capturing group for the primary part
-    \d+         # Matches one or more digits. This is used for specific time points, like "5" in minute field for the 5th minute.
-    |           # OR operator
-    [*?]        # Matches either a star or a question mark. Star (*) is used for 'every' time unit, question mark (?) is used for 'no specific value'.
-)               # End of primary part
-(?:             # Start of non-capturing group for the secondary part
-    [/\-]       # Matches either a slash or a dash. Slash (/) is used for step values, like "*/15" in minute field for every 15 minutes. Dash (-) is used for ranges, like "5-10" in hour field for between 5 and 10.
-    \d+         # Matches one or more digits. This is the value used with the slash or dash in the secondary part.
-)?              # End of secondary part. The group is optional, as not all cron parts have a secondary part.
-"""
+CRON_WRAPPER_REGEX = re.compile(
+    r"""(?ix)         # case-insensitive, verbose
+    ^cron\(           # AWS-style "cron(" wrapper at the start
+    (?P<body>.*)      # the cron fields inside the wrapper
+    \)$               # closing parenthesis at the end
+    """
+)
 
 def convert_aws_cron_to_crontab_guru_link(cron_expression):
-    # Extract the minute, hour, day of month, month, and day of week fields
-    fields = re.findall(CRON_PART_REGEX, cron_expression, re.X)[:5]
-    
-    # Convert ? to * for the day of week field
-    for i, field in enumerate(fields):
-        if field == '?':
-            fields[i] = '*'
-    
+    # Strip an AWS-style cron(...) wrapper, then split on whitespace so lists
+    # (1,15) and names (MON-FRI) pass through verbatim — crontab.guru handles them.
+    expression = cron_expression.strip()
+    wrapper = CRON_WRAPPER_REGEX.match(expression)
+    if wrapper:
+        expression = wrapper.group("body")
+    fields = expression.split()
+    if len(fields) not in (5, 6):
+        raise ValueError(
+            f"Expected 5 or 6 cron fields, got {len(fields)} in {cron_expression!r}"
+        )
+
+    # Drop the AWS year field and convert ? (no specific value) to *
+    fields = ['*' if field == '?' else field for field in fields[:5]]
+
     # Build the crontab.guru link
     link = f"https://crontab.guru/#{'_'.join(fields)}"
-    
+
     return link
 
 def get_crontab_guru_description(url) -> tuple[str, list[datetime]]:
@@ -90,8 +92,8 @@ def get_crontab_guru_description(url) -> tuple[str, list[datetime]]:
 
     return description, next_times
 
-def unique(l):
-    return list(dict.fromkeys(l))
+def unique(items):
+    return list(dict.fromkeys(items))
 
 if __name__ == '__main__':
     # Read the input cron expression from either stdin or argument
