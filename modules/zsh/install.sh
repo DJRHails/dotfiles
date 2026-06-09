@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 # Ensure ~/.local/bin is on PATH for tools installed there
@@ -26,22 +27,28 @@ fi
 
 # Install sheldon plugin manager
 if ! cmd_exists sheldon; then
+  SHELDON_INSTALLER="$(mktemp)"
   curl --proto '=https' -fLsS https://rossmacarthur.github.io/install/crate.sh \
-    | bash -s -- --repo rossmacarthur/sheldon --to ~/.local/bin
+    -o "$SHELDON_INSTALLER" \
+    && bash "$SHELDON_INSTALLER" --repo rossmacarthur/sheldon --to ~/.local/bin
   log::result $? "sheldon"
+  rm -f "$SHELDON_INSTALLER"
 fi
 
 # Install starship prompt
 if ! cmd_exists starship; then
   mkdir -p ~/.local/bin
-  curl -sS https://starship.rs/install.sh | sh -s -- --yes --bin-dir ~/.local/bin
+  STARSHIP_INSTALLER="$(mktemp)"
+  curl -fsS https://starship.rs/install.sh -o "$STARSHIP_INSTALLER" \
+    && sh "$STARSHIP_INSTALLER" --yes --bin-dir ~/.local/bin
   log::result $? "starship"
+  rm -f "$STARSHIP_INSTALLER"
 fi
 
 # Install fzf
 if [[ -z $FZF_BASE ]] && [[ ! -d ~/.fzf ]]; then
   export FZF_BASE=~/.fzf
-  git clone --depth 1 https://github.com/junegunn/fzf.git $FZF_BASE
+  git clone --depth 1 --branch v0.73.1 https://github.com/junegunn/fzf.git $FZF_BASE
   log::result $? "Clone fzf to $FZF_BASE"
   $FZF_BASE/install --no-bash --all
   log::result $? "Install fzf"

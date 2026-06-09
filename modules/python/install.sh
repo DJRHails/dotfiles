@@ -4,8 +4,10 @@ install::package "Python (3)" "python3"
 
 if ! cmd_exists uv; then
   log::info "Installing uv..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  UV_INSTALLER="$(mktemp)"
+  curl -LsSf https://astral.sh/uv/install.sh -o "$UV_INSTALLER" && sh "$UV_INSTALLER"
   log::result $? "uv installed"
+  rm -f "$UV_INSTALLER"
 else
   log::success "uv already installed"
 fi
