@@ -61,8 +61,8 @@
     # List remote branches.
 
     lrb = "!f() { \
-        remote="${1:-origin}"; \
-        git ls-remote --heads "$remote"; \
+        remote=\"${1:-origin}\"; \
+        git ls-remote --heads \"$remote\"; \
     }; f"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -90,8 +90,8 @@
     # exists and tag the latest commit with that name.
 
     retag = "!f() { \
-        git tag -d "$1" &> /dev/null; \
-        git tag $1; \
+        git tag -d \"$1\" > /dev/null 2>&1; \
+        git tag \"$1\"; \
     }; f"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -101,7 +101,7 @@
     # https://stackoverflow.com/a/4408378
 
     reset-perms = "!f() { \
-        git diff -p -R --no-ext-diff --no-color | grep -E "^(diff|(old|new) mode)" --color=never | git apply; \
+        git diff -p -R --no-ext-diff --no-color | grep -E \"^(diff|(old|new) mode)\" --color=never | git apply; \
     }; f"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -109,9 +109,11 @@
     # Remove local branches that have been merged and deleted
 
     prune-local = "!f() { \
-        git checkout -q master; \
-        git fetch -q --prune; \
-        git branch -vv | grep ': gone]' | cut -d' ' -f3 | xargs git branch -d; \
+        default=\"$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')\"; \
+        git checkout -q \"${default:-main}\" && \
+        git fetch -q --prune && \
+        git branch -vv | grep ': gone]' | awk '{print $1}' | \
+        while read -r b; do git branch -d \"$b\"; done; \
     }; f"
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
