@@ -24,11 +24,11 @@ install::release_binary "zizmor" "zizmor" "zizmorcore/zizmor" \
   "https://github.com/zizmorcore/zizmor/releases/download/@TAG@/zizmor-@ARCH_GNU@-unknown-linux-gnu.tar.gz"
 
 # trash: macos-trash provides `trash` (real Finder Trash). On Linux, link the
-# repo's shim, which moves paths to $TRASH_DIR (default /tmp/trash).
+# repo's shim, which moves paths to $TRASH_DIR (default ~/.local/share/Trash/files).
 if platform::is_osx; then
   install::package "macos-trash" "macos-trash"
 else
   mkdir -p "$HOME/.local/bin"
   ln -sfn "$DOTFILES/modules/claude/bin/trash" "$HOME/.local/bin/trash"
-  log::success "trash (mv to \${TRASH_DIR:-/tmp/trash})"
+  log::success "trash (mv to \${TRASH_DIR:-~/.local/share/Trash/files})"
 fi

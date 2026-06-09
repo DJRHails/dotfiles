@@ -3,10 +3,11 @@ set -euo pipefail
 # Hook: Enforce correct package manager per project
 # Blocks npm in pnpm projects, pip in uv projects
 
-CMD=$(jq -r '.tool_input.command // empty')
+INPUT=$(cat)
+CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 [[ -z "$CMD" ]] && exit 0
 
-CWD=$(jq -r '.cwd // empty')
+CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 [[ -z "$CWD" ]] && exit 0
 
 # Block npm in pnpm projects
