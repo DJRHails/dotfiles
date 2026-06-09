@@ -25,8 +25,6 @@ Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) 
 3. 100-char line length
 4. Absolute imports only — no relative (`..`) paths
 5. Google-style docstrings on non-trivial public APIs
-6. Multi-line raw strings with `(?ixm)` mode for all regexes — verbose mode is mandatory for readability
-7. Use `jaxtyping` for numpy array type annotations (e.g. `Float[np.ndarray, "batch features"]`)
 
 ### Regex convention
 
@@ -93,7 +91,7 @@ When adding dependencies, CI actions, or tool versions, always look up the curre
 | `actionlint`   | -          | `actionlint .github/workflows/` - GitHub Actions linter                   |
 | `zizmor`       | -          | `zizmor .github/workflows/` - Actions security audit                      |
 | `prek`         | pre-commit | `prek run` - fast git hooks (Rust, no Python)                             |
-| `trash`        | rm         | `trash file` - moves to macOS Trash (recoverable). **Never use `rm -rf`** |
+| `trash`        | rm         | `trash file` - moves to the OS trash (recoverable). **Never use `rm -rf`** |
 
 Prefer `ast-grep` over ripgrep when searching for code structure (function calls, class definitions, imports). Use ripgrep for literal strings and log messages.
 
@@ -240,71 +238,23 @@ skill — leaving me a single `bash …/post_touchstone.sh`.)
 
 ## Session Artifacts — long output goes in files, not the chat
 
-Anything over ~40 lines of tool output, grep results, sub-agent reports,
-log dumps, API responses, or raw evidence should go through
-`write_artifact` with a short summary in the main thread — never paste
-it back verbatim. Reasons:
+Anything over ~40 lines — tool output, grep results, sub-agent reports,
+log dumps, API responses, raw evidence — goes into a file (e.g.
+`artifacts/<name>.md` or under `/tmp/`) with a short summary in the
+main thread, never pasted back verbatim. The chat context budget is for
+**decisions**, not evidence.
 
-- Keeps the main chat context budget for **decisions**, not evidence.
-- Sub-agents can write findings to `artifacts/<name>.md` and the parent
-  reads them with `read_artifact` instead of re-ingesting everything.
-- Session search (`session-search` skill) can grep artifacts later.
-
-**When to use `write_artifact`:**
-
-- Datadog / log query results longer than a screen.
-- `git diff` / `git log` output longer than ~40 lines.
-- Sub-agent reports (they should write to `artifacts/<name>.md` and the
-  parent loads the summary, not the full transcript).
-- Research notes, scope docs, plans the user will iterate on.
-- JSON dumps from `curl` / API responses when the structure matters but
-  the bulk is noise.
-
-**When to paste inline:**
+Paste inline only:
 
 - Short log snippets (<20 lines) directly relevant to the next decision.
 - The 1-2 lines of a stack trace that pinpoint the bug.
 - Exact commands the user should run.
 
-**Pattern for sub-agents:**
-
-> Sub-agent writes to `artifacts/<task-name>.md` via `write_artifact`.
-> Its FINAL assistant message is a short summary (≤ 15 lines) + the
-> artifact name. The parent uses `read_artifact` to pull detail only
-> when needed for the next step.
-
-Avoid dumping a 2000-line file into the chat to "make sure the other
-side can see it" — the other side is the same token budget. Always
-prefer artifact + summary.
-
-## Markdown Structure (mdstruct)
-
-Use `mdstruct` to split large markdown files into hierarchical folder structures, or join them back.
-
-**Split a file by headers:**
-
-```bash
-mdstruct split path/to/file.md        # splits into path/to/file/
-mdstruct split path/to/file.md -l 3   # split up to H3 level
-```
-
-**Join files back:**
-
-```bash
-mdstruct join path/to/folder/         # joins back into path/to/folder.md
-```
-
-**Auto-detect:**
-
-```bash
-mdstruct auto path/to/file            # splits .md file or joins folder
-```
-
-- Useful for breaking up large idea/note files into individual topics
-- Each H2 becomes its own file, numbered for ordering
-- Creates a README.md with the top-level content
-- Original file is backed up to `/tmp/mdstruct/`
-- **Parallel sub-agents**: Split a file, spawn sub-agents to work on individual sections concurrently, then join back
+Sub-agents should write detail to a file and end with a short summary
+(≤ 15 lines) plus the file path; the parent reads the file only when
+the next step needs it. Never dump a 2000-line file into the chat to
+"make sure the other side can see it" — the other side is the same
+token budget.
 
 ## Git Hygiene
 
@@ -315,8 +265,8 @@ mdstruct auto path/to/file            # splits .md file or joins folder
 | server | description |
 | --- | --- |
 | `context7` | Look up live documentation and code examples for any library/framework via Context7 |
+| `figma-dev-mode-mcp-server` | Figma Dev Mode — inspect designs and pull code/context from Figma frames (remote, `mcp.figma.com`) |
 | `playwriter` | Control Chrome via Playwright — browser automation, scraping, testing, and recording |
-| `serper-search` | Google search (web, images, videos, news, scholar, patents, shopping, maps) and webpage scraping via Serper |
 
 ## References
 
