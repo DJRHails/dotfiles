@@ -4,8 +4,7 @@
   "env": {
     "DISABLE_TELEMETRY": "1",
     "DISABLE_ERROR_REPORTING": "1",
-    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
-    "CLAUDE_CODE_EFFORT_LEVEL": "xhigh"
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
   },
   "attribution": {
     "commit": "",
@@ -100,6 +99,10 @@
   "enabledPlugins": {
     "swift-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "skillOverrides": {
+    "code-review": "off",
+    "simplify": "off"
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
