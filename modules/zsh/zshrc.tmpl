@@ -43,6 +43,13 @@ freload $^fpath/*(N-.x:t)
 autoload -U compinit
 compinit
 
+# replay compdef calls queued by plugins loaded before compinit (see sheldon.zsh)
+for d in $__deferred_compdefs
+do
+  compdef ${=d}
+done
+unset __deferred_compdefs d
+
 # load every completion after autocomplete loads
 for file in ${(M)config_files:#*/completion.zsh}
 do
