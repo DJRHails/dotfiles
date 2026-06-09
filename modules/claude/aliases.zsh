@@ -26,14 +26,18 @@ _claude_ant_link() {
 }
 
 _claude_ant_ensure() {
+  # Repo links mirror modules/{agents,claude}/symlinks.conf — the source of
+  # truth applied by bootstrap.sh; this only self-heals them at launch.
   local ant=$HOME/.claude-ant
   local dotfiles=$HOME/.files/modules
   mkdir -p "$ant"
   _claude_ant_link "$dotfiles/agents/AGENTS.md"     "$ant/CLAUDE.md"
   _claude_ant_link "$dotfiles/agents/skills"        "$ant/skills"
+  _claude_ant_link "$dotfiles/agents/commands"      "$ant/commands"
+  _claude_ant_link "$dotfiles/agents/subagents"     "$ant/agents"
   _claude_ant_link "$dotfiles/claude/mcp.json"      "$ant/mcp.json"
   _claude_ant_link "$dotfiles/claude/settings.ant.json" "$ant/settings.json"
-  _claude_ant_link "$HOME/.claude/commands"         "$ant/commands"
+  # Runtime state shared with the default profile (not in symlinks.conf).
   _claude_ant_link "$HOME/.claude/plugins"          "$ant/plugins"
   # Mirror the current cwd's memory dir so KB-style auto-memory survives the
   # profile split. Slug is the absolute cwd with '/' → '-' (Claude Code convention).
