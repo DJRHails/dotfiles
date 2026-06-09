@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
 # Install fira code (fonts are in homebrew-cask since 2023)

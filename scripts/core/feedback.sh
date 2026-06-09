@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 feedback::ask() {
   local default="$2"
   if [ -n "$default" ]; then
@@ -5,7 +6,7 @@ feedback::ask() {
   else
     log::question "$1 "
   fi
-  if [ "$skipQuestions" = true ] && [ -n "$default" ]; then
+  if [ "${skipQuestions:-}" = true ] && [ -n "$default" ]; then
     REPLY="$default"
   else
     read -r
