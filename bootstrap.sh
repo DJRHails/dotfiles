@@ -18,7 +18,8 @@
 # Move to the correct directory for duration of this script
 cd "$(dirname "${BASH_SOURCE[0]}")" \
   || exit 1
-readonly DOTFILES=$(pwd -P)
+DOTFILES=$(pwd -P)
+readonly DOTFILES
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -55,9 +56,15 @@ run() {
   local module_dir=$1
   local script_name=$2
   local src="$1/$2"
-  if [ -f $src ]; then
+  if [ -f "$src" ]; then
     log::subheader "Executing ${script_name%.*} for '${module_dir##*/}'"
-    . $src
+    # Subshell: isolate the installer's set -e/-u/pipefail, exit, cd and
+    # traps from this shell, while $DOTFILES and the log::/install::
+    # helpers stay visible. Do not flatten to `. "$src"` — one leaked
+    # `set -u` aborts the whole --all run on the next 2-arg
+    # install::package call.
+    # shellcheck source=/dev/null
+    ( . "$src" )
     log::result $? "${script_name%.*} completed"
   fi
 }
@@ -65,6 +72,8 @@ run() {
 create_links() {
   local module_dir="$1"
   local symlink_file="$module_dir/symlinks.conf"
+  # Read by link::extract_and_link (scripts/link.sh) via dynamic scoping.
+  # shellcheck disable=SC2034
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
   if [ -f $symlink_file ]; then
@@ -84,6 +93,8 @@ main() {
 
   # Check for arguments
   scanned_valid_modules=()
+  # Read by scan::find_valid_modules (scripts/scan.sh).
+  # shellcheck disable=SC2034
   allModules=false
   skipQuestions=false
   parse_args "$@"
@@ -93,6 +104,8 @@ main() {
 
   # Verify OS
   log::header "Verify OS verion\n"
+  # os_name/os_version are assigned by platform::is_supported.
+  # shellcheck disable=SC2154
   platform::is_supported && log::success "$os_name with v$os_version is valid"
 
 
@@ -100,14 +113,25 @@ main() {
   # interactive module selection can introduce delays that expire them.
   platform::ask_for_sudo
 
-  # Platform-specific bootstrap (Homebrew, Bash upgrade, apt, etc.)
+  # Platform-specific bootstrap (Homebrew, Bash upgrade, apt, etc.).
+  # Sourced in THIS shell — not via run()'s subshell — because it must
+  # mutate the bootstrap shell: brew shellenv PATH and the Bash 4+ re-exec.
+  # BOOTSTRAP_ARGS is read by scripts/bootstrap.macos.sh on that re-exec.
+  # shellcheck disable=SC2034
   BOOTSTRAP_ARGS=("$@")
-  run "$DOTFILES/scripts" "bootstrap.$(platform::os).sh"
+  local platform_bootstrap
+  platform_bootstrap="$DOTFILES/scripts/bootstrap.$(platform::os).sh"
+  if [ -f "$platform_bootstrap" ]; then
+    log::subheader "Executing bootstrap.$(platform::os) for 'scripts'"
+    # shellcheck source=/dev/null
+    . "$platform_bootstrap"
+    log::result $? "bootstrap.$(platform::os) completed"
+  fi
 
   # Verify Bash 4+ (platform bootstrap should have installed it)
   log::header "Verify Bash Version\n"
   if [ "${BASH_VERSINFO:-0}" -ge 4 ]; then
-    log::success "Bash ${BASH_VERSINFO} (associative arrays supported)"
+    log::success "Bash ${BASH_VERSINFO[0]} (associative arrays supported)"
   else
     log::error "Bash ${BASH_VERSINFO:-unknown} is too old (need 4+)"
     exit 1
