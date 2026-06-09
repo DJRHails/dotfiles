@@ -13,8 +13,20 @@ gh repo clone $REPO /tmp/depbot-eval-$(echo "$REPO" | tr '/' '-') -- --depth=50 
 
 Work from `/tmp/depbot-eval-{repo-slug}` for all subsequent phases.
 
-Execute every phase below sequentially. Do not stop or ask for
-confirmation at any phase.
+**Shared-repo guard:** before anything that posts to GitHub
+(approving, commenting, opening PRs, or merging), determine
+whether $REPO is a solo personal repo — owned by
+`github.com/DJRHails` with no other collaborators (check:
+`gh api repos/<owner>/<repo>/collaborators --jq length` returns 1).
+On solo personal repos, run fully autonomously. On any other repo (a
+shared org, or any repo with other collaborators), pause before
+each such action, post a short summary of what you are about to
+send or merge, and wait for explicit user confirmation. `--admin`
+merges are allowed only on solo personal repos — never pass
+`--admin` on a shared repo.
+
+Execute every phase below sequentially without pausing for
+confirmation, except where the shared-repo guard requires it.
 
 ## Turn Budget Management
 
@@ -499,6 +511,10 @@ For each work unit with a **PASS** verdict, in order:
    ```bash
    gh pr merge --repo $REPO --squash --admin {number}
    ```
+
+   The shared-repo guard applies here: on anything other than a
+   solo personal repo, get explicit confirmation first and drop
+   `--admin` (`gh pr merge --repo $REPO --squash {number}`).
 
 3. Verify the merge succeeded:
    ```bash

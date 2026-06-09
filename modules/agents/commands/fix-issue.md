@@ -21,8 +21,17 @@ ensure they target the correct repository. Run
 `git fetch <upstream-remote>` to ensure you are working with
 up-to-date code.
 
-Execute every step below sequentially. Do not stop or ask for
-confirmation at any step.
+**Shared-repo guard:** determine whether the canonical repo is a
+solo personal repo — owned by `github.com/DJRHails` with no other
+collaborators. Concretely: solo means the owner is DJRHails and `gh api repos/<owner>/<repo>/collaborators --jq length` returns 1. On solo personal repos, run fully autonomously. On
+any other repo (a shared org, or any repo with other
+collaborators), pause before each action that reaches other people
+— creating the PR (step 9) and commenting on the issue (step 10) —
+post a short summary of what you are about to send, and wait for
+explicit user confirmation.
+
+Execute every step below sequentially without pausing for
+confirmation, except where the shared-repo guard requires it.
 
 ## 1. Research (if needed)
 
