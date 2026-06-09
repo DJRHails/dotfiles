@@ -341,20 +341,24 @@ Summary:
 Next steps:
 - Review findings in detail
 - Address CRITICAL/HIGH issues before merge
-- Consider chaining with issue-writer for stakeholder report
+- Consider filing findings as GitHub issues with `gh issue create`
 ```
 
 ---
 
-## Integration with issue-writer
+## Filing Findings as GitHub Issues
 
-After generating differential review, transform into audit report:
+After generating the differential review, file findings for tracking:
 
 ```bash
-issue-writer --input DIFFERENTIAL_REVIEW_REPORT.md --format audit-report
+gh issue create \
+  --title "Security review: <change under review>" \
+  --body-file DIFFERENTIAL_REVIEW_REPORT.md
 ```
 
-This creates polished documentation for non-technical stakeholders.
+For multiple findings, create one issue per CRITICAL/HIGH finding so each
+can be triaged and closed independently. Confirm with the user before
+posting to repositories with other collaborators.
 
 ---
 
