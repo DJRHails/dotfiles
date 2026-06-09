@@ -1,10 +1,17 @@
+---
+name: review-pr
+description: Review an existing GitHub PR with parallel agents (pr-review-toolkit + Codex + Gemini), post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
+argument-hint: <pr-number>
+---
+
 # Review and Fix PR
 
-@source https://github.com/trailofbits/claude-code-config
-@description Review an existing PR with parallel agents, fix findings, and push.
-@arguments $PR_NUMBER: GitHub PR number to review and fix
+Adapted from [trailofbits/claude-code-config](https://github.com/trailofbits/claude-code-config).
 
-Read PR #$PR_NUMBER thoroughly using `gh pr view`. Understand the
+`$ARGUMENTS` is the GitHub PR number to review and fix (e.g. `/review-pr 42`).
+If invoked without one, ask which PR before proceeding.
+
+Read PR #$ARGUMENTS thoroughly using `gh pr view`. Understand the
 full context: description, linked issues, commit history, and the
 diff against the base branch.
 
@@ -120,7 +127,7 @@ only.)
 Capture the PR head commit (the inline comments anchor to it):
 
 ```bash
-HEAD_SHA=$(gh pr view $PR_NUMBER --repo <owner/name> \
+HEAD_SHA=$(gh pr view $ARGUMENTS --repo <owner/name> \
   --json headRefOid -q .headRefOid)
 ```
 
@@ -150,7 +157,7 @@ Then create the review:
 
 ```bash
 gh api --method POST \
-  repos/<owner>/<name>/pulls/$PR_NUMBER/reviews \
+  repos/<owner>/<name>/pulls/$ARGUMENTS/reviews \
   --input /tmp/pr-inline-review.json
 ```
 
@@ -296,7 +303,7 @@ failing the pipeline.
 - Commit the fixes as a separate commit (do not squash into the
   original — preserve review history)
 - Write a detailed commit message that covers:
-  - Subject: `fix: resolve code review findings for PR #$PR_NUMBER`
+  - Subject: `fix: resolve code review findings for PR #$ARGUMENTS`
   - Body: list findings by severity, what was fixed vs dismissed
     (with brief reasoning), and confirmation that the quality
     pipeline passes
@@ -318,7 +325,7 @@ gh api graphql -f query='
         }}
       }
     }
-  }' -f owner=<owner> -f repo=<name> -F pr=$PR_NUMBER
+  }' -f owner=<owner> -f repo=<name> -F pr=$ARGUMENTS
 ```
 
 For each thread, read the `<!-- finding:F<n> -->` token from its first
@@ -328,7 +335,7 @@ comment and look up that finding's disposition:
 
   ```bash
   gh api --method POST \
-    repos/<owner>/<name>/pulls/$PR_NUMBER/comments \
+    repos/<owner>/<name>/pulls/$ARGUMENTS/comments \
     -f body='Fixed in <commit-sha>.' -F in_reply_to=<databaseId>
 
   gh api graphql -f query='
@@ -345,7 +352,7 @@ Leave threads with no `finding:` token untouched — they are not ours.
 ## 5. PR comment
 
 Post a review summary as a PR comment using
-`gh pr comment $PR_NUMBER --repo <owner/name>`.
+`gh pr comment $ARGUMENTS --repo <owner/name>`.
 
 Format the comment body as:
 
