@@ -226,11 +226,259 @@ Pass each subagent:
 
 ### Subagent prompt: Library Dep Evaluation
 
-Use this prompt for each library dep work unit (see original template for full subagent instructions covering checkout, transitive analysis, build, test, matrix gap analysis, and verdict).
+Use this prompt for each library dep work unit.
+
+---
+
+You are evaluating dependabot PR(s) for merge safety. Work
+in the repo directory: {repo_path}
+
+**Repo:** $REPO
+**PR(s) to evaluate:** {pr_numbers_and_titles}
+**Baseline dependency tree from main:**
+
+```
+{baseline_dep_tree}
+```
+
+**Build command:** {build_command}
+**Test command:** {test_command}
+
+Execute every step. Do not skip steps. Do not ask for confirmation.
+
+**STEP 1 — Checkout**
+
+```bash
+cd {repo_path}
+git fetch origin pull/{number}/head:pr-{number}
+git checkout pr-{number}
+```
+
+For batches (multiple PRs), create a temporary merge branch:
+
+```bash
+cd {repo_path}
+git checkout -b test-batch-{batch_id} main
+git fetch origin pull/{pr1}/head:pr-{pr1}
+git fetch origin pull/{pr2}/head:pr-{pr2}
+git merge pr-{pr1} pr-{pr2} --no-edit
+```
+
+If the merge has conflicts, report FAIL with the conflicting files
+and stop.
+
+**STEP 2 — Transitive dependency analysis**
+
+Generate the full dependency tree using the same command that
+produced the baseline. Compare against the baseline and report:
+
+```
+DIRECT CHANGES:
+  - {package}: {old_version} → {new_version}
+
+TRANSITIVE CHANGES:
+  - {package}: {old_version} → {new_version}  (depended on by: {parent})
+
+NEW TRANSITIVE DEPS:
+  - {package} {version}  (pulled in by: {parent})
+
+REMOVED TRANSITIVE DEPS:
+  - {package} {version}
+
+FLAGS:
+  - DOWNGRADE: {package} went from {higher} to {lower}
+  - MAJOR BUMP: {package} crossed a major version boundary
+```
+
+If there are zero flags and zero new/removed transitive deps,
+note "Clean transitive dependency change."
+
+**STEP 3 — Build**
+
+Run the build command: {build_command}
+
+If the build command was not provided (blank), discover it:
+
+1. Read `.github/workflows/` for build steps
+2. Check `Makefile` or `justfile` for a `build` target
+3. Language-specific defaults:
+
+| Manifest | Default |
+|---|---|
+| `Cargo.toml` | `cargo build` |
+| `pyproject.toml` | `uv pip install -e ".[dev]"` |
+| `package.json` | `pnpm install && pnpm build` |
+| `go.mod` | `go build ./...` |
+| `Gemfile` | `bundle install` |
+
+If the build fails, report FAIL with exact error output and stop.
+
+**STEP 4 — Test**
+
+Run the test command: {test_command}
+
+If the test command was not provided (blank), discover it using the
+same approach as Step 3:
+
+| Manifest | Default |
+|---|---|
+| `Cargo.toml` | `cargo test` |
+| `pyproject.toml` | `pytest -q` |
+| `package.json` | `pnpm test` |
+| `go.mod` | `go test ./...` |
+| `Gemfile` | `bundle exec rspec` or `bundle exec rake test` |
+
+If tests fail, check whether the same tests also fail on the main
+branch baseline. Pre-existing failures do not count against this PR.
+
+If there are new test failures (pass on main, fail on this PR),
+report FAIL with the failing test names and error output.
+
+**STEP 5 — Build matrix gap analysis**
+
+Read `.github/workflows/` for `strategy.matrix` blocks. For each
+matrix dimension, report what was tested locally vs. what only
+runs in CI:
+
+| Dimension | Example values | Testable locally? |
+|---|---|---|
+| OS | ubuntu, macos, windows | Current OS only |
+| Language version | python 3.9-3.12 | Installed version only |
+| Dependency version | numpy 1.x, 2.x | PR's version only |
+
+Report the matrix gaps and assess risk:
+- **HIGH risk:** The dependency is known to have version-specific
+  behavior (e.g., numpy/scipy ABI, pytorch CUDA builds, native
+  extensions) and CI tests versions we couldn't test locally
+- **LOW risk:** The matrix covers OS variants or formatting
+  differences unlikely to be affected by a dependency bump
+
+If there is no matrix strategy in CI, report "No CI matrix — single
+configuration build."
+
+**STEP 6 — Verdict**
+
+**PASS** — all conditions met:
+- Build succeeds
+- All tests pass (or only pre-existing failures)
+- No transitive dependency flags (downgrades, major bumps)
+- No high-risk matrix gaps
+
+**WARN** — build and tests pass, but concerns exist:
+- New transitive dependencies introduced
+- Transitive dep crossed a major version boundary
+- High-risk matrix gaps
+- List each specific concern
+
+**FAIL** — any of:
+- Build fails
+- New test failures
+- Merge conflicts
+
+Format the final report:
+
+```
+## Evaluation Report: PR #{number} — {title}
+
+**Verdict: {PASS|WARN|FAIL}**
+
+### Transitive Dependency Analysis
+{step 2 output}
+
+### Build Result
+{pass/fail with output if failed}
+
+### Test Result
+{pass/fail with details}
+
+### Matrix Gap Analysis
+{step 5 output}
+
+### Concerns
+{list of concerns, or "None"}
+```
+
+---
 
 ### Subagent prompt: Actions Dep Evaluation
 
-Use this prompt for each GitHub Actions version bump PR (see original template for full subagent instructions covering checkout, diff analysis, workflow validation, pin verification, and verdict).
+Use this prompt for each GitHub Actions version bump PR.
+
+---
+
+You are evaluating a GitHub Actions version bump for merge safety.
+Work in the repo directory: {repo_path}
+
+**Repo:** $REPO
+**PR to evaluate:** #{number} — {title}
+
+Execute every step.
+
+**STEP 1 — Checkout**
+
+```bash
+cd {repo_path}
+git fetch origin pull/{number}/head:pr-{number}
+git checkout pr-{number}
+```
+
+**STEP 2 — Diff analysis**
+
+Run `git diff main -- .github/` to see what changed. Identify:
+- Which action(s) were bumped
+- Old and new versions (or SHA pins)
+- Whether this is a patch, minor, or major version bump
+
+For major version bumps, use Exa (`mcp__exa__web_search_exa`) to
+search for breaking changes:
+`{action_name} v{old_major} to v{new_major} migration breaking changes`
+
+**STEP 3 — Workflow validation**
+
+Run: `actionlint .github/workflows/`
+
+If `actionlint` is not installed, note this and skip to Step 4.
+
+Distinguish pre-existing errors (also present on main) from new
+errors introduced by the version bump. Only new errors count
+against this PR.
+
+**STEP 4 — Pin verification**
+
+Check every `uses:` line in changed workflow files. Verify the
+SHA-pin format:
+
+```yaml
+# GOOD:
+uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+# BAD (tag only):
+uses: actions/checkout@v4
+
+# BAD (SHA without version comment):
+uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+```
+
+Flag tag-only references as a WARN concern (not FAIL).
+
+**STEP 5 — Verdict**
+
+**PASS** — all conditions met:
+- actionlint clean (or only pre-existing warnings)
+- No breaking changes for major version bumps
+- Actions are SHA-pinned with version comments
+
+**WARN** — concerns exist:
+- Tag pin instead of SHA pin
+- Major version bump with breaking changes that appear handled
+
+**FAIL** — any of:
+- New actionlint errors
+- Major version bump with unhandled breaking changes
+
+Format the report the same way as library dep evaluations.
+
+---
 
 ## Phase 4: Sequential Merge
 
