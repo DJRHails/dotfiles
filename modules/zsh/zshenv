@@ -10,6 +10,11 @@ for i in ${fpath[@]}; do
     fi
 done
 
+# Drop zsh's obsolete `log` builtin (lists watched logins) so it never shadows
+# macOS's /usr/bin/log. In .zshenv so it applies to non-interactive shells too
+# (scripts, `zsh -c`, Claude Code's tool shell) — not just interactive ones.
+disable log 2>/dev/null
+
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 [[ -d "$HOME/.foundry/bin" ]] && export PATH="$PATH:$HOME/.foundry/bin"
