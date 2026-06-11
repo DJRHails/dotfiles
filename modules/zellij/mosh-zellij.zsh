@@ -239,3 +239,41 @@ ssh::durable() {
 
     ssh::durable::fresh "$host" "$@"
 }
+
+# zellij::sweep-husks [--dry-run]
+#
+# Close LOCAL cmux zellij sessions that are idle husks (pane running only a bare shell). These
+# pile up from durable hops that strand a detached local zellij (now auto-deleted on hop — see
+# auto-attach.zsh — but legacy ones, cmux surface re-mints, and aborted hops still accumulate).
+#
+# "Doing something" is judged by the session's pane PROCESSES, not screen text: `zellij action
+# dump-screen` is unreliable here (full-screen TUIs like claude/vim live on the alternate screen
+# so it dumps blank, and `-s` targeting of detached sessions returns nothing). The server process
+# names its session in its cmdline (`zellij --server <sock>/<session>`), so we map session ->
+# server PID -> descendant processes and keep any session running a real foreground process
+# (claude, mosh-client, ssh, vim, a build, …). The current session is always kept.
+zellij::sweep-husks() {
+    emulate -L zsh
+    local dry=0; [[ "$1" == (--dry-run|-n) ]] && dry=1
+    local agent="$ZELLIJ_SESSION_NAME" snap; snap=$(ps -axww -o pid,ppid,command)
+    local spid rest sess meaningful
+    ps -axww -o pid,command | grep 'zellij --server' | grep -v grep | while read -r spid rest; do
+        sess=$(print -r -- "$rest" | grep -oE 'cmux-[a-z0-9-]+$'); [[ -z $sess ]] && continue
+        [[ $sess == $agent ]] && { print -r -- "  keep(current) $sess"; continue }
+        meaningful=$(print -r -- "$snap" | awk -v root="$spid" '
+            { par[$1]=$2; c=$0; sub(/^ *[0-9]+ +[0-9]+ +/,"",c); cmdof[$1]=c }
+            END{ q[root]=1; ch=1; while(ch){ch=0; for(p in par){if(q[par[p]]&&!q[p]){q[p]=1;ch=1}}}
+              for(p in par){ if(q[p]&&p!=root){ c=cmdof[p]
+                if(c ~ /^(\/[^ ]*\/)?zellij( |$)/) continue
+                if(c ~ /^(\/usr\/bin\/|\/bin\/)?-?(zsh|bash|sh|login)( |$)/) continue
+                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
+                print c } } }')
+        if [[ -n $meaningful ]]; then
+            print -r -- "  keep(active)  $sess  [${$(print -r -- "$meaningful" | head -1)[1,60]}]"
+        elif (( dry )); then
+            print -r -- "  idle→kill     $sess"
+        else
+            zellij delete-session --force "$sess" >/dev/null 2>&1 && print -r -- "  killed idle   $sess"
+        fi
+    done
+}

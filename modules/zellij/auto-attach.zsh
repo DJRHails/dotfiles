@@ -184,6 +184,13 @@
         local hop="$(<"$handoff")"
         rm -f "$handoff" 2>/dev/null
         _log durable-hop "session=$session"
+        # The de-nest leaves this surface's local zellij as an empty husk — its only job was to
+        # host the shell that ran ssh::durable, and we're about to exec mosh away from it. Delete
+        # it so husks don't accumulate (otherwise every durable hop strands one detached session).
+        # We're in the outer shell here (the `zellij attach` above returned on detach), so deleting
+        # the session is safe. --force kills it even though its inner shell is still running.
+        { zellij delete-session --force "$session" } >/dev/null 2>&1
+        _log husk-deleted "session=$session"
         eval "exec ${hop}"
     fi
 
