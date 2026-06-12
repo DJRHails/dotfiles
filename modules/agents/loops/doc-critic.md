@@ -37,5 +37,8 @@ accurate, say which docs are now trusted and at what depth.
 ## Write state back
 
 Append a `[doc-critic]` entry to the repo's log: what was audited, the finding
-fixed (or "accurate"), the next-highest item. Commit + push (`git pull --rebase`
-before pushing — loops push concurrently). End with a ≤4-line status.
+fixed (or "accurate"), the next-highest item. Always **open a PR** (never push straight to
+`main`, even on a solo repo); then use your judgement on whether to merge it — squash-merge a
+clean, low-risk, well-tested change you're confident in, and leave anything uncertain or worth
+a human glance open. `git pull --rebase` before pushing the branch (loops run concurrently).
+End with a ≤4-line status.
