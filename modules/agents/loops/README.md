@@ -33,9 +33,13 @@ editing one file.
 3. **Write state back** — record the iteration in the repo's log if it has one
    (`EXPERIMENT_LOG.md`, `CHANGELOG.md`, else a `[<name>]` line in a `docs/loop-log.md`),
    commit small, and **always open a PR** — never push straight to `main`, even on a solo
-   repo. Then use your judgement on whether to merge it: squash-merge a clean, low-risk,
-   well-tested change you're confident in; leave anything uncertain or worth a human glance
-   open for review. `git pull --rebase` before pushing the branch (loops run concurrently).
+   repo. Opening it triggers an automated code review; never merge before that review lands
+   as an approval or review comments (`gh pr view --json reviews,comments,reviewDecision`;
+   schedule a wake rather than busy-polling). Once reviewed, pull the branch (the reviewer
+   may push fix commits), address the feedback, then use your judgement: squash-merge a
+   clean, low-risk, well-tested change you're confident in; leave anything uncertain or
+   worth a human glance open for review. No review after two wakes: leave the PR open and
+   say so. `git pull --rebase` before pushing the branch (loops run concurrently).
    Also report findings to the loop's Slack channel — the scheduler's wrapper names it and
    posts a start-ping there.
 4. **Guardrails** — never weaken a test or delete a cache to make a check pass;

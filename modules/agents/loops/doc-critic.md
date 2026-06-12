@@ -38,7 +38,11 @@ accurate, say which docs are now trusted and at what depth.
 
 Append a `[doc-critic]` entry to the repo's log: what was audited, the finding
 fixed (or "accurate"), the next-highest item. Always **open a PR** (never push straight to
-`main`, even on a solo repo); then use your judgement on whether to merge it — squash-merge a
-clean, low-risk, well-tested change you're confident in, and leave anything uncertain or worth
-a human glance open. `git pull --rebase` before pushing the branch (loops run concurrently).
+`main`, even on a solo repo). Opening it triggers an automated code review — never merge
+before a review lands as an approval or review comments (`gh pr view --json
+reviews,comments,reviewDecision`; schedule a wake rather than busy-polling). Once reviewed,
+pull the branch (the reviewer may push fix commits), address the feedback, then use your
+judgement — squash-merge a clean, low-risk, well-tested change you're confident in, and leave
+anything uncertain or worth a human glance open. No review after two wakes: leave the PR open
+and say so. `git pull --rebase` before pushing the branch (loops run concurrently).
 End with a ≤4-line status.
