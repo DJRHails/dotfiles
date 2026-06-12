@@ -20,8 +20,25 @@ event log. Otherwise use test runtimes, build logs, or a representative workload
 Classify the sink before touching code: CPU/algorithmic, IO/serialisation,
 network/IO-bound, or cache/recompute-bound. State the metric you'll move
 (wall-clock on a fixed workload, throughput, allocations, p50/p95 latency) and how
-you'll measure it. If nothing is worth attacking (best candidate <10% of the
-workload), log that and stop — don't invent work.
+you'll measure it. If you can measure and nothing is worth attacking (best
+candidate <10% of the workload), log that and stop — don't invent work. But if you
+*can't* localise the sink because the signal isn't there, instrument first (next)
+rather than calling it done.
+
+## Instrument first when production isn't traced
+
+If the production signal you'd measure against is missing or too thin to localise a
+bottleneck — no per-operation timing in the logs, logs are ephemeral (lost on
+restart, not queryable), outputs aren't traced — then **adding that instrumentation
+is the iteration**. Trace production outputs durably and structured: timing spans
+around the hot operations, p50/p95 latency, per-operation durations/costs, written
+somewhere queryable (a persistent log file/sink, the service's datastore, or a
+metrics surface) rather than only stdout. Keep it cheap (sampled or async if hot)
+and **never log secrets** — route any line that could carry a token/env through the
+repo's redactor. This is a complete, high-value pass on its own: skip the candidate
+race this round and log what is now traceable, so the next iteration can measure and
+optimise against real numbers. Don't optimise blind — an unmeasurable change can't
+qualify under "Pick the winner".
 
 ## Generate N candidates in parallel
 
