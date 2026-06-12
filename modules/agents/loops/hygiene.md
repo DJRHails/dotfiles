@@ -39,5 +39,4 @@ comment.
 ## Write state back
 
 Append a `[hygiene]` entry to the repo's log **only if something was found/fixed**
-(no empty heartbeat entries). Commit + push (`git pull --rebase` before pushing —
-loops push concurrently). End with a ≤3-line status.
+(no empty heartbeat entries). Always **open a PR** (never push straight to `main`, even on a solo repo); then use your judgement on whether to merge it — squash-merge a clean, low-risk, well-tested change you're confident in, and leave anything uncertain or worth a human glance open. `git pull --rebase` before pushing the branch (loops run concurrently). End with a ≤3-line status.

@@ -40,5 +40,4 @@ rest (keeping any reusable idea in the log).
 
 Append a `[perf-bestofn]` entry to the repo's log: bottleneck, the N tacks, a
 benchmark table (baseline + each candidate), winner and why, losers' ideas worth
-keeping. Commit + push (`git pull --rebase` before pushing — loops push
-concurrently). End with a ≤5-line status.
+keeping. Always **open a PR** (never push straight to `main`, even on a solo repo); then use your judgement on whether to merge it — squash-merge a clean, low-risk, well-tested change you're confident in, and leave anything uncertain or worth a human glance open. `git pull --rebase` before pushing the branch (loops run concurrently). End with a ≤5-line status.
