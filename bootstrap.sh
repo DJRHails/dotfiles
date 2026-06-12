@@ -21,6 +21,26 @@ cd "$(dirname "${BASH_SOURCE[0]}")" \
 DOTFILES=$(pwd -P)
 readonly DOTFILES
 
+# Vendored-skill submodules (e.g. graph-design → DJRHails/graphs): a clone
+# without --recurse-submodules leaves them empty, so the skills' symlinked
+# SKILL.md/examples dangle. Initialise each missing one independently and
+# tolerate failures — some submodules (modules/askllm) are private/dead and
+# must not abort the others or the bootstrap (e.g. inside image builds).
+if command -v git >/dev/null 2>&1 && [ -e .git ] \
+  && git submodule status 2>/dev/null | grep -q '^-'; then
+  echo "Initialising vendored submodules…"
+  # for-loop over a pre-collected list (not `| while read`): a failing clone
+  # inside the loop body would otherwise consume the remaining piped stdin
+  # and silently skip the later submodules.
+  sm_paths=$(git config --file .gitmodules --get-regexp 'submodule\..*\.path' \
+    | awk '{print $2}')
+  for sm_path in $sm_paths; do
+    git submodule status -- "$sm_path" 2>/dev/null | grep -q '^-' || continue
+    git submodule update --init --depth 1 -- "$sm_path" </dev/null \
+      || echo "warning: submodule $sm_path failed to initialise; skipping" >&2
+  done
+fi
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 parse_args() {
