@@ -12,13 +12,16 @@ written off) are off the table unless new evidence reopens them.
 
 ## Find the bottleneck (measure, don't guess)
 
-Profile or mine timings (test runtimes, build logs, a representative workload) for
-the single biggest wall-clock sink in a hot path. Classify it before touching
-code: CPU/algorithmic, IO/serialisation, network/IO-bound, or
-cache/recompute-bound. State the metric you'll move (wall-clock on a fixed
-workload, throughput, allocations) and how you'll measure it. If nothing is worth
-attacking (best candidate <10% of the workload), log that and stop — don't invent
-work.
+Profile or mine timings for the single biggest wall-clock sink in a hot path.
+**If the repo is a deployed service, prefer its production telemetry over
+synthetic benchmarks** — that's where real bottlenecks surface: operation/request
+latencies in its logs, and run durations/costs/queue-waits in its datastore or
+event log. Otherwise use test runtimes, build logs, or a representative workload.
+Classify the sink before touching code: CPU/algorithmic, IO/serialisation,
+network/IO-bound, or cache/recompute-bound. State the metric you'll move
+(wall-clock on a fixed workload, throughput, allocations, p50/p95 latency) and how
+you'll measure it. If nothing is worth attacking (best candidate <10% of the
+workload), log that and stop — don't invent work.
 
 ## Generate N candidates in parallel
 
