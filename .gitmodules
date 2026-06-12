@@ -1,6 +1,6 @@
 [submodule "modules/askllm"]
 	path = modules/askllm
 	url = https://github.com/DJRHails/askllm.git
-[submodule "modules/agents/skills/graph-design/graphs"]
-	path = modules/agents/skills/graph-design/graphs
+[submodule "modules/agents/skills/graph-design"]
+	path = modules/agents/skills/graph-design
 	url = https://github.com/DJRHails/graphs.git
