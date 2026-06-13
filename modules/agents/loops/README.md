@@ -27,15 +27,21 @@ editing one file.
 ## Shared conventions (every loop)
 
 1. **State first** — read the repo's loop ledger (`rg '\[<name>\]'` in the
-   experiment/change log) so the iteration continues rather than repeats.
+   experiment/change log) so the iteration continues rather than repeats, and resume any
+   open PR from a previous iteration (`gh pr list --author @me`) whose review has landed
+   before starting new work — that can be the whole iteration.
 2. **One improvement** — pick the single highest-value item and finish it (code,
    test, doc); don't start a second.
 3. **Write state back** — record the iteration in the repo's log if it has one
    (`EXPERIMENT_LOG.md`, `CHANGELOG.md`, else a `[<name>]` line in a `docs/loop-log.md`),
-   commit small, and **always open a PR** — never push straight to `main`, even on a solo
-   repo. Then use your judgement on whether to merge it: squash-merge a clean, low-risk,
-   well-tested change you're confident in; leave anything uncertain or worth a human glance
-   open for review. `git pull --rebase` before pushing the branch (loops run concurrently).
+   commit small, and ship it through the **merge gate** (a verbatim-identical section in
+   each loop file): open a PR (never push straight to `main`); wait for a code review to
+   land — an approval **or** review comments (the auto-reviewer usually shares the bot
+   identity, so `reviewDecision` never reaches APPROVED) — without busy-polling (gantry
+   workers schedule a `$GANTRY_WAKE_URL` wake; wake-less schedulers just end the iteration
+   and resume via State first); once reviewed, pull the branch, address feedback, then
+   judge the squash-merge; **never merge unreviewed** — no review after two checks, or no
+   auto-reviewer at all, means leave the PR open for a human and say so.
    Also report findings to the loop's Slack channel — the scheduler's wrapper names it and
    posts a start-ping there.
 4. **Guardrails** — never weaken a test or delete a cache to make a check pass;

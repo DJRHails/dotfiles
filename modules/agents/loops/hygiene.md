@@ -10,6 +10,10 @@ finding. Default loop — works in any repo; reads the toolchain from the repo.
 `docs/loop-log.md`). Anything found/fixed/deferred there is off the table unless
 it's still the highest-value item.
 
+Also check this loop's open PRs (`gh pr list --author @me`): one whose review has landed
+gets resumed — address the feedback and judge the merge (see Merge gate) — before any new
+sweep. That can be the whole iteration.
+
 ## Sweep (read-only, in order)
 
 1. **Toolchain green.** Detect the stack and run its linter, formatter (check
@@ -39,4 +43,22 @@ comment.
 ## Write state back
 
 Append a `[hygiene]` entry to the repo's log **only if something was found/fixed**
-(no empty heartbeat entries). Always **open a PR** (never push straight to `main`, even on a solo repo); then use your judgement on whether to merge it — squash-merge a clean, low-risk, well-tested change you're confident in, and leave anything uncertain or worth a human glance open. `git pull --rebase` before pushing the branch (loops run concurrently). End with a ≤3-line status.
+(no empty heartbeat entries). Ship it through the merge gate below. End with a ≤3-line status.
+
+## Merge gate
+
+1. **Open a PR** — never push straight to `main`, even on a solo repo. `git pull --rebase`
+   before pushing the branch (loops run concurrently).
+2. **Wait for a code review to land**: an approval **or** review comments. On repos with an
+   auto-reviewer it usually shares your bot identity, so comments are the landed review
+   (`reviewDecision` never reaches APPROVED — don't wait on it); check with
+   `gh pr view --json reviews,comments`. Never busy-poll: if your harness has a wake
+   primitive (gantry workers: `$GANTRY_WAKE_URL`), schedule one ~15 min out and end your
+   turn; otherwise end the iteration — the next scheduled run resumes the PR via State first.
+3. **Reviewed → address, then judge**: pull the branch (the reviewer may have pushed fix
+   commits), address the feedback, then squash-merge a clean, low-risk, well-tested change
+   you're confident in; leave anything uncertain or worth a human glance open. After your own
+   feedback-fix push, allow one more wake/iteration for a follow-up review, then judge —
+   don't loop forever.
+4. **Never merge unreviewed.** No review after two checks — or no auto-reviewer on the repo
+   at all — means leave the PR open for a human and say so in your report.
