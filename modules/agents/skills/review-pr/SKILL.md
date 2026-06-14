@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review an existing GitHub PR with parallel agents (pr-review-toolkit + Codex + Gemini), post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Right-sizes small / delta PRs to a direct single-pass review with no sub-agents. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
+description: Review an existing GitHub PR with the parallel pr-review-toolkit agents, post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Right-sizes small / delta PRs to a direct single-pass review with no sub-agents. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
 argument-hint: <pr-number>
 ---
 
@@ -39,10 +39,10 @@ confirmation, except where the shared-repo guard requires it.
 
 ## 0. Right-size the review (do this first)
 
-Not every PR earns the full seven-agent battery. The fan-out in §1 (five
-toolkit agents + Codex + Gemini, each up to a 10-minute timeout) exists for
-substantial PRs; running it on a four-line fix or a docs tweak burns minutes
-and tokens for no extra signal. Classify the PR first and pick the lane.
+Not every PR earns the full agent battery. The fan-out in §1 (five
+pr-review-toolkit agents) exists for substantial PRs; running it on a
+four-line fix or a docs tweak burns minutes and tokens for no extra signal.
+Classify the PR first and pick the lane.
 
 Measure the diff against the base (or, for a re-review, against the
 last-reviewed commit — see **Delta re-reviews** below):
@@ -61,8 +61,8 @@ git diff --name-only <upstream-remote>/<base-branch>...HEAD
   parent already reviewed through this skill, where the new changes are
   themselves small — the parent's battery already covered the substance.
 
-In Lane A, **skip §1's Pass A and Pass B entirely** — launch no Task agents
-and do not call Codex/Gemini. Instead review the diff yourself in a single
+In Lane A, **skip §1's agent fan-out entirely** — launch no Task agents.
+Instead review the diff yourself in a single
 pass: read every changed hunk and judge it against the repo's
 CLAUDE.md/AGENTS.md conventions, looking for the same things the agents would
 (correctness bugs, silent failures, test gaps, comment rot, type/invariant
@@ -73,11 +73,8 @@ exactly as §1's "Post inline review comments" describes, then continue with
 **Lane B — full multi-agent review.** Real source changes beyond the Lane-A
 thresholds. Run §1 as written.
 
-**Borderline** (e.g. ~100 lines of straightforward source): prefer Lane A but
-keep the single heaviest external opinion — run *one* of Codex or Gemini
-(whichever is installed) as a sanity check and skip the five toolkit
-sub-agents. When trimming the fan-out, drop the external CLIs first: they are
-the slowest, most expensive part.
+**Borderline** (e.g. ~100 lines of straightforward source): prefer Lane A; if
+the change carries real risk despite its size, run the full §1 fan-out instead.
 
 **Delta re-reviews.** When re-running this flow on a PR you already reviewed
 that has since gained commits, review only the *new* delta — diff against the
@@ -93,9 +90,9 @@ State which lane you picked and why in one line before proceeding.
 > Lane B (substantial PRs). For small / delta PRs, §0 replaces this whole
 > section with a direct single-pass review — skip straight to §2.
 
-Run two review passes in parallel, then merge findings.
+Launch the pr-review-toolkit agents in parallel, then merge their findings.
 
-### Pass A — pr-review-toolkit agents
+### Review agents (pr-review-toolkit)
 
 Launch these Task tool agents **in parallel** (single message,
 multiple tool calls), each with the matching `subagent_type` below
@@ -114,66 +111,11 @@ changed (from `git diff --name-only <base>...HEAD`):
 than reporting findings, so it runs as a polish step after fixes, not
 in this read-only pass. See step 2.)
 
-### Pass B — external second opinion
-
-Launch these Task tool agents **in parallel with Pass A** — all
-7 agents in a single message, multiple tool calls. Each uses
-`subagent_type: general-purpose`.
-
-**Codex reviewer** — tell the agent to run:
-
-```bash
-codex review --base <upstream-remote>/<base-branch> \
-  -c model='"gpt-5.3-codex"' \
-  -c model_reasoning_effort='"xhigh"'
-```
-
-- `--base` does not accept custom prompts (codex reads
-  `AGENTS.md` at the repo root if one exists)
-- If `gpt-5.3-codex` fails with an auth error, retry with
-  `gpt-5.2-codex`
-- Set `timeout: 600000` on the Bash call
-- Tell the agent to summarize findings only — skip
-  `[thinking]`/`[exec]` blocks and sandbox warnings
-- If `codex` is not installed, report and skip
-
-**Gemini reviewer** — tell the agent to run:
-
-```bash
-git diff <upstream-remote>/<base-branch>...HEAD > /tmp/pr-review-diff.txt
-
-# Build prompt file (avoids heredoc shell expansion issues)
-{
-  echo "Review this diff for code quality, bugs, and improvements."
-  if [ -f AGENTS.md ] || [ -f CLAUDE.md ] || [ -f .agents/AGENTS.md ] || [ -f .claude/CLAUDE.md ]; then
-    echo ""
-    echo "Project conventions:"
-    echo "---"
-    cat AGENTS.md CLAUDE.md .agents/AGENTS.md .claude/CLAUDE.md 2>/dev/null
-    echo "---"
-  fi
-  echo ""
-  echo "Diff:"
-  cat /tmp/pr-review-diff.txt
-} > /tmp/pr-review-prompt.txt
-
-# Pipe prompt via stdin to avoid shell metacharacter issues
-cat /tmp/pr-review-prompt.txt | gemini -p - \
-  -m gemini-3-pro-preview \
-  --yolo
-```
-
-- Uses stdin (`-p -`) instead of heredoc to avoid shell
-  expansion issues with `$`, backticks, etc. in diffs
-- Set `timeout: 600000` on the Bash call
-- If `gemini` is not installed, report and skip
-
 ### Merge findings
 
-Collect results from all 7 sources (5 toolkit agents + Codex +
-Gemini). Deduplicate overlapping findings — if multiple sources
-flag the same issue, keep the most specific description and note
-the consensus. Rank every finding by severity:
+Collect results from the five toolkit agents. Deduplicate overlapping
+findings — if multiple agents flag the same issue, keep the most specific
+description and note the consensus. Rank every finding by severity:
 
 - **P1** — blocks merge (correctness bugs, security issues)
 - **P2** — important (missing error handling, test gaps, logic flaws)
