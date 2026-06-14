@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review an existing GitHub PR with parallel agents (pr-review-toolkit + Codex + Gemini), post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
+description: Review an existing GitHub PR with parallel agents (pr-review-toolkit + Codex + Gemini), post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Right-sizes small / delta PRs to a direct single-pass review with no sub-agents. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
 argument-hint: <pr-number>
 ---
 
@@ -37,7 +37,61 @@ are about to send, and wait for explicit user confirmation.
 Execute every step below sequentially without pausing for
 confirmation, except where the shared-repo guard requires it.
 
+## 0. Right-size the review (do this first)
+
+Not every PR earns the full seven-agent battery. The fan-out in §1 (five
+toolkit agents + Codex + Gemini, each up to a 10-minute timeout) exists for
+substantial PRs; running it on a four-line fix or a docs tweak burns minutes
+and tokens for no extra signal. Classify the PR first and pick the lane.
+
+Measure the diff against the base (or, for a re-review, against the
+last-reviewed commit — see **Delta re-reviews** below):
+
+```bash
+git diff --stat <upstream-remote>/<base-branch>...HEAD
+git diff --name-only <upstream-remote>/<base-branch>...HEAD
+```
+
+**Lane A — direct review, NO sub-agents.** Take this lane when ANY holds:
+
+- **Small:** roughly ≤ 80 changed lines across ≤ 5 hand-written files.
+- **Low-risk types only:** the diff touches only docs/markdown, comments,
+  config, fixtures, lockfiles, or generated files — no source logic.
+- **Follow-up delta:** a "resolve review findings"-style PR layered on a
+  parent already reviewed through this skill, where the new changes are
+  themselves small — the parent's battery already covered the substance.
+
+In Lane A, **skip §1's Pass A and Pass B entirely** — launch no Task agents
+and do not call Codex/Gemini. Instead review the diff yourself in a single
+pass: read every changed hunk and judge it against the repo's
+CLAUDE.md/AGENTS.md conventions, looking for the same things the agents would
+(correctness bugs, silent failures, test gaps, comment rot, type/invariant
+issues). Rank findings P1–P4 and post the P1–P3 ones as inline comments
+exactly as §1's "Post inline review comments" describes, then continue with
+§2–§5 unchanged (fix → verify → push → resolve → summary).
+
+**Lane B — full multi-agent review.** Real source changes beyond the Lane-A
+thresholds. Run §1 as written.
+
+**Borderline** (e.g. ~100 lines of straightforward source): prefer Lane A but
+keep the single heaviest external opinion — run *one* of Codex or Gemini
+(whichever is installed) as a sanity check and skip the five toolkit
+sub-agents. When trimming the fan-out, drop the external CLIs first: they are
+the slowest, most expensive part.
+
+**Delta re-reviews.** When re-running this flow on a PR you already reviewed
+that has since gained commits, review only the *new* delta — diff against the
+previously-reviewed head (`git diff <last-reviewed-sha>...HEAD`), not the whole
+PR — and reuse the existing inline threads (match on the `finding:F<n>`
+tokens) instead of re-posting the full set. A small delta takes Lane A even if
+the original PR was Lane B.
+
+State which lane you picked and why in one line before proceeding.
+
 ## 1. Review
+
+> Lane B (substantial PRs). For small / delta PRs, §0 replaces this whole
+> section with a direct single-pass review — skip straight to §2.
 
 Run two review passes in parallel, then merge findings.
 
