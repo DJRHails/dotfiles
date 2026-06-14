@@ -22,9 +22,12 @@ The script (mirrors `DJRHails/kb` `bin/r2_upload.py`):
 - **Content-addressed**: key is `img/<sha256[:32]><ext>`, so identical bytes collapse to one object
   and re-uploads are idempotent (same URL every time).
 - **Immutable cache header** on upload (`Cache-Control: public, max-age=31536000, immutable`).
-- **Routing**: uses a local `rclone` if the `r2:` remote is configured; otherwise scps the file to
-  `trifle` (the user's Mac, where `rclone` + the `r2:` remote live) and uploads from there. So it
-  works from any tailnet host (e.g. `bonbon`).
+- **Routing**: a local `rclone` `r2:` remote if configured; else, inside a **gantry worker**
+  (`$GANTRY_BASE_URL` + `$GANTRY_API_KEY` set), it POSTs the bytes to gantry's
+  `/agent/attachments` — gantry holds the R2 creds the sandboxed worker lacks and returns the same
+  `cdn.hails.info/img/<sha>` URL (images only); else it scps to `trifle` (the user's Mac, where
+  `rclone` + the `r2:` remote live) and uploads from there. So it works from a maintainer host, a
+  gantry worker, or any tailnet host.
 
 ## Embedding in a GitHub PR/issue (the common case)
 
