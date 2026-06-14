@@ -8,10 +8,11 @@
 # Routing (first that applies):
 #   1. a local `rclone` with the `r2:` remote (maintainer hosts: trifle, or bonbon
 #      once configured) — uploads directly.
-#   2. a gantry worker ($GANTRY_BASE_URL + $GANTRY_API_KEY set) — POSTs the bytes to
-#      gantry's /agent/attachments, which holds the R2 creds the sandboxed worker
-#      lacks and returns the same content-addressed cdn.hails.info/img/<sha> URL.
-#      Images only (png/jpeg/gif/webp); no rclone/ssh needed in the worker.
+#   2. the `gantry` CLI with a token (a gantry worker, where $GANTRY_API_KEY is
+#      injected) — `gantry attach` POSTs to gantry's /agent/attachments, which holds
+#      the R2 creds the sandboxed worker lacks and returns the same content-addressed
+#      cdn.hails.info/img/<sha> URL. Images only (png/jpeg/gif/webp). No rclone/ssh
+#      or R2 credential needed in the worker.
 #   3. scp to `trifle` (the user's Mac) and run rclone there.
 # So it works from a maintainer host, a gantry worker, or any tailnet host.
 #
@@ -30,7 +31,11 @@ if [ "$#" -eq 0 ]; then
 fi
 
 have_local_r2() { command -v rclone >/dev/null 2>&1 && rclone listremotes 2>/dev/null | grep -qx "r2:"; }
-have_gantry() { [ -n "${GANTRY_BASE_URL:-}" ] && [ -n "${GANTRY_API_KEY:-}" ]; }
+# A gantry worker has the `gantry` CLI on PATH and a thread-bound $GANTRY_API_KEY
+# (also matches a maintainer host that has exported $GANTRY_TOKEN).
+have_gantry() {
+  command -v gantry >/dev/null 2>&1 && { [ -n "${GANTRY_API_KEY:-}" ] || [ -n "${GANTRY_TOKEN:-}" ]; }
+}
 
 content_key() { # <file> -> img/<sha256[:32]><.ext>
   local f="$1" sha ext
@@ -38,16 +43,6 @@ content_key() { # <file> -> img/<sha256[:32]><.ext>
   ext=".${f##*.}"
   [ "$ext" = ".$f" ] && ext=".bin"
   printf 'img/%s%s' "$sha" "$(printf '%s' "$ext" | tr '[:upper:]' '[:lower:]')"
-}
-
-gantry_mime() { # <file> -> the image media-type gantry accepts, or empty
-  case "$(printf '%s' "${1##*.}" | tr '[:upper:]' '[:lower:]')" in
-  png) echo image/png ;;
-  jpg | jpeg) echo image/jpeg ;;
-  gif) echo image/gif ;;
-  webp) echo image/webp ;;
-  *) echo "" ;;
-  esac
 }
 
 upload_local() { # <file> <key>
@@ -63,32 +58,6 @@ upload_via_trifle() { # <file> <key>
   ssh trifle "bash -lc \"rclone copyto '$tmp' '${REMOTE}/$key' --header-upload '$CACHE_HEADER'\""
 }
 
-# Inside a gantry worker the R2 creds live in the control plane, not the sandbox:
-# POST the raw bytes to /agent/attachments with the worker's thread-bound token.
-# gantry stores them content-addressed in the same bucket and returns the public
-# URL — so the worker never needs rclone, ssh, or any R2 credential.
-upload_via_gantry() { # <file> -> prints the authoritative cdn url
-  local f="$1" mime resp url
-  mime="$(gantry_mime "$f")"
-  if [ -z "$mime" ]; then
-    echo "cdn-upload: in a gantry worker only images (png/jpeg/gif/webp) can be hosted via gantry attachments (got '$f'). Commit it and link the in-repo path instead." >&2
-    return 1
-  fi
-  resp="$(curl -fsS -X POST \
-    "${GANTRY_BASE_URL%/}/agent/attachments?media_type=${mime}&name=$(basename "$f")" \
-    -H "Authorization: Bearer ${GANTRY_API_KEY}" \
-    --data-binary @"$f")" || {
-    echo "cdn-upload: gantry attachment upload failed for '$f'" >&2
-    return 1
-  }
-  url="$(printf '%s' "$resp" | sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
-  [ -n "$url" ] || {
-    echo "cdn-upload: no url in gantry response: $resp" >&2
-    return 1
-  }
-  printf '%s\n' "$url"
-}
-
 for f in "$@"; do
   [ -f "$f" ] || {
     echo "not a file: $f" >&2
@@ -99,7 +68,11 @@ for f in "$@"; do
     upload_local "$f" "$key" >&2
     emit_url "$key"
   elif have_gantry; then
-    upload_via_gantry "$f"
+    # Inside a gantry worker the R2 creds live in the control plane, not the
+    # sandbox: the gantry CLI POSTs the bytes to /agent/attachments (worker token,
+    # base+token resolved from the env gantry injects) and prints the same
+    # content-addressed cdn.hails.info URL. Images only — gantry rejects the rest.
+    gantry attach "$f"
   else
     key="$(content_key "$f")"
     upload_via_trifle "$f" "$key" >&2
