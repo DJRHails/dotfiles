@@ -7,6 +7,7 @@ Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) 
 - **No speculative features** - Don't add features, flags, or configuration unless users actively need them
 - **No premature abstraction** - Don't create utilities until you've written the same code three times
 - **Clarity over cleverness** - Prefer explicit, readable code over dense one-liners
+- **Name things for what they are** - When you split work, options, modes, or data into categories, label each by what distinguishes it (`direct-review` / `multi-agent-review`), never with opaque placeholders (`lane A` / `option B` / `variant alpha` / `tier 1`). Arbitrary labels force the reader to hold a decoder ring; descriptive names carry the meaning. Applies to code (enum variants, functions, flags) and to prose/docs alike.
 - **Justify new dependencies** - Each dependency is attack surface and maintenance burden
 - **Replace, don't deprecate** - When a new implementation replaces an old one, remove the old one entirely. No backward-compatible shims, dual config formats, or migration paths. Proactively flag dead code.
 - **Verify at every level** - Set up automated guardrails (linters, type checkers, pre-commit hooks, tests) as the first step, not an afterthought. Prefer structure-aware tools (ast-grep, LSPs, compilers) over text pattern matching.
