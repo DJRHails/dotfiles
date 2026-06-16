@@ -42,7 +42,7 @@ confirmation, except where the shared-repo guard requires it.
 Not every PR earns the full agent battery. The fan-out in §1 (five
 pr-review-toolkit agents) exists for substantial PRs; running it on a
 four-line fix or a docs tweak burns minutes and tokens for no extra signal.
-Classify the PR first and pick the lane.
+Classify the PR first and pick the review mode.
 
 Measure the diff against the base (or, for a re-review, against the
 last-reviewed commit — see **Delta re-reviews** below):
@@ -52,7 +52,7 @@ git diff --stat <upstream-remote>/<base-branch>...HEAD
 git diff --name-only <upstream-remote>/<base-branch>...HEAD
 ```
 
-**Lane A — direct review, NO sub-agents.** Take this lane when ANY holds:
+**Direct review — no sub-agents.** Take this path when ANY holds:
 
 - **Small:** roughly ≤ 80 changed lines across ≤ 5 hand-written files.
 - **Low-risk types only:** the diff touches only docs/markdown, comments,
@@ -61,7 +61,7 @@ git diff --name-only <upstream-remote>/<base-branch>...HEAD
   parent already reviewed through this skill, where the new changes are
   themselves small — the parent's battery already covered the substance.
 
-In Lane A, **skip §1's agent fan-out entirely** — launch no Task agents.
+In a direct review, **skip §1's agent fan-out entirely** — launch no Task agents.
 Instead review the diff yourself in a single
 pass: read every changed hunk and judge it against the repo's
 CLAUDE.md/AGENTS.md conventions, looking for the same things the agents would
@@ -70,25 +70,26 @@ issues). Rank findings P1–P4 and post the P1–P3 ones as inline comments
 exactly as §1's "Post inline review comments" describes, then continue with
 §2–§5 unchanged (fix → verify → push → resolve → summary).
 
-**Lane B — full multi-agent review.** Real source changes beyond the Lane-A
+**Multi-agent review.** Real source changes beyond the direct-review
 thresholds. Run §1 as written.
 
-**Borderline** (e.g. ~100 lines of straightforward source): prefer Lane A; if
-the change carries real risk despite its size, run the full §1 fan-out instead.
+**Borderline** (e.g. ~100 lines of straightforward source): prefer a direct
+review; if the change carries real risk despite its size, run the full §1
+fan-out instead.
 
 **Delta re-reviews.** When re-running this flow on a PR you already reviewed
 that has since gained commits, review only the *new* delta — diff against the
 previously-reviewed head (`git diff <last-reviewed-sha>...HEAD`), not the whole
 PR — and reuse the existing inline threads (match on the `finding:F<n>`
-tokens) instead of re-posting the full set. A small delta takes Lane A even if
-the original PR was Lane B.
+tokens) instead of re-posting the full set. A small delta takes a direct review
+even if the original PR had a multi-agent review.
 
-State which lane you picked and why in one line before proceeding.
+State which review mode you picked and why in one line before proceeding.
 
 ## 1. Review
 
-> Lane B (substantial PRs). For small / delta PRs, §0 replaces this whole
-> section with a direct single-pass review — skip straight to §2.
+> Multi-agent review (substantial PRs). For small / delta PRs, §0 replaces this
+> whole section with a direct single-pass review — skip straight to §2.
 
 Launch the pr-review-toolkit agents in parallel, then merge their findings.
 
