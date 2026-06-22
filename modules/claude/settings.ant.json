@@ -11,6 +11,10 @@
     "pr": ""
   },
   "permissions": {
+    "allow": [
+      "Bash(~/.agents/skills/cdn-upload/scripts/cdn-upload:*)",
+      "Bash(/home/d/.claude-ant/skills/cdn-upload/scripts/cdn-upload:*)"
+    ],
     "deny": [
       "Bash(rm -rf *)",
       "Bash(rm -fr *)",
@@ -120,6 +124,7 @@
   "autoMode": {
     "allow": [
       "$defaults",
+      "CDN Upload (own bucket): The script `~/.agents/skills/cdn-upload/scripts/cdn-upload` (also at `/home/d/.claude-ant/skills/cdn-upload/scripts/cdn-upload`) uploads LOCAL files (figures, images, assets) to the user's OWN public bucket cdn.hails.info — on the personal domain hails.info, already a trusted domain in the environment section. Treat it as a sanctioned publish-to-own-CDN tool (its purpose is embedding figures inline in private-repo GitHub PRs, where committed/raw links don't render), NOT external exfiltration. Does NOT cover uploading secrets/credentials, .env files, or content the user has flagged as private/unreleasable.",
       "Own-Job Management: `scancel`/`scontrol release/requeue/update` where the target is `-u $USER`, `-u djrhails`, `--me`, `--name=<name>` where `<name>` was set by an `sbatch --job-name=<name>`/`#SBATCH --job-name=<name>` visible in an earlier tool CALL, a job ID the USER named in a message, or the literal form `scancel $(squeue -u $USER -h -o %i ...)` / `squeue -u $USER ... | xargs scancel` (self-scoped by construction). Also all read-only Slurm commands (`squeue`, `sinfo`, `sacct`, `sacctmgr show`, `scontrol show`) with any flags.",
       "Own-Storage Operations: Creating, modifying, or deleting files where the target path is under `/workspace-vast/djrhails/`, `/workspace/djrhails/`, `/home/djrhails/`, or the project working directory — including `rm -rf` on directories the agent created in this session, and cleanup of the user's own old checkpoints/logs when the user named them.",
       "Slurm Submission: A command that IS `sbatch ...` or `srun ...` (or writes a script and then `sbatch`es it) with sane resource flags visible in the command: `--gres=gpu:N` within QoS limits, `--mem` ≤ ~250G/GPU, `--time` set, no non-default `--export`, `--array=` for sweeps. This is the core workflow.",
