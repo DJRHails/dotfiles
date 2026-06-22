@@ -22,9 +22,9 @@ cmux close-window --window window:2
 
 cmux list-workspaces
 cmux list-workspaces --json
-cmux new-workspace --name "task" --cwd "$PWD"
-cmux new-workspace --command "npm run dev"
-cmux new-workspace --layout '{"root":{"type":"terminal"}}'
+cmux workspace create --name "task" --cwd "$PWD"
+cmux workspace create --command "npm run dev"
+cmux workspace create --layout '{"root":{"type":"terminal"}}'
 cmux current-workspace
 cmux select-workspace --workspace workspace:2
 cmux rename-workspace --workspace workspace:2 -- "new name"

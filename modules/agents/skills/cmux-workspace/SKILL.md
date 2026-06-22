@@ -105,7 +105,7 @@ Prefer explicit workspace flags even when env vars are set. It makes automation 
 
 ```bash
 # create a new workspace when the user asks for a new task area
-cmux new-workspace --name "debug auth" --cwd "$PWD"
+cmux workspace create --name "debug auth" --cwd "$PWD"
 
 # rename / close (only when explicitly requested)
 cmux rename-workspace --workspace "${CMUX_WORKSPACE_ID:-}" -- "build fix"
