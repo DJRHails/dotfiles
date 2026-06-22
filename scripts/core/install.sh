@@ -70,6 +70,27 @@ install::cargo_tool() {
   fi
 }
 
+# Install a CLI via `go install` (idempotent). Same trap as install::uv_tool:
+# routing go through install::with back-fills the system package-manager flags,
+# which `go install` rejects. GOBIN is forced to ~/.local/bin (same landing spot
+# as install::release_binary) so the probe finds tools during bootstrap, which
+# runs under bash without zshenv's ~/go/bin PATH entry.
+# Args: readable name, command to probe, module path with version
+# (e.g. github.com/org/repo/cmd/tool@latest).
+install::go_tool() {
+  local -r readable_name="$1"
+  local -r cmd="$2"
+  local -r pkg="$3"
+  if platform::command_exists "$cmd"; then
+    log::success "$readable_name"
+  elif platform::command_exists go; then
+    mkdir -p "$HOME/.local/bin"
+    log::execute "GOBIN=$HOME/.local/bin go install $pkg" "$readable_name"
+  else
+    log::warning "$readable_name: go not on PATH; skipping go install"
+  fi
+}
+
 # Install a developer CLI tool, preferring Homebrew (macOS always; Linux only
 # when Linuxbrew is present) and falling back to a prebuilt GitHub-release binary
 # only when brew is unavailable — e.g. a bare Linux box where the tool has no apt

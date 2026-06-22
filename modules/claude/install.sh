@@ -23,6 +23,8 @@ install::release_binary "actionlint" "actionlint" "rhysd/actionlint" \
 install::release_binary "zizmor" "zizmor" "zizmorcore/zizmor" \
   "https://github.com/zizmorcore/zizmor/releases/download/@TAG@/zizmor-@ARCH_GNU@-unknown-linux-gnu.tar.gz"
 
+install::go_tool "ant (anthropic-cli)" "ant" "github.com/anthropics/anthropic-cli/cmd/ant@latest"
+
 # trash: macos-trash provides `trash` (real Finder Trash). On Linux, link the
 # repo's shim, which moves paths to $TRASH_DIR (default ~/.local/share/Trash/files).
 if platform::is_osx; then
