@@ -5,11 +5,11 @@
 # cmux mints fresh workspace/surface UUIDs on every app restart, so the id-keyed
 # session name changes and the old sessions are orphaned (they keep running). So we
 # don't trust the forwarded ids — instead we show a picker of the host's live zellij
-# sessions, each annotated with a one-line summary of what its panel is currently
-# doing (fzf, with the live screen in the preview; ctrl-r re-summarises). Pick one and
-# we mosh-attach it. Press Esc (or if there are no sessions) and we fall back to the
-# legacy behaviour: forward the cmux ids and let the remote auto-attach snippet
-# create/attach the id-designated session.
+# sessions, each annotated with a one-line summary of what its panel is currently doing and its
+# cwd (fzf, with the live screen in the preview; ctrl-r re-summarises). A green ● marks sessions
+# with a live mosh client, and the header shows the connected count. Pick one and we mosh-attach
+# it. Press Esc (or if there are no sessions) and we fall back to the legacy behaviour: forward
+# the cmux ids and let the remote auto-attach snippet create/attach the id-designated session.
 #
 # Non-interactive / scriptable (for automation like `resurrect`):
 #   ssh::durable <host> --list                 print "<session>\t<summary>" lines, no fzf, no attach
@@ -17,6 +17,9 @@
 #   ssh::durable <host> --query <str> [mosh…]  attach the most-recent session whose menu line
 #                                              contains <str> (case-insensitive fixed string,
 #                                              not a regex); no match → fresh
+#   ssh::durable <host> --reap                 refresh the connected-session cache + kill orphaned
+#                                              (disconnected) mosh-servers; ~60s, safe to loop. The
+#                                              picker also fires this in the background on teardown.
 # --attach/--query exec mosh when run outside a local zellij (via ssh::durable::go), so they
 # still work as a cmux workspace --command; inside one they de-nest like the interactive path.
 #
@@ -50,12 +53,16 @@
 # mirror after every line — so an fzf polling the mirror sees cwds and summaries fill in live.
 ssh::durable::stream_apply() {
     emulate -L zsh
-    local mirror="$1" autherr="$2" raw sess k
+    local mirror="$1" autherr="$2" statusf="$3" raw sess k
     local -a order; local -A line
     while IFS= read -r raw; do
         [[ -n $raw ]] || continue
         if [[ $raw == '__AUTHFAIL__'* ]]; then
             print -r -- "${raw#__AUTHFAIL__$'\t'}" > "$autherr"
+            continue
+        fi
+        if [[ $raw == '__STATUS__'* ]]; then
+            print -r -- "${raw#__STATUS__$'\t'}" > "$statusf"
             continue
         fi
         sess=${raw%%$'\t'*}
@@ -71,7 +78,7 @@ ssh::durable::stream_apply() {
 # ssh-pipeline pid in $pidf so the caller can kill an in-flight refresh on teardown.
 ssh::durable::stream_supervisor() {
     emulate -L zsh
-    local host="$1" mirror="$2" done="$3" req="$4" quit="$5" pidf="$6" autherr="$7"
+    local host="$1" mirror="$2" done="$3" req="$4" quit="$5" pidf="$6" autherr="$7" statusf="$8"
     local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
     [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; : > "$done"; return 1; }
     local ttl pp
@@ -80,7 +87,7 @@ ssh::durable::stream_supervisor() {
         [[ -f $req ]] && { ttl=0; command rm -f "$req" "$autherr"; }
         command rm -f "$done"
         ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" \
-            < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" &
+            < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" "$statusf" &
         pp=$!
         print -r -- "$pp" > "$pidf"
         wait $pp
@@ -202,6 +209,14 @@ ssh::durable() {
             ssh::durable::menu_list "$host"
             return $?
             ;;
+        --reap|--sweep-mosh)
+            # Refresh the connected-session cache + reap disconnected mosh-servers (~60s on the
+            # host). Safe to loop. The picker reads the cache this leaves behind for its ● + count.
+            local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
+            [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; return 1; }
+            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap < "$rscript"
+            return $?
+            ;;
         --attach|-a)
             shift
             local sess="$1"; shift
@@ -241,9 +256,25 @@ ssh::durable() {
     if command -v fzf >/dev/null 2>&1 && [[ -r $rscript ]]; then
         local tmpd; tmpd=$(mktemp -d "${TMPDIR:-/tmp}/durable.XXXXXX")
         local mirror="$tmpd/menu" done="$tmpd/done" req="$tmpd/req" quit="$tmpd/quit"
-        local pidf="$tmpd/pid" autherr="$tmpd/autherr"
+        local pidf="$tmpd/pid" autherr="$tmpd/autherr" sig="$tmpd/sig" poll="$tmpd/poll.sh"
+        local statusf="$tmpd/statusf"
         : > "$mirror"
-        ssh::durable::stream_supervisor "$host" "$mirror" "$done" "$req" "$quit" "$pidf" "$autherr" &
+
+        # Debounce reloads: block until the mirror's (mtime+size) signature changes or $done
+        # lands, then print it — so fzf redraws only on real updates instead of on a fixed timer.
+        cat > "$poll" <<'POLL'
+#!/bin/sh
+m=$1 d=$2 sig=$3
+last=$(cat "$sig" 2>/dev/null || echo init)
+while :; do
+  cur=$(stat -c '%Y %s' "$m" 2>/dev/null || stat -f '%m %z' "$m" 2>/dev/null || echo 0)
+  { [ "$cur" != "$last" ] || [ -f "$d" ]; } && break
+  sleep 0.3
+done
+printf '%s' "$cur" > "$sig"
+cat "$m"
+POLL
+        ssh::durable::stream_supervisor "$host" "$mirror" "$done" "$req" "$quit" "$pidf" "$autherr" "$statusf" &
         local sup=$!
 
         # Wait briefly for the first snapshot before showing fzf (≤15s; $done means no sessions).
@@ -254,9 +285,9 @@ ssh::durable() {
         local chosen='' pick=1
         if [[ -s $mirror ]]; then
             local preview="ssh ${(q)host} sh -s -- --preview {1} < ${(q)rscript}"
-            # start: show the cached snapshot at once. load: poll the mirror every 0.5s so live
-            # updates appear, swap the header to the auth error if one lands, then unbind once
-            # $done is set. ctrl-r: force a fresh re-summarise.
+            # start: show the cached snapshot at once. load: wait for the next real mirror change
+            # (debounced — see poll.sh) then reload, swap the header to the auth error if one
+            # lands, and unbind once $done is set. ctrl-r: force a fresh re-summarise.
             chosen=$(fzf < /dev/null \
                 --ansi --delimiter=$'\t' --with-nth=2 \
                 --prompt="durable@${host}> " \
@@ -264,8 +295,8 @@ ssh::durable() {
                 --height=90% --border --reverse \
                 --preview "$preview" --preview-window='right:62%:wrap' \
                 --bind "start:reload(cat $mirror)" \
-                --bind "load:transform-header[test -s $autherr && cat $autherr || echo '$hdr']+transform[test -f $done && echo 'reload(cat $mirror)+unbind(load)' || echo 'reload(sleep 0.5; cat $mirror)']" \
-                --bind "ctrl-r:execute-silent(command rm -f $done $autherr; : > $req)+rebind(load)+reload(cat $mirror)")
+                --bind "load:transform-header[test -s $autherr && cat $autherr || { test -s $statusf && printf '%s · %s' \"\$(cat $statusf)\" '$hdr' || echo '$hdr'; }]+transform[test -f $done && echo 'reload(cat $mirror)+unbind(load)' || echo 'reload(sh $poll $mirror $done $sig)']" \
+                --bind "ctrl-r:execute-silent(command rm -f $done $autherr $sig; : > $req)+rebind(load)+reload(cat $mirror)")
             pick=$?
         fi
 
@@ -275,9 +306,14 @@ ssh::durable() {
         [[ -s $pidf ]] && kill "$(<$pidf)" 2>/dev/null
         kill "$sup" 2>/dev/null
         local authmsg=''; [[ -s $autherr ]] && authmsg=$(<$autherr)
-        command rm -f "$mirror" "$mirror.tmp" "$done" "$req" "$quit" "$pidf" "$autherr"
+        command rm -f "$mirror" "$mirror.tmp" "$done" "$req" "$quit" "$pidf" "$autherr" "$sig" "$poll" "$statusf"
         rmdir "$tmpd" 2>/dev/null
         [[ -n $authmsg ]] && print -u2 -- "ssh::durable: ⚠ $authmsg"
+
+        # Self-maintain the connected cache: fire a detached, lock-guarded reap on the host (it
+        # samples mosh-servers for ~60s, refreshes the cache, kills disconnected ones). Decoupled
+        # from this picker's lifetime; flock -n means concurrent opens don't pile up.
+        ( ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap < "$rscript" >/dev/null 2>&1 & ) 2>/dev/null
 
         if [[ $pick -eq 0 && -n $chosen ]]; then
             ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
