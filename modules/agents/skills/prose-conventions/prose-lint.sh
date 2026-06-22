@@ -22,6 +22,7 @@ BANNED_VOCAB=(
   enduring lasting foster cultivate
   enhance garner vibrant nestled
   breathtaking stunning testament profound
+  spine
 )
 
 BANNED_ATMOSPHERIC=(
@@ -61,6 +62,19 @@ NEGATIVE_PARALLELISMS=(
   "doesn't just"
 )
 
+UNNECESSARY_WORDS=(
+  genuinely currently literally precisely arguably
+)
+
+UNNECESSARY_PHRASES=(
+  "in many ways" "to some extent" "it could be said"
+  "it's worth noting" "note that" "observe that"
+)
+
+BANNED_PHRASES=(
+  "dive into" "align with" "in conclusion" "that said"
+)
+
 # --- Helpers ---
 
 total_hits=0
@@ -76,6 +90,10 @@ scan_pattern() {
   local category="$1" pattern="$2"
   shift 2
   while IFS=: read -r file line match; do
+    # Skip non-prose lines: markdown tables, imports, YAML frontmatter keys
+    [[ "$match" =~ ^[[:space:]]*\| ]] && continue
+    [[ "$match" =~ ^import[[:space:]] ]] && continue
+    [[ "$match" =~ ^[a-z][a-zA-Z_-]*:([[:space:]]|$) ]] && continue
     warn "$category" "$match" "$file" "$line"
   done < <(rg -inH --no-heading "$pattern" "$@" 2>/dev/null || true)
 }
@@ -131,6 +149,21 @@ for pattern in "${NEGATIVE_PARALLELISMS[@]}"; do
   scan_pattern "negative-parallelism" "$pattern" "${files[@]}"
 done
 
+# --- 7b. Unnecessary words and hedge phrases ---
+
+unnecessary_pattern=$(IFS='|'; echo "${UNNECESSARY_WORDS[*]}")
+scan_pattern "unnecessary-word" "\\b($unnecessary_pattern)\\b" "${files[@]}"
+
+for phrase in "${UNNECESSARY_PHRASES[@]}"; do
+  scan_pattern "unnecessary-word" "\\b$phrase\\b" "${files[@]}"
+done
+
+# --- 7c. Banned multi-word phrases ---
+
+for phrase in "${BANNED_PHRASES[@]}"; do
+  scan_pattern "banned-vocab" "\\b$phrase\\b" "${files[@]}"
+done
+
 # --- 8. Excessive em dashes (3+ in one file) ---
 
 for f in "${files[@]}"; do
@@ -155,10 +188,11 @@ vague_pattern="(experts believe|industry observers|some critics argue|"
 vague_pattern+="several sources|observers have cited)"
 scan_pattern "vague-attribution" "$vague_pattern" "${files[@]}"
 
-# --- 11. Rule of three (X, Y, and Z repeated patterns) ---
-# Heuristic: lines with 2+ commas followed by ", and"
+# --- 11. Rule of three (balanced "X, Y, and Z" tricolons) ---
+# Heuristic: a clause with exactly two commas before "and". The character
+# classes exclude commas, so four-item lists (the recommended fix) do not match.
 
-scan_pattern "rule-of-three" ",.*,.*,\\s+and\\s+" "${files[@]}"
+scan_pattern "rule-of-three" "(^|[.;:!?] )[^,.;:!?]+, [^,.;:!?]+, and [^,.;:!?]+" "${files[@]}"
 
 # --- Summary ---
 

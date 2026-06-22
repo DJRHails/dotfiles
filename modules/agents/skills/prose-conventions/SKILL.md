@@ -68,7 +68,7 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Punctuation & Syntax
 
-- **Excessive em dashes** — zero to two in the whole piece. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`.
+- **Excessive em dashes** — zero to two in the whole piece. A paired parenthetical (`-- like this --`) counts as one use, and `--` in markdown source counts the same as a typeset `—`. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`.
 - **"It's not X, it's Y"** — formulaic contrast
 - **"You're not X, you're Y"** — formulaic contrast
 - **"No X. No Y. Just Z."** — rule-of-threes literary variant
@@ -110,6 +110,7 @@ These patterns signal machine-generated text. Never use them.
 | `interesting`, `fascinating` | Empty praise — explain *why* it matters |
 | `groundbreaking` | Let the reader judge significance |
 | `complex`, `rich` (as praise) | Vacuous; describe what makes it so |
+| `spine` (metaphorical) | "the spine of the argument" — AI structural metaphor |
 
 ### Banned Atmospheric Words
 
@@ -120,7 +121,7 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Rhetorical Moves
 
-- **Compulsive tricolons** — a balanced three-item list ("X, Y, and Z") is a fingerprint. Break to two, split across sentences, or disrupt with an off fourth item.
+- **Compulsive tricolons** — a balanced three-item list ("X, Y, and Z") is a fingerprint. Break to two, split across sentences, or disrupt with an off fourth item. The ban targets balanced abstract triads; a list of concrete specifics ("blog posts, conference slides, and LinkedIn thought pieces") earns its place, and a four-item list is already the fix, not the disease.
 - **Formulaic openings** — "In today's fast-paced world", "In the age of X", "There is something almost mythic about..."
 - **Empty profundity** — "carve your code into my core, etched like prophecy"
 - **Mixed metaphors** — piling concepts until collapse
@@ -200,7 +201,7 @@ Every caption should answer three questions in order: *what am I looking at*, *h
 
 1. **Self-contained** — A reader should understand the figure without reading the surrounding text. You could rip any figure out and it would still make sense.
 2. **Define terms inline** — Don't assume the reader remembers what a metric means. Restate definitions in the caption (e.g. "0 = uniform prediction, 100 = perfect foresight"; "replaceability = reduction in score when removing a model").
-3. **State the takeaway** — Don't just describe axes and labels. Say what the reader should conclude. "gpt-oss-120b climbs 7 points and marginally exceeds Gemini 3 Pro" not "shows training curves".
+3. **State the takeaway** — Don't just describe axes and labels. Say what the reader should conclude. "gpt-oss-120b climbs 7 points and marginally exceeds Gemini 3 Pro" not "shows training curves". State it directly, not as an instruction: "The crosshatching makes dots hard to count", never "Note the crosshatching". Captions are where didactic "Note the X" openers sneak in.
 4. **Include specific numbers** — Ensemble weights (40%, 20%, 20%, 20%), score improvements (38.6 → 45.8), chosen baselines (18.8%). Ground the caption so the figure is verifiable.
 5. **Explain design choices** — Why the Y-axis is truncated at 22.3, what marker colour encodes, why a particular baseline is chosen. Prevent misreading.
 6. **Short enough to scan** — Most captions should be 2–3 sentences. Earn extra length only by packing in necessary context.
@@ -262,8 +263,8 @@ Ask: does this change make the writing better, or just more uniform?
 
 Two helpers ship in this skill's directory:
 
-- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, superficial "-ing" openers, vague attribution, rule-of-three). Word lists are kept in sync with this guide. Requires `rg`; exits non-zero when it finds hits.
-- `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences.
+- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, superficial "-ing" openers, vague attribution, rule-of-three). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
+- `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences. Strips YAML frontmatter, tables, imports, and JSX before counting, so MDX files report prose only.
 
 Run both before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
 

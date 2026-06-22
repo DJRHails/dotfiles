@@ -17,19 +17,28 @@ if [[ ! -f "$file" ]]; then
   exit 1
 fi
 
-# Strip markdown headers, links, code blocks, and blank lines
+# Strip YAML frontmatter, markdown headers, links, code blocks, tables,
+# imports, JSX tags/attributes, and blank lines
 # Split on sentence-ending punctuation
 # Count words per sentence
 
 awk '
+  NR == 1 && /^---$/ { in_fm = 1; next }
+  in_fm && /^---$/ { in_fm = 0; next }
+  in_fm { next }
   /^```/ { in_code = !in_code; next }
   in_code { next }
   /^#/ { next }
+  /^[[:space:]]*\|/ { next }
+  /^import / { next }
+  /^[[:space:]]*[<{}\/]/ { next }
+  /^[[:space:]]*[A-Za-z][A-Za-z]*=["{]/ { next }
   /^[-*] / { sub(/^[-*] /, "") }
   /^[0-9]+\. / { sub(/^[0-9]+\. /, "") }
   /^\s*$/ { next }
   {
     # Remove markdown formatting
+    gsub(/\[\^[^\]]*\]:?/, "")               # footnote markers and definitions
     gsub(/\[([^\]]*)\]\([^\)]*\)/, "\\1")  # links
     gsub(/[*_`~]/, "")                       # bold/italic/code
     gsub(/!\[([^\]]*)\]/, "")                # images

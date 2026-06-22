@@ -15,7 +15,9 @@ objects (title/body/bullets/tables/positioned images, brand-styled text boxes) �
 so the result stays editable, not a flat image. `pull` reconstructs the markdown
 from those native objects; `roundtrip` proves the loop is stable.
 
-Script (uv, self-contained deps): `scripts/slidesync.py`.
+Packaged at [github.com/DJRHails/slidesync](https://github.com/DJRHails/slidesync)
+(PyPI: [`slidesync`](https://pypi.org/project/slidesync/)). Run with
+**`uvx slidesync`** — no install needed.
 
 ## Auth (no setup)
 
@@ -30,21 +32,27 @@ The account defaults to gog's default account (override with `--account` or
 
 | Command | Purpose |
 |---------|---------|
-| `slidesync.py push <file.slidev.md> [--deck ID] [--new "Title"] [--anchor SLIDE] [--prune]` | md -> Slides |
-| `slidesync.py pull <deckId> --out <file.md> [--all]` | Slides -> md (`--all` includes non-managed slides) |
-| `slidesync.py roundtrip [--keep]` | self-test: push a sample, pull, assert identical |
-| `slidesync.py layouts <deckId>` | list a deck's theme layouts + placeholders |
-| `slidesync.py make-templates <deckId>` | inject legacy in-deck `{{token}}` template slides |
+| `slidesync push <file.slidev.md>... [--deck ID] [--new "Title"] [--anchor SLIDE] [--prune] [--force]` | md -> Slides (rejected if it would discard live Slides edits; `--force` overrides) |
+| `slidesync pull <deckId> --out <file.md> [--all]` | Slides -> md (`--all` includes non-managed slides) |
+| `slidesync sync <file.slidev.md>... [--deck ID] [--prune]` | reconcile with the live deck: capture comment threads as `<!-- @Author: ... -->`, write live edits back into the markdown, push local changes; conflicts print three-way diffs and exit 1 |
+| `slidesync comments <deckId>` | list comment threads as JSON (page anchor, author, content, replies) |
+| `slidesync roundtrip [--keep]` | self-test: push a sample, pull, assert identical |
+| `slidesync layouts <deckId>` | list a deck's theme layouts + placeholders |
+| `slidesync make-templates <deckId>` | inject legacy in-deck `{{token}}` template slides |
 
 `push` resolves the target deck from (in order) `--deck`, `--new`, or a
 top-level `deck:` frontmatter key (URL or bare id). Relative image paths resolve
-against the markdown file's directory.
+against each slide's own source file. **Multi-file decks** (>=0.5): `push`/`sync`
+accept several files (deck order = argument order, e.g. newest meeting first);
+slide ids namespace as `<file-stem>-<id>` and intra-file `[text](#id)` links are
+rewritten to the namespaced target. `sync` routes captured comments and live-edit
+write-backs into the right source file.
 
 ```bash
-scripts/slidesync.py push deck.slidev.md          # targets `deck:` frontmatter
-scripts/slidesync.py push deck.slidev.md --new "Talk"
-scripts/slidesync.py pull <id> --out deck.slidev.md
-scripts/slidesync.py roundtrip
+uvx slidesync push deck.slidev.md          # targets `deck:` frontmatter
+uvx slidesync push deck.slidev.md --new "Talk"
+uvx slidesync pull <id> --out deck.slidev.md
+uvx slidesync roundtrip
 ```
 
 ## Idempotent sync (upsert)
@@ -56,7 +64,8 @@ a no-op. Diff per run: identical hash -> skip; same key, new content -> replace;
 new key -> create. Removed slides are **kept** unless `--prune`. **Only `s2g_`
 slides are ever touched** — hand-authored slides are invisible to the sync. A
 hidden `<!-- s2g {...} -->` marker in speaker notes carries the human id, image
-path, and template vars so `pull` can recover them (3 blank lines below the
+path, template vars — and, for template slides, the authored body markdown
+(base64) — so `pull` recovers the source verbatim (3 blank lines below the
 real note).
 
 ## Markdown dialect
@@ -71,7 +80,10 @@ may have its own frontmatter (`id:`, `template:`, `layout:`).
   images (uploaded to Drive; `alt` becomes the image's accessibility
   description via `updatePageElementAltText`, round-tripped on pull). Blank
   lines preserved as spacing. `<!-- notes -->`
-  become speaker notes. `<v-clicks>`/`<div>` are stripped.
+  become speaker notes — and (v0.2+) round-trip as **comments, in place**: on
+  template slides `pull` re-emits each comment where it was written, not as one
+  merged trailing blob; speaker notes edited live in Slides come back as one
+  extra trailing comment. `<v-clicks>`/`<div>` are stripped.
 - **Internal links:** `[text](#slide-id)` becomes a native Slides link that jumps
   to the slide whose `id:` (or title slug) is `slide-id`. Resolved against the
   whole push set and re-applied on every push, so links survive a target's
@@ -84,8 +96,8 @@ Select per slide via `template:` — native styled boxes, no in-deck templates:
 
 | `template:` | look |
 |-------------|------|
-| `dark` / `title` | dark #1E2024 bg, kicker + big white headline (centred) |
-| `appendix` | light #FAFAFA bg, kicker + big ink headline |
+| `dark` / `title` | dark #1E2024 bg, kicker + big white headline (centred); body lines render as a small dimmed **byline** beneath (e.g. `Project · Presenter`) |
+| `appendix` | light #FAFAFA bg, kicker + big ink headline; body lines render as a small byline |
 | `question` / `label` | kicker + headline + **centred** body |
 | `topic` | kicker + headline + **left** body (and/or image) |
 | `content` | red kicker-as-title + left body |
