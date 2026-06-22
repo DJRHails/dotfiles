@@ -35,7 +35,10 @@ cwd_of() {  # $1=session  ->  prints cwd with $HOME collapsed to ~
 
 if [ "${1:-}" = "--preview" ]; then
   s="${2:-}"; [ -n "$s" ] || exit 0
-  printf '\033[1;36mcwd:\033[0m %s\n\n' "$(cwd_of "$s")"
+  # Title from cache only — preview runs on every cursor move, so it must never call claude.
+  sum='?'; [ -s "$cdir/$s" ] && sum=$(cat "$cdir/$s")
+  printf '\033[1;36mtitle:\033[0m %s\n' "$sum"
+  printf '\033[1;36mcwd:\033[0m   %s\n\n' "$(cwd_of "$s")"
   zellij -s "$s" action dump-screen 2>/dev/null | tail -n 200
   exit 0
 fi
