@@ -462,7 +462,9 @@ def format_timestamp(ts_ms: int) -> str:
 
 
 def _format_location(result: SearchResult) -> str:
-    if result.source in (SessionSource.PI, SessionSource.PI_ARTIFACT):
+    if result.source == SessionSource.PI:
+        return f"Resume:   pi::resume {result.session_id}"
+    if result.source == SessionSource.PI_ARTIFACT:
         return f"File:     {result.path}"
     return f"Resume:   claude::resume {result.session_id}"
 

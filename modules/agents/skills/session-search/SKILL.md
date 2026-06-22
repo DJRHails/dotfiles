@@ -56,7 +56,7 @@ For each matching session the script prints:
 
 - Searches `~/.claude*/projects/` (all config-dir variants), `~/.agents/projects/`, and `~/.pi/agent/sessions/` for session transcripts
 - History index from every `~/.claude*/history.jsonl` plus `~/.agents/history.jsonl`
-- Pi sessions are identified with `[pi]` label and show the file path instead of a resume command
+- Pi sessions are identified with `[pi]` label and resume via `pi::resume <id>` (cd's into the session's directory, then `pi --session <id>`; defined in `modules/pi/aliases.zsh`)
 - Pi artifacts (markdown files under `artifacts/`) are also searched and labelled `(pi artifact: <name>)`
 - Searches text content from user and assistant messages (skips tool calls, binary data, etc.)
 - Subagent files are not searched (only top-level session files)
