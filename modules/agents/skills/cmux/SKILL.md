@@ -27,7 +27,7 @@ cmux list-panes
 cmux list-pane-surfaces --pane pane:1
 
 # create/focus/move
-cmux new-workspace
+cmux workspace create
 cmux new-split right --panel pane:1
 cmux move-surface --surface surface:7 --pane pane:2 --focus true
 cmux split-off --surface surface:7 right

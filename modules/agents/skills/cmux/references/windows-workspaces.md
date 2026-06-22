@@ -18,7 +18,7 @@ cmux new-window
 cmux focus-window --window window:2
 cmux close-window --window window:2
 
-cmux new-workspace
+cmux workspace create
 cmux select-workspace --workspace workspace:4
 cmux close-workspace --workspace workspace:4
 ```
