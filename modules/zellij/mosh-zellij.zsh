@@ -39,43 +39,65 @@
 # Config (override in ~/.zshrc.local):
 #   DURABLE_SUMMARY_MODEL   summariser model. Default: claude-haiku-4-5
 #   DURABLE_SUMMARY_TTL     seconds before a cached summary is refreshed. Default: 300
-#   DURABLE_SUMMARY_PAR     max concurrent summarisers on the host. Default: 6
+#   DURABLE_SUMMARY_PAR     max concurrent summarisers on the host. Default: 8
 
 : ${DURABLE_SUMMARY_MODEL:=claude-haiku-4-5}
 : ${DURABLE_SUMMARY_TTL:=300}
-: ${DURABLE_SUMMARY_PAR:=6}
+: ${DURABLE_SUMMARY_PAR:=8}
 
-# Draw a single-line progress bar on the tty from the remote's stderr progress events
-# (DURABLE_TOTAL <n> then one DURABLE_TICK per finished summary). Anything else on
-# stderr is passed through. The bar is cleared on EOF.
-ssh::durable::render_progress() {
+# Apply a progressive menu stream to a mirror file. Each input line is "<session>\t<label>";
+# we upsert by session (keeping the newest-first order of the first snapshot) and rewrite the
+# mirror after every line — so an fzf polling the mirror sees cwds and summaries fill in live.
+ssh::durable::stream_apply() {
     emulate -L zsh
-    local line bar k filled total=0 cnt=0 width=20
-    local out=/dev/null; { : > /dev/tty } 2>/dev/null && out=/dev/tty
-    while IFS= read -r line; do
-        case $line in
-            'DURABLE_TOTAL '*) total=${line#DURABLE_TOTAL } ;;
-            'DURABLE_TICK')    (( cnt < total )) && (( cnt++ )) ;;
-            *) [[ -n $line ]] && print -r -- "$line" >&2 ;;
-        esac
-        (( total > 0 )) || continue
-        filled=$(( cnt * width / total ))
-        bar=''; for (( k = 0; k < filled; k++ )); do bar+='#'; done
-        printf '\r  titling sessions  [%-*s] %d/%d' "$width" "$bar" "$cnt" "$total" > $out
+    local mirror="$1" autherr="$2" raw sess k
+    local -a order; local -A line
+    while IFS= read -r raw; do
+        [[ -n $raw ]] || continue
+        if [[ $raw == '__AUTHFAIL__'* ]]; then
+            print -r -- "${raw#__AUTHFAIL__$'\t'}" > "$autherr"
+            continue
+        fi
+        sess=${raw%%$'\t'*}
+        (( ${+line[$sess]} )) || order+=("$sess")
+        line[$sess]=$raw
+        { for k in $order; do print -r -- "$line[$k]"; done } > "$mirror.tmp" && mv -f "$mirror.tmp" "$mirror"
     done
-    (( total > 0 )) && printf '\r\033[2K' > $out
 }
 
-# Fetch the host's live-session menu: tab-separated "<session-name>\t<summary>" lines,
-# most-recent first (ordering owned by durable-remote.sh). Summaries are cached on the
-# host for $DURABLE_SUMMARY_TTL. Progress bar goes to the tty (or /dev/null when scripted).
-ssh::durable::menu() {
+# Background feeder for the picker. Streams the host's session menu into $mirror (see
+# ssh::durable::stream_apply) then touches $done. Idles until ctrl-r touches $req, then
+# re-streams with ttl=0 (force re-summarise). Exits when $quit appears. Records the live
+# ssh-pipeline pid in $pidf so the caller can kill an in-flight refresh on teardown.
+ssh::durable::stream_supervisor() {
+    emulate -L zsh
+    local host="$1" mirror="$2" done="$3" req="$4" quit="$5" pidf="$6" autherr="$7"
+    local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
+    [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; : > "$done"; return 1; }
+    local ttl pp
+    while [[ ! -f $quit ]]; do
+        ttl=$DURABLE_SUMMARY_TTL
+        [[ -f $req ]] && { ttl=0; command rm -f "$req" "$autherr"; }
+        command rm -f "$done"
+        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" \
+            < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" &
+        pp=$!
+        print -r -- "$pp" > "$pidf"
+        wait $pp
+        : > "$done"
+        while [[ ! -f $req && ! -f $quit ]]; do sleep 0.3; done
+    done
+}
+
+# Batch menu for automation (--list/--query): refresh everything on the host, then print the
+# final "<session>\t<label>" lines once (most-recent first). No streaming, no progress UI.
+ssh::durable::menu_list() {
     emulate -L zsh
     local host="$1"
     local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
     [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; return 1; }
-    ssh "$host" sh -s -- "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" 1 \
-        < "$rscript" 2> >(ssh::durable::render_progress)
+    ssh "$host" sh -s -- --list "$host" "$DURABLE_SUMMARY_MODEL" "$DURABLE_SUMMARY_TTL" "$DURABLE_SUMMARY_PAR" \
+        < "$rscript" 2>/dev/null
 }
 
 # Replace the surface with the durable command — but if we're nested inside a local zellij
@@ -177,7 +199,7 @@ ssh::durable() {
     # Non-interactive selectors for automation. These short-circuit the fzf picker.
     case "$1" in
         --list|--ls)
-            ssh::durable::menu "$host"
+            ssh::durable::menu_list "$host"
             return $?
             ;;
         --attach|-a)
@@ -200,7 +222,8 @@ ssh::durable() {
             local line
             # -F: fixed-string match — without it a '.' over-matches and a '[' in the
             # query is a regex error (grep exit 2), silently falling through to fresh.
-            line=$(ssh::durable::menu "$host" | grep -iF -m1 -- "$query")
+            # The menu line includes the cwd, so --query matches by directory too.
+            line=$(ssh::durable::menu_list "$host" | grep -iF -m1 -- "$query")
             if [[ -n $line ]]; then
                 ssh::durable::attach "$host" "${line%%$'\t'*}" "$@"
                 return
@@ -213,28 +236,54 @@ ssh::durable() {
 
     local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
 
-    # Picker path: needs fzf locally and the remote generator script.
+    # Picker path: open fzf immediately on a cached snapshot (session ids + cwds), then stream
+    # cwds and AI summaries in live as the host computes them. Needs fzf and the remote script.
     if command -v fzf >/dev/null 2>&1 && [[ -r $rscript ]]; then
-        local menu
-        menu=$(ssh::durable::menu "$host")
-        { : > /dev/tty } 2>/dev/null && printf '\r\033[2K' > /dev/tty
-        if [[ -n $menu ]]; then
-            local reload="ssh ${(q)host} sh -s -- ${(q)host} ${(q)DURABLE_SUMMARY_MODEL} 0 ${(q)DURABLE_SUMMARY_PAR} < ${(q)rscript}"
+        local tmpd; tmpd=$(mktemp -d "${TMPDIR:-/tmp}/durable.XXXXXX")
+        local mirror="$tmpd/menu" done="$tmpd/done" req="$tmpd/req" quit="$tmpd/quit"
+        local pidf="$tmpd/pid" autherr="$tmpd/autherr"
+        : > "$mirror"
+        ssh::durable::stream_supervisor "$host" "$mirror" "$done" "$req" "$quit" "$pidf" "$autherr" &
+        local sup=$!
+
+        # Wait briefly for the first snapshot before showing fzf (≤15s; $done means no sessions).
+        local t=0
+        while [[ ! -s $mirror && ! -f $done ]]; do sleep 0.1; (( ++t > 150 )) && break; done
+
+        local hdr='enter: attach · ctrl-r: re-summarise · esc: new session'
+        local chosen='' pick=1
+        if [[ -s $mirror ]]; then
             local preview="ssh ${(q)host} sh -s -- --preview {1} < ${(q)rscript}"
-            local chosen
-            chosen=$(print -r -- "$menu" | fzf \
+            # start: show the cached snapshot at once. load: poll the mirror every 0.5s so live
+            # updates appear, swap the header to the auth error if one lands, then unbind once
+            # $done is set. ctrl-r: force a fresh re-summarise.
+            chosen=$(fzf < /dev/null \
                 --ansi --delimiter=$'\t' --with-nth=2 \
                 --prompt="durable@${host}> " \
-                --header='enter: attach · ctrl-r: re-summarise · esc: new session' \
+                --header="$hdr" \
                 --height=90% --border --reverse \
                 --preview "$preview" --preview-window='right:62%:wrap' \
-                --bind "ctrl-r:reload($reload)")
-            if [[ -n $chosen ]]; then
-                ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
-                return
-            fi
-            # Esc / no pick → fall through to a fresh session.
+                --bind "start:reload(cat $mirror)" \
+                --bind "load:transform-header[test -s $autherr && cat $autherr || echo '$hdr']+transform[test -f $done && echo 'reload(cat $mirror)+unbind(load)' || echo 'reload(sleep 0.5; cat $mirror)']" \
+                --bind "ctrl-r:execute-silent(command rm -f $done $autherr; : > $req)+rebind(load)+reload(cat $mirror)")
+            pick=$?
         fi
+
+        # Teardown: stop the supervisor + any in-flight refresh, drop the tmp dir (keep any
+        # auth-failure message so we can surface it after fzf closes).
+        : > "$quit"
+        [[ -s $pidf ]] && kill "$(<$pidf)" 2>/dev/null
+        kill "$sup" 2>/dev/null
+        local authmsg=''; [[ -s $autherr ]] && authmsg=$(<$autherr)
+        command rm -f "$mirror" "$mirror.tmp" "$done" "$req" "$quit" "$pidf" "$autherr"
+        rmdir "$tmpd" 2>/dev/null
+        [[ -n $authmsg ]] && print -u2 -- "ssh::durable: ⚠ $authmsg"
+
+        if [[ $pick -eq 0 && -n $chosen ]]; then
+            ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
+            return
+        fi
+        # Esc / no pick → fall through to a fresh session.
     fi
 
     ssh::durable::fresh "$host" "$@"
