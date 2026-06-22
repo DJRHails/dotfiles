@@ -464,7 +464,7 @@ def format_timestamp(ts_ms: int) -> str:
 def _format_location(result: SearchResult) -> str:
     if result.source in (SessionSource.PI, SessionSource.PI_ARTIFACT):
         return f"File:     {result.path}"
-    return f"Resume:   claude --resume {result.session_id}"
+    return f"Resume:   claude::resume {result.session_id}"
 
 
 def _format_snippet(m: MatchSnippet) -> str:

@@ -48,7 +48,7 @@ python3 ~/.claude/skills/session-search/scripts/search.py "deploy" --context 400
 
 For each matching session the script prints:
 
-- **Session ID** and resume command (`claude --resume <id>`)
+- **Session ID** and resume command (`claude::resume <id>` — cd's into the session's original directory and resumes via the owning config profile; defined in `modules/claude/aliases.zsh`)
 - **Date**, **project**, and the **original prompt**
 - Up to 3 **matching snippets** with role labels and line numbers
 

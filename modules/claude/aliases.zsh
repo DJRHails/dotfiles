@@ -61,6 +61,38 @@ claude::ant() {
     claude "$@"
 }
 
+# Resume a session by id, cd-ing into its original directory first. Claude can
+# only --resume a session from the cwd it was started in, and session-search
+# only prints the bare `claude --resume <id>`. This resolves both the directory
+# and the owning config profile so a copy-pasted id Just Works.
+claude::resume() {
+  emulate -L zsh
+  local id=$1
+  [[ -n $id ]] || { echo "claude::resume: usage: claude::resume <session-id>" >&2; return 1; }
+
+  # Search every config-dir variant (default + ant) and the legacy agents dir.
+  local file
+  file=$(command find "$HOME/.claude" "$HOME/.claude-ant" "$HOME/.agents" \
+           -type f -name "${id}.jsonl" -print 2>/dev/null | head -1)
+  [[ -n $file ]] || { echo "claude::resume: no session '$id' under ~/.claude*, ~/.agents" >&2; return 1; }
+
+  # The encoded project dir is lossy ('/' and '.' both collapse to '-'), so read
+  # the real working directory from the transcript's cwd field instead.
+  local dir
+  dir=$(command grep -m1 -o '"cwd":"[^"]*"' "$file" | cut -d'"' -f4)
+  [[ -n $dir && -d $dir ]] || { echo "claude::resume: cannot resolve cwd for '$id' ($file)" >&2; return 1; }
+
+  cd "$dir" || return 1
+
+  # Route through the profile whose config dir owns the session so --resume finds
+  # it (and the ant profile gets its env + self-healing links).
+  case ${file%%/projects/*} in
+    "$HOME/.claude-ant") claude::ant --resume "$id" ;;
+    "$HOME/.claude")     claude --resume "$id" ;;
+    *)                   CLAUDE_CONFIG_DIR=${file%%/projects/*} claude --resume "$id" ;;
+  esac
+}
+
 claude::local() {
   ANTHROPIC_BASE_URL=http://localhost:1234 \
   ANTHROPIC_AUTH_TOKEN=lmstudio \
