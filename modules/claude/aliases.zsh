@@ -13,10 +13,14 @@ _claude_aliases_dir="${${(%):-%x}:A:h}"
 claude::jnj() {
   local env_file="${_claude_aliases_dir}/.env.jnj"
   [[ -f $env_file ]] || { echo "claude::jnj: missing $env_file — refusing to launch on the default account" >&2; return 1; }
-  set -a
-  source "$env_file"
-  set +a
-  claude "$@"
+  # Subshell: keep the sourced credentials scoped to this launch instead of
+  # leaking them into the interactive shell.
+  (
+    set -a
+    source "$env_file"
+    set +a
+    claude "$@"
+  )
 }
 
 _claude_ant_link() {
@@ -30,7 +34,8 @@ _claude_ant_link() {
 _claude_ant_ensure() {
   # Repo links mirror modules/{agents,claude}/symlinks.conf — the source of
   # truth applied by bootstrap.sh; this only self-heals them at launch.
-  local ant=$HOME/.claude-ant
+  # Optional arg: config dir to populate (default ~/.claude-ant).
+  local ant=${1:-$HOME/.claude-ant}
   local dotfiles=$HOME/.files/modules
   mkdir -p "$ant"
   _claude_ant_link "$dotfiles/agents/AGENTS.md"     "$ant/CLAUDE.md"
@@ -53,12 +58,42 @@ _claude_ant_ensure() {
 
 claude::ant() {
   _claude_ant_ensure
-  set -a
-  source "${_claude_aliases_dir}/.env.ant"
-  set +a
-  CLAUDE_CONFIG_DIR="$HOME/.claude-ant" \
-    CMUX_PRESERVE_CLAUDE_AUTH_SELECTION_ENV=1 \
-    claude "$@"
+  mkdir -p "$HOME/.claude-ant/anthropic"
+  # Subshell: keep .env.ant's ANTHROPIC_API_KEY scoped to this launch — leaked
+  # into the shell it outranks profiles on every later ant/claude call.
+  # Auth comes from the API key alone: ANTHROPIC_CONFIG_DIR points the
+  # ant-profile lookup at an empty dir so claude doesn't also see
+  # ~/.config/anthropic's profiles and warn about ambiguous auth.
+  (
+    set -a
+    source "${_claude_aliases_dir}/.env.ant"
+    set +a
+    CLAUDE_CONFIG_DIR="$HOME/.claude-ant" \
+      ANTHROPIC_CONFIG_DIR="$HOME/.claude-ant/anthropic" \
+      CMUX_PRESERVE_CLAUDE_AUTH_SELECTION_ENV=1 \
+      claude "$@"
+  )
+}
+
+# claude::ant::safe lives in modules/claude/safe.zsh (transcrypt-encrypted).
+
+# One-shot prompt via `ant messages create`, parameterized by env so a session
+# can set the target once: ANT_MODEL (required), ANT_PROFILE (default safe),
+# ANT_MAX_TOKENS (default 1024). Prompt is the joined arguments (or stdin when
+# piped). Prints the text reply; pass extra flags via ANT_FLAGS if needed.
+#   ANT_MODEL=claude-boiler-v3 ant::msg "Reply with exactly: ok"
+ant::msg() {
+  local prompt="$*"
+  [[ -z $prompt && ! -t 0 ]] && prompt="$(cat)"
+  [[ -n $prompt ]] || { echo "ant::msg: no prompt given (args or stdin)" >&2; return 1; }
+  [[ -n $ANT_MODEL ]] || { echo "ant::msg: set ANT_MODEL (try: ant models list)" >&2; return 1; }
+  # </dev/null: ant treats piped stdin as a JSON request body, which would
+  # fight the --message flag when the prompt arrives via pipe.
+  ANTHROPIC_PROFILE="${ANT_PROFILE:-safe}" ant messages create \
+    --model "$ANT_MODEL" \
+    --max-tokens "${ANT_MAX_TOKENS:-1024}" \
+    --message "$(jq -cn --arg c "$prompt" '{role: "user", content: $c}')" \
+    --format json < /dev/null | jq -r '.content[0].text'
 }
 
 # Resume a session by id, cd-ing into its original directory first. Claude can

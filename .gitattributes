@@ -9,3 +9,4 @@ modules/agents/skills/slack/**                      filter=crypt diff=crypt merg
 modules/agents/skills/tailscale-topology/**        filter=crypt diff=crypt merge=crypt
 modules/agents/skills/web-animation-design/**      filter=crypt diff=crypt merge=crypt
 modules/agents/commands/archive-book.md      filter=crypt diff=crypt merge=crypt
+modules/claude/safe.zsh                      filter=crypt diff=crypt merge=crypt
