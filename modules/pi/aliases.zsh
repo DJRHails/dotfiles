@@ -36,9 +36,10 @@ pi::resume() {
            -print 2>/dev/null | head -1)
   [[ -n $file ]] || { echo "pi::resume: no session '$id' under ~/.pi*/agent/sessions" >&2; return 1; }
 
-  # The session header line (type=session) records the real cwd.
+  # The session header line (type=session) records the real cwd. Use jq, not a
+  # regex, so both compact ("cwd":"...") and spaced ("cwd": "...") JSON parse.
   local dir
-  dir=$(command grep -m1 -o '"cwd":"[^"]*"' "$file" | cut -d'"' -f4)
+  dir=$(command jq -r '.cwd? // empty' "$file" 2>/dev/null | head -1)
   [[ -n $dir && -d $dir ]] || { echo "pi::resume: cannot resolve cwd for '$id' ($file)" >&2; return 1; }
 
   cd "$dir" || return 1

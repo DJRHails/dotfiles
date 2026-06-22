@@ -112,9 +112,11 @@ claude::resume() {
   [[ -n $file ]] || { echo "claude::resume: no session '$id' under ~/.claude*, ~/.agents" >&2; return 1; }
 
   # The encoded project dir is lossy ('/' and '.' both collapse to '-'), so read
-  # the real working directory from the transcript's cwd field instead.
+  # the real working directory from the transcript's cwd field instead. Use jq,
+  # not a regex: transcripts may be written compact ("cwd":"...") or spaced
+  # ("cwd": "..."), and only a JSON parser handles both plus any path escaping.
   local dir
-  dir=$(command grep -m1 -o '"cwd":"[^"]*"' "$file" | cut -d'"' -f4)
+  dir=$(command jq -r '.cwd? // empty' "$file" 2>/dev/null | head -1)
   [[ -n $dir && -d $dir ]] || { echo "claude::resume: cannot resolve cwd for '$id' ($file)" >&2; return 1; }
 
   cd "$dir" || return 1
