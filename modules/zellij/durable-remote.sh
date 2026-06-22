@@ -1,11 +1,12 @@
 #!/bin/sh
 # Generate the ssh::durable picker menu for a host's live zellij sessions.
 #
-# Each menu line is tab-separated:
-#   <session-name>\t<short-id>  —  <summary>  ·  <cwd>
+# Each menu line is tab-separated, three fields:
+#   <session-name> \t <●><cwd-fragment>  ·  <3-5 word title> \t <short-id> <full-cwd>
 # field 1 is the exact session name (used to attach / drive the fzf preview);
-# field 2 is the human label fzf shows and searches — so the AI summary AND the
-# working directory are both fuzzy-searchable.
+# field 2 is the compact label the picker shows and fuzzy-searches (last two path components +
+# a tiny AI title); field 3 is hidden — it carries the full cwd + short-id so the --query/--list
+# grep still matches the whole path and session id. The one-line summary lives in the preview.
 #
 # Runs entirely on the host (single ssh). cwds come from `dump-layout` (cheap,
 # local IPC); summaries come from piping the live screen through `claude -p`.
@@ -24,7 +25,9 @@ set -u
 
 cdir="$HOME/.cache/durable-summaries"
 connf="$cdir/.connected"  # cache: sessions with a live mosh client (one name per line)
-prompt='This is the current terminal screen of a dev session. In ONE terse line (max 12 words), say what it is currently doing. No preamble.'
+prompt='This is the current terminal screen of a dev session. Reply with EXACTLY two lines, nothing else.
+Line 1: what it is currently doing, one terse line, max 12 words.
+Line 2: a 3-5 word title, no trailing punctuation.'
 # cwd extraction is local zellij IPC (no API), so fan out much wider than summaries.
 cwd_par=16
 
@@ -32,6 +35,12 @@ cwd_of() {  # $1=session  ->  prints cwd with $HOME collapsed to ~
   zellij -s "$1" action dump-layout 2>/dev/null \
     | sed -nE 's/^[[:space:]]*cwd "(.*)"$/\1/p' | head -1 \
     | sed "s|^$HOME|~|"
+}
+
+# Last two path components, end-first: ~/projects/github.com/DJRHails/touchstone -> DJRHails/touchstone; ~ -> ~
+cwd_frag() {  # $1=cwd
+  p="$1"; rest="${p%/*}"
+  if [ "$rest" = "$p" ]; then printf '%s\n' "$p"; else printf '%s/%s\n' "${rest##*/}" "${p##*/}"; fi
 }
 
 # Dump a session's live screen. `dump-screen` returns the rendered viewport, which is empty for a
@@ -105,19 +114,25 @@ run_claude() {  # reads a screen dump on stdin, prints a one-line summary; exit 
   fi
 }
 
-# Summarise the session's screen. Returns non-zero (and writes nothing) on any failure
-# — empty screen, claude error/timeout, or error-shaped output — so an auth failure
-# (claude prints "Failed to authenticate…" to stdout and exits 1) is never cached as a title.
-summarise() {  # $1=session ; writes $cdir/$1 on success
+# Summarise the session's screen into a one-liner (line 1, for the preview header → $cdir/$1) and
+# a 3-5 word title (line 2, for the picker list → $cdir/$1.title). Returns non-zero and writes
+# nothing on any failure — empty screen, claude error/timeout, or error-shaped output — so an auth
+# failure (claude prints "Failed to authenticate…" to stdout and exits 1) is never cached.
+summarise() {  # $1=session ; writes $cdir/$1 and $cdir/$1.title on success
   screen=$(dump_screen "$1" | grep -v '^[[:space:]]*$' | tail -n 40)
   [ -n "$screen" ] || return 1
   out=$(printf '%s\n' "$screen" | run_claude) || return 1
-  out=$(printf '%s' "$out" | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//' | cut -c1-90)
   case "$out" in
-    '') return 1 ;;
     *'API Error'* | *'authenticate'* | *'Invalid authentication'*) return 1 ;;
   esac
-  printf '%s\n' "$out" > "$cdir/$1.tmp" && mv -f "$cdir/$1.tmp" "$cdir/$1"
+  # first two non-blank lines, tolerating a stray "Line 1:" / "Line 2." prefix from the model
+  nb=$(printf '%s' "$out" | grep -v '^[[:space:]]*$' | sed -E 's/^[[:space:]]*[Ll]ine [0-9][:.][[:space:]]*//')
+  one=$(printf '%s\n' "$nb" | sed -n '1p' | sed 's/^ *//; s/ *$//' | cut -c1-90)
+  tit=$(printf '%s\n' "$nb" | sed -n '2p' | sed 's/^ *//; s/ *$//' | cut -c1-40)
+  [ -n "$one" ] || return 1
+  [ -n "$tit" ] || tit=$(printf '%s' "$one" | cut -d' ' -f1-4)  # fallback: first words of the one-liner
+  printf '%s\n' "$one" > "$cdir/$1.tmp" && mv -f "$cdir/$1.tmp" "$cdir/$1"
+  printf '%s\n' "$tit" > "$cdir/$1.title.tmp" && mv -f "$cdir/$1.title.tmp" "$cdir/$1.title"
 }
 
 # One cheap probe so an expired/invalid token fails fast instead of hammering every session
@@ -146,16 +161,14 @@ emit_authfail() {  # $1=message
 is_connected() { [ -s "$connf" ] && grep -qxF "$1" "$connf"; }
 
 emit_line() {  # $1=session ; one menu line from cache (placeholders for what's not ready yet)
-  sum='?'; [ -s "$cdir/$1" ] && sum=$(cat "$cdir/$1")
+  tit='?'; [ -s "$cdir/$1.title" ] && tit=$(cat "$cdir/$1.title")
   cwd=''; [ -s "$cdir/$1.cwd" ] && cwd=$(cat "$cdir/$1.cwd")
   short=${1#cmux-"${hostpfx}"-}
+  frag='?'; [ -n "$cwd" ] && frag=$(cwd_frag "$cwd")
   ind='  '  # detached: blank, keeping labels aligned with the connected marker
   is_connected "$1" && ind="$(printf '\033[32m●\033[0m ')"  # green ● = a client is attached
-  if [ -n "$cwd" ]; then
-    printf '%s\t%s%s  —  %s  ·  %s\n' "$1" "$ind" "$short" "$sum" "$cwd"
-  else
-    printf '%s\t%s%s  —  %s\n' "$1" "$ind" "$short" "$sum"
-  fi
+  # field 2 = compact display (cwd fragment, then the tiny title); field 3 = hidden, searchable
+  printf '%s\t%s%s  ·  %s\t%s %s\n' "$1" "$ind" "$frag" "$tit" "$short" "$cwd"
 }
 
 cpu_jiffies() {  # $1=space-separated pids ; prints "pid utime+stime" per pid (no forks)

@@ -4,12 +4,13 @@
 #
 # cmux mints fresh workspace/surface UUIDs on every app restart, so the id-keyed
 # session name changes and the old sessions are orphaned (they keep running). So we
-# don't trust the forwarded ids — instead we show a picker of the host's live zellij
-# sessions, each annotated with a one-line summary of what its panel is currently doing and its
-# cwd (fzf, with the live screen in the preview; ctrl-r re-summarises). A green ● marks sessions
-# with a live mosh client, and the header shows the connected count. Pick one and we mosh-attach
-# it. Press Esc (or if there are no sessions) and we fall back to the legacy behaviour: forward
-# the cmux ids and let the remote auto-attach snippet create/attach the id-designated session.
+# don't trust the forwarded ids — instead we show a picker of the host's live zellij sessions.
+# Each row is its cwd fragment (last two path components) + a 3-5 word AI title; the preview shows
+# the full one-line summary, the full cwd, and the live screen. ctrl-r re-summarises; ctrl-x kills
+# the selected session (confirm prompt). A green ● marks sessions with a live mosh client, and the
+# header shows the connected count. Pick one and we mosh-attach it. Press Esc (or if there are no
+# sessions) and we fall back to the legacy behaviour: forward the cmux ids and let the remote
+# auto-attach snippet create/attach the id-designated session.
 #
 # Non-interactive / scriptable (for automation like `resurrect`):
 #   ssh::durable <host> --list                 print "<session>\t<summary>" lines, no fzf, no attach
@@ -257,14 +258,20 @@ ssh::durable() {
         local tmpd; tmpd=$(mktemp -d "${TMPDIR:-/tmp}/durable.XXXXXX")
         local mirror="$tmpd/menu" done="$tmpd/done" req="$tmpd/req" quit="$tmpd/quit"
         local pidf="$tmpd/pid" autherr="$tmpd/autherr" sig="$tmpd/sig" poll="$tmpd/poll.sh"
-        local statusf="$tmpd/statusf"
-        : > "$mirror"
+        local statusf="$tmpd/statusf" killed="$tmpd/killed" show="$tmpd/show.sh" killsh="$tmpd/kill.sh"
+        : > "$mirror"; : > "$killed"
 
-        # Debounce reloads: block until the mirror's (mtime+size) signature changes or $done
-        # lands, then print it — so fzf redraws only on real updates instead of on a fixed timer.
+        # show.sh: print the mirror minus any ctrl-x-killed sessions (field 1 ∈ $killed). Every
+        # display path goes through this so a killed session vanishes and never comes back.
+        cat > "$show" <<'SHOW'
+#!/bin/sh
+awk -F'\t' -v kf="$2" 'BEGIN{while((getline l < kf)>0) k[l]=1} !($1 in k)' "$1"
+SHOW
+        # poll.sh: debounce — block until the mirror's (mtime+size) signature changes or $done
+        # lands, then print it (killed-filtered) — so fzf redraws only on real updates, not a timer.
         cat > "$poll" <<'POLL'
 #!/bin/sh
-m=$1 d=$2 sig=$3
+m=$1 d=$2 sig=$3 killed=$4
 last=$(cat "$sig" 2>/dev/null || echo init)
 while :; do
   cur=$(stat -c '%Y %s' "$m" 2>/dev/null || stat -f '%m %z' "$m" 2>/dev/null || echo 0)
@@ -272,8 +279,17 @@ while :; do
   sleep 0.3
 done
 printf '%s' "$cur" > "$sig"
-cat "$m"
+awk -F'\t' -v kf="$killed" 'BEGIN{while((getline l < kf)>0) k[l]=1} !($1 in k)' "$m"
 POLL
+        # kill.sh: confirm, then delete the selected zellij session on the host (force-kills a live
+        # one) and record it in $killed so the list drops it. Destructive, hence the y/N prompt.
+        cat > "$killsh" <<'KILL'
+#!/bin/sh
+host=$1 s=$2 killed=$3
+printf '\n  kill durable session %s on %s? [y/N] ' "$s" "$host" > /dev/tty
+read -r a < /dev/tty
+case "$a" in [yY]*) ssh "$host" zellij delete-session --force "$s" >/dev/null 2>&1 && printf '%s\n' "$s" >> "$killed" ;; esac
+KILL
         ssh::durable::stream_supervisor "$host" "$mirror" "$done" "$req" "$quit" "$pidf" "$autherr" "$statusf" &
         local sup=$!
 
@@ -281,22 +297,24 @@ POLL
         local t=0
         while [[ ! -s $mirror && ! -f $done ]]; do sleep 0.1; (( ++t > 150 )) && break; done
 
-        local hdr='enter: attach · ctrl-r: re-summarise · esc: new session'
+        local hdr='enter: attach · ctrl-r: re-summarise · ctrl-x: kill · esc: new session'
         local chosen='' pick=1
         if [[ -s $mirror ]]; then
             local preview="ssh ${(q)host} sh -s -- --preview {1} < ${(q)rscript}"
             # start: show the cached snapshot at once. load: wait for the next real mirror change
-            # (debounced — see poll.sh) then reload, swap the header to the auth error if one
-            # lands, and unbind once $done is set. ctrl-r: force a fresh re-summarise.
+            # (debounced — see poll.sh) then reload, swap the header to the auth error if one lands,
+            # and unbind once $done is set. ctrl-r: force a fresh re-summarise. ctrl-x: kill the
+            # selected session (confirm prompt). All displays go through show.sh (killed-filtered).
             chosen=$(fzf < /dev/null \
                 --ansi --delimiter=$'\t' --with-nth=2 \
                 --prompt="durable@${host}> " \
                 --header="$hdr" \
                 --height=90% --border --reverse \
                 --preview "$preview" --preview-window='right:62%:wrap' \
-                --bind "start:reload(cat $mirror)" \
-                --bind "load:transform-header[test -s $autherr && cat $autherr || { test -s $statusf && printf '%s · %s' \"\$(cat $statusf)\" '$hdr' || echo '$hdr'; }]+transform[test -f $done && echo 'reload(cat $mirror)+unbind(load)' || echo 'reload(sh $poll $mirror $done $sig)']" \
-                --bind "ctrl-r:execute-silent(command rm -f $done $autherr $sig; : > $req)+rebind(load)+reload(cat $mirror)")
+                --bind "start:reload(sh $show $mirror $killed)" \
+                --bind "load:transform-header[test -s $autherr && cat $autherr || { test -s $statusf && printf '%s · %s' \"\$(cat $statusf)\" '$hdr' || echo '$hdr'; }]+transform[test -f $done && echo 'reload(sh $show $mirror $killed)+unbind(load)' || echo 'reload(sh $poll $mirror $done $sig $killed)']" \
+                --bind "ctrl-r:execute-silent(command rm -f $done $autherr $sig; : > $req)+rebind(load)+reload(sh $show $mirror $killed)" \
+                --bind "ctrl-x:execute(sh $killsh ${(q)host} {1} $killed)+reload(sh $show $mirror $killed)")
             pick=$?
         fi
 
@@ -306,7 +324,8 @@ POLL
         [[ -s $pidf ]] && kill "$(<$pidf)" 2>/dev/null
         kill "$sup" 2>/dev/null
         local authmsg=''; [[ -s $autherr ]] && authmsg=$(<$autherr)
-        command rm -f "$mirror" "$mirror.tmp" "$done" "$req" "$quit" "$pidf" "$autherr" "$sig" "$poll" "$statusf"
+        command rm -f "$mirror" "$mirror.tmp" "$done" "$req" "$quit" "$pidf" "$autherr" "$sig" "$poll" \
+            "$statusf" "$killed" "$show" "$killsh"
         rmdir "$tmpd" 2>/dev/null
         [[ -n $authmsg ]] && print -u2 -- "ssh::durable: ⚠ $authmsg"
 
