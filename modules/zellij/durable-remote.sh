@@ -67,12 +67,14 @@ dump_screen() {  # $1=session
 
 if [ "${1:-}" = "--preview" ]; then
   s="${2:-}"; [ -n "$s" ] || exit 0
+  short=${s#cmux-"${3:-}"-}  # $3 = host prefix, passed in so we can show the short session id
   # Title + cwd from cache (instant, printed first so they show while the screen renders). The
   # preview must not call claude or re-run dump-layout per render (that made the cwd flicker); fall
   # back to a live cwd lookup only when it isn't cached yet.
   sum='?'; [ -s "$cdir/$s" ] && sum=$(cat "$cdir/$s")
   cwd=''; [ -s "$cdir/$s.cwd" ] && cwd=$(cat "$cdir/$s.cwd")
   [ -n "$cwd" ] || cwd=$(cwd_of "$s")
+  printf '\033[1;36mid:\033[0m    %s\n' "$short"
   printf '\033[1;36mtitle:\033[0m %s\n' "$sum"
   printf '\033[1;36mcwd:\033[0m   %s\n\n' "${cwd:-?}"
   dump_screen "$s" | tail -n 200

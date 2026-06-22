@@ -281,14 +281,12 @@ done
 printf '%s' "$cur" > "$sig"
 awk -F'\t' -v kf="$killed" 'BEGIN{while((getline l < kf)>0) k[l]=1} !($1 in k)' "$m"
 POLL
-        # kill.sh: confirm, then delete the selected zellij session on the host (force-kills a live
-        # one) and record it in $killed so the list drops it. Destructive, hence the y/N prompt.
+        # kill.sh: delete the selected zellij session on the host (force-kills a live one) and
+        # record it in $killed so the list drops it immediately.
         cat > "$killsh" <<'KILL'
 #!/bin/sh
 host=$1 s=$2 killed=$3
-printf '\n  kill durable session %s on %s? [y/N] ' "$s" "$host" > /dev/tty
-read -r a < /dev/tty
-case "$a" in [yY]*) ssh "$host" zellij delete-session --force "$s" >/dev/null 2>&1 && printf '%s\n' "$s" >> "$killed" ;; esac
+ssh "$host" zellij delete-session --force "$s" >/dev/null 2>&1 && printf '%s\n' "$s" >> "$killed"
 KILL
         ssh::durable::stream_supervisor "$host" "$mirror" "$done" "$req" "$quit" "$pidf" "$autherr" "$statusf" &
         local sup=$!
@@ -300,7 +298,7 @@ KILL
         local hdr='enter: attach · ctrl-r: re-summarise · ctrl-x: kill · esc: new session'
         local chosen='' pick=1
         if [[ -s $mirror ]]; then
-            local preview="ssh ${(q)host} sh -s -- --preview {1} < ${(q)rscript}"
+            local preview="ssh ${(q)host} sh -s -- --preview {1} ${(q)host} < ${(q)rscript}"
             # start: show the cached snapshot at once. load: wait for the next real mirror change
             # (debounced — see poll.sh) then reload, swap the header to the auth error if one lands,
             # and unbind once $done is set. ctrl-r: force a fresh re-summarise. ctrl-x: kill the
@@ -314,7 +312,7 @@ KILL
                 --bind "start:reload(sh $show $mirror $killed)" \
                 --bind "load:transform-header[test -s $autherr && cat $autherr || { test -s $statusf && printf '%s · %s' \"\$(cat $statusf)\" '$hdr' || echo '$hdr'; }]+transform[test -f $done && echo 'reload(sh $show $mirror $killed)+unbind(load)' || echo 'reload(sh $poll $mirror $done $sig $killed)']" \
                 --bind "ctrl-r:execute-silent(command rm -f $done $autherr $sig; : > $req)+rebind(load)+reload(sh $show $mirror $killed)" \
-                --bind "ctrl-x:execute(sh $killsh ${(q)host} {1} $killed)+reload(sh $show $mirror $killed)")
+                --bind "ctrl-x:execute-silent(sh $killsh ${(q)host} {1} $killed)+reload(sh $show $mirror $killed)")
             pick=$?
         fi
 
