@@ -73,6 +73,16 @@ ssh::durable::stream_apply() {
     done
 }
 
+# Ports of local mosh-clients connected to $1 (host): a mosh-client's last arg is the host port,
+# and a client for this host carries the host string in its args. Used to mark connected sessions
+# exactly (a session whose mosh-server holds one of these ports has a live client right here).
+ssh::durable::live_ports() {
+    emulate -L zsh
+    ps -axww -o command= 2>/dev/null \
+        | awk -v h="$1" '$1 ~ /mosh-client$/ && index($0, h) {print $NF}' \
+        | sort -u | tr '\n' ' '
+}
+
 # Background feeder for the picker. Streams the host's session menu into $mirror (see
 # ssh::durable::stream_apply) then touches $done. Idles until ctrl-r touches $req, then
 # re-streams with ttl=0 (force re-summarise). Exits when $quit appears. Records the live
@@ -82,12 +92,13 @@ ssh::durable::stream_supervisor() {
     local host="$1" mirror="$2" done="$3" req="$4" quit="$5" pidf="$6" autherr="$7" statusf="$8"
     local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
     [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; : > "$done"; return 1; }
-    local ttl pp
+    local ttl pp lp
     while [[ ! -f $quit ]]; do
         ttl=$DURABLE_SUMMARY_TTL
         [[ -f $req ]] && { ttl=0; command rm -f "$req" "$autherr"; }
         command rm -f "$done"
-        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" \
+        lp=$(ssh::durable::live_ports "$host")  # recomputed each stream so the ● stays current
+        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" "$lp" \
             < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" "$statusf" &
         pp=$!
         print -r -- "$pp" > "$pidf"
@@ -215,7 +226,7 @@ ssh::durable() {
             # host). Safe to loop. The picker reads the cache this leaves behind for its ● + count.
             local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
             [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; return 1; }
-            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap < "$rscript"
+            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "$(ssh::durable::live_ports "$host")" < "$rscript"
             return $?
             ;;
         --attach|-a)
@@ -330,7 +341,7 @@ KILL
         # Self-maintain the connected cache: fire a detached, lock-guarded reap on the host (it
         # samples mosh-servers for ~60s, refreshes the cache, kills disconnected ones). Decoupled
         # from this picker's lifetime; flock -n means concurrent opens don't pile up.
-        ( ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap < "$rscript" >/dev/null 2>&1 & ) 2>/dev/null
+        ( ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "$(ssh::durable::live_ports "$host")" < "$rscript" >/dev/null 2>&1 & ) 2>/dev/null
 
         if [[ $pick -eq 0 && -n $chosen ]]; then
             ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"

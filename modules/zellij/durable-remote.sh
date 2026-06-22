@@ -1,12 +1,13 @@
 #!/bin/sh
 # Generate the ssh::durable picker menu for a host's live zellij sessions.
 #
-# Each menu line is tab-separated, three fields:
-#   <session-name> \t <●><cwd-fragment>  ·  <3-5 word title> \t <short-id> <full-cwd>
+# Each menu line is tab-separated, two fields:
+#   <session-name> \t <●><cwd-fragment>  ·  <3-5 word title>  <dim: full-cwd short-id>
 # field 1 is the exact session name (used to attach / drive the fzf preview);
-# field 2 is the compact label the picker shows and fuzzy-searches (last two path components +
-# a tiny AI title); field 3 is hidden — it carries the full cwd + short-id so the --query/--list
-# grep still matches the whole path and session id. The one-line summary lives in the preview.
+# field 2 is what the picker shows and fuzzy-searches: a compact head (last two path components +
+# a tiny AI title), then a dim tail (full cwd + short-id) that scrolls off the narrow list but
+# stays searchable — so a search still matches the whole path and the session id. fzf's display
+# truncation doesn't affect matching. The longer one-line summary lives in the preview header.
 #
 # Runs entirely on the host (single ssh). cwds come from `dump-layout` (cheap,
 # local IPC); summaries come from piping the live screen through `claude -p`.
@@ -82,7 +83,7 @@ if [ "${1:-}" = "--preview" ]; then
 fi
 
 mode="${1:-}"
-hostpfx="${2:-}"; model="${3:-claude-haiku-4-5}"; ttl="${4:-300}"; par="${5:-8}"
+hostpfx="${2:-}"; model="${3:-claude-haiku-4-5}"; ttl="${4:-300}"; par="${5:-8}"; live_ports="${6:-}"
 mkdir -p "$cdir"
 now=$(date +%s)
 
@@ -156,10 +157,8 @@ emit_authfail() {  # $1=message
   fi
 }
 
-# A session is "connected" if it has a live mosh client. mosh-server keeps a `zellij attach`
-# child alive long after the human disconnects, so a process merely existing means nothing —
-# but a *connected* mosh-server burns a little CPU on keepalives every ~3s while a dead one
-# blocks idle. mosh_phase() samples that and writes the live set to $connf; is_connected reads it.
+# A session is "connected" if a local mosh-client is talking to its mosh-server's UDP port — an
+# exact signal computed fresh each open (see compute_connf), cached in $connf for is_connected.
 is_connected() { [ -s "$connf" ] && grep -qxF "$1" "$connf"; }
 
 emit_line() {  # $1=session ; one menu line from cache (placeholders for what's not ready yet)
@@ -169,56 +168,54 @@ emit_line() {  # $1=session ; one menu line from cache (placeholders for what's 
   frag='?'; [ -n "$cwd" ] && frag=$(cwd_frag "$cwd")
   ind='  '  # detached: blank, keeping labels aligned with the connected marker
   is_connected "$1" && ind="$(printf '\033[32m●\033[0m ')"  # green ● = a client is attached
-  # field 2 = compact display (cwd fragment, then the tiny title); field 3 = hidden, searchable
-  printf '%s\t%s%s  ·  %s\t%s %s\n' "$1" "$ind" "$frag" "$tit" "$short" "$cwd"
+  # field 2 = compact head (cwd fragment + tiny title) shown in the list, then a DIM tail (full
+  # cwd + short-id) that scrolls off the narrow list but is still matched by fzf — display
+  # truncation doesn't affect matching — so you can search by the whole path or the session id.
+  printf '%s\t%s%s  ·  %s\033[2m    %s %s\033[0m\n' "$1" "$ind" "$frag" "$tit" "$cwd" "$short"
 }
 
-cpu_jiffies() {  # $1=space-separated pids ; prints "pid utime+stime" per pid (no forks)
-  for p in $1; do
-    read -r line < "/proc/$p/stat" 2>/dev/null || continue
-    # shellcheck disable=SC2086  # deliberate word-split of the stat line into positional fields
-    set -- $line
-    [ "$#" -ge 15 ] && printf '%s %s\n' "$p" "$(( ${14} + ${15} ))"
-  done
+# Each mosh-server's UDP port + owning pid, one "port pid" line per server. The local address is
+# the only field ending in :<digits> (the peer prints as :*); the pid comes from ss's users:((…)).
+mosh_port_pids() {
+  ss -uanp 2>/dev/null | awk '/mosh-server/ {
+    p = ""; for (i = 1; i <= NF; i++) if ($i ~ /:[0-9]+$/) { n = split($i, a, ":"); p = a[n] }
+    pid = ""; if (match($0, /pid=[0-9]+/)) pid = substr($0, RSTART + 4, RLENGTH - 4)
+    if (p != "" && pid != "") print p, pid
+  }'
 }
 
-# Refresh the connected-session cache and reap orphaned mosh-servers (the `--reap` mode). A
-# mosh-server burns a little CPU on keepalives while a client is connected and is flat once it
-# disconnects; sampling twice, $win apart, tells them apart. The window must be generous —
-# keepalive work is often sub-jiffie, so short windows misfire — 60s separates live from dead
-# cleanly. Live sessions → $connf (drives the picker's green ● + count). Flat servers older than
-# $age_min → SIGTERM, which is safe: it only drops the stale mosh transport; the zellij session
-# (your actual work) persists and the picker re-moshes a fresh one. Linux-only (needs /proc).
-mosh_reap() {
-  [ -r /proc/self/stat ] || { printf 'mosh-reap: not Linux, skipping\n' >&2; return 0; }
-  win="${1:-60}" age_min=120
-  raw=$(pgrep -af 'mosh-server' 2>/dev/null)
-  [ -n "$raw" ] || { : > "$connf"; printf 'mosh-reap: no mosh-servers\n' >&2; return 0; }
-  pids=$(printf '%s\n' "$raw" | awk '{print $1}')
-  # pid -> session, but only for the picker-attach form (`zellij attach <session>`); fresh-path
-  # mosh-servers (… zsh -l) can't be name-mapped, so they feed the reaper but not $connf.
-  map=$(printf '%s\n' "$raw" | sed -nE 's/^([0-9]+).*zellij attach (-c )?(cmux-[A-Za-z0-9_-]+).*/\1 \3/p')
-  s1=$(cpu_jiffies "$pids")
-  sleep "$win"
-  s2=$(cpu_jiffies "$pids")
-  live_pids=$(printf '%s\n%s\n' "$s1" "$s2" \
-    | awk '{seen[$1]=seen[$1]" "$2; n[$1]++}
-           END {for (p in n) if (n[p] >= 2) {split(seen[p], a, " "); if (a[2] > a[1]) print p}}')
-  # live attach-path sessions → cache (atomic)
-  printf '%s\n' "$map" | awk -v L="$live_pids" \
-    'BEGIN{split(L,a," ");for(i in a)keep[a[i]]=1} ($1 in keep){print $2}' \
-    | sort -u > "$connf.tmp" && mv -f "$connf.tmp" "$connf"
-  # reap every flat (disconnected) mosh-server old enough to be sure — attach- AND fresh-path
-  reaped=$(printf '%s\n' "$pids" | { n=0; while read -r p; do
-      case " $live_pids " in *" $p "*) continue ;; esac
-      a=$(ps -o etimes= -p "$p" 2>/dev/null | tr -d ' ')
-      [ -n "$a" ] && [ "$a" -gt "$age_min" ] 2>/dev/null && kill -TERM "$p" 2>/dev/null && n=$((n + 1))
+# Connected = a session whose mosh-server holds a UDP port that a *local* mosh-client is talking to
+# (the caller passes those ports as $1). We map each such port to its session via the owning
+# process's args. Exact and instant — no CPU-activity guessing — and recomputed every open, so it
+# can't go stale. Writes the live set to $connf, which drives the green ●.
+compute_connf() {  # $1 = space-separated host ports with a live local mosh client
+  { [ -n "$1" ] && command -v ss >/dev/null 2>&1; } || { : > "$connf"; return 0; }
+  pmap=$(pgrep -af 'mosh-server' 2>/dev/null \
+    | sed -nE 's/^([0-9]+).*zellij attach (-c )?(cmux-[A-Za-z0-9_-]+).*/\1 \3/p')
+  lp=" $1 "
+  mosh_port_pids | while read -r port pid; do
+    case "$lp" in *" $port "*) ;; *) continue ;; esac
+    printf '%s\n' "$pmap" | awk -v P="$pid" '$1 == P {print $2; exit}'
+  done | sort -u > "$connf.tmp" && mv -f "$connf.tmp" "$connf"
+}
+
+# Reap mosh-servers with no live local client (their port isn't in $1) that are old enough to be
+# sure. Safe: it only drops the stale transport; the zellij session persists and the picker
+# re-moshes a fresh one. Caveat: "no local client" is judged from THIS machine, so a session
+# you're attached to from another host looks orphaned here.
+mosh_reap() {  # $1 = space-separated host ports with a live local mosh client
+  command -v ss >/dev/null 2>&1 || { printf 'mosh-reap: ss unavailable\n' >&2; return 0; }
+  age_min=120; lp=" ${1:-} "
+  reaped=$(mosh_port_pids | { n=0; while read -r port pid; do
+      case "$lp" in *" $port "*) continue ;; esac   # has a local client → keep
+      a=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+      [ -n "$a" ] && [ "$a" -gt "$age_min" ] 2>/dev/null && kill -TERM "$pid" 2>/dev/null && n=$((n + 1))
     done; echo "$n"; })
-  printf 'mosh-reap: %s live, %s orphans reaped\n' "$(grep -c . "$connf" 2>/dev/null || echo 0)" "$reaped" >&2
+  printf 'mosh-reap: %s orphans reaped\n' "$reaped" >&2
 }
 
-# --reap: sample mosh-servers, refresh $connf, kill disconnected ones. Run on its own (it takes
-# ~$win seconds); the picker only ever reads the $connf cache it leaves behind. See mosh_reap.
+# --reap <live-ports>: kill mosh-servers with no live local client (those ports aren't in $2).
+# Cleanup only — the picker computes $connf itself from the same port list. See mosh_reap.
 [ "$mode" = "--reap" ] && { mosh_reap "${2:-}"; exit 0; }
 
 sessions=$(list_sessions)
@@ -226,12 +223,15 @@ sessions=$(list_sessions)
 
 stream=0; [ "$mode" = "--stream" ] && stream=1
 
-# Instant list: every session straight from cache (ids, cached cwd/summary, and ● from the last
-# run's $connf). In stream mode this is what the picker shows before any refresh has run.
+# Connected set, recomputed fresh for this open from the local mosh-client ports the caller passed,
+# before we draw anything — so the green ● is exact and current, not a stale cache.
+[ "$stream" = 1 ] && compute_connf "$live_ports"
+
+# Instant list: every session straight from cache (ids, cached cwd/summary), with the ● from the
+# just-computed $connf. In stream mode this is what the picker shows before any refresh has run.
 [ "$stream" = 1 ] && for s in $sessions; do emit_line "$s"; done
 
-# Connected count → picker header (control line, not a row). Straight from the cached live set
-# ($connf, refreshed out-of-band by --reap), so it's known immediately like the ● markers.
+# Connected count → picker header (control line, not a row), from the $connf we just computed.
 if [ "$stream" = 1 ]; then
   n_conn=0; for s in $sessions; do is_connected "$s" && n_conn=$((n_conn + 1)); done
   printf '__STATUS__\t%d connected\n' "$n_conn"
