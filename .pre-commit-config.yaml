@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.95.5
+    hooks:
+      - id: trufflehog
+  - repo: local
+    hooks:
+      - id: check-crypt-patterns
+        name: check transcrypt rules match tracked files
+        entry: scripts/check-crypt-patterns.sh
+        language: script
+        pass_filenames: false

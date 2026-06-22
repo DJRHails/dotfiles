@@ -256,6 +256,12 @@
 [init]
     defaultBranch = main
 
+    # init.templateDir is set in gitconfig.local (machine-specific absolute
+    # path, see the warning in [user]) by modules/git/setup.sh — it points at
+    # ~/.git-template, which carries prek's pre-commit shim so every
+    # clone/init gets hooks. Not set here with a tilde because prek's
+    # init-template-dir check reads the value without tilde expansion.
+
 [fetch]
     prune = true
 

@@ -41,6 +41,23 @@ install::package "Git LFS" "git-lfs"
 install::package "Transcrypt" "transcrypt"
 github::install_cli
 
+# Hook enforcement: point init.templateDir at ~/.git-template and populate it
+# with prek's pre-commit shim, so every future clone/init gets hooks — the
+# shim no-ops in repos without a pre-commit config. Then install hooks for
+# this repo itself, which already has one. templateDir goes in gitconfig.local
+# as an absolute path: git would tilde-expand `~/.git-template`, but prek's
+# init-template-dir check reads the configured value literally.
+if platform::command_exists prek; then
+  git config --file "$DOTFILES/modules/git/gitconfig.local" \
+    init.templateDir "$HOME/.git-template"
+  prek init-template-dir "$HOME/.git-template" > /dev/null 2>&1
+  log::result $? "prek template dir (~/.git-template)"
+  (cd "$DOTFILES" && prek install > /dev/null 2>&1)
+  log::result $? "prek install (.files)"
+else
+  log::warning "prek not on PATH (rust module installs it); skipping git hook setup"
+fi
+
 if [ "$skipQuestions" != true ]; then
   feedback::ask_for_confirmation "Do you want to setup github?"
   if feedback::answer_is_yes
