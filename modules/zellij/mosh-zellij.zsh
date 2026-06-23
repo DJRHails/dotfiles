@@ -98,7 +98,11 @@ ssh::durable::stream_supervisor() {
         [[ -f $req ]] && { ttl=0; command rm -f "$req" "$autherr"; }
         command rm -f "$done"
         lp=$(ssh::durable::live_ports "$host")  # recomputed each stream so the ● stays current
-        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" "$lp" \
+        # ${(q)lp} is load-bearing: $lp is a space-separated port list, and ssh flattens its argv
+        # into one string the remote shell re-splits — so an unquoted "$lp" arrives as N args and
+        # the remote only reads $6 (the first port). That made the ● mark a single session. Quote it
+        # so the whole list survives as one remote arg.
+        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" "${(q)lp}" \
             < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" "$statusf" &
         pp=$!
         print -r -- "$pp" > "$pidf"
@@ -239,7 +243,10 @@ ssh::durable() {
                 print -u2 "ssh::durable --reap: no live mosh-client to $host from this host — refusing (would target every server). Run from the attached host, or pass --force."
                 return 0
             fi
-            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "$reap_lp" "$reap_force" < "$rscript"
+            # ${(q)reap_lp} for the same reason as the stream path: an unquoted space-separated
+            # port list is flattened by ssh and the remote reads only its first port — which made
+            # the reap treat every other server as orphaned and kill it. Quote it intact.
+            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "${(q)reap_lp}" "$reap_force" < "$rscript"
             return $?
             ;;
         --attach|-a)
