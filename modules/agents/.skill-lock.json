@@ -10,6 +10,15 @@
       "installedAt": "2026-03-06T18:27:03.922Z",
       "updatedAt": "2026-03-06T18:27:11.071Z"
     },
+    "handoff": {
+      "source": "openclaw/agent-skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/openclaw/agent-skills.git",
+      "skillPath": "skills/handoff/SKILL.md",
+      "skillFolderHash": "e8f28444c70fcee6290a60fa21fe1839719f8323",
+      "installedAt": "2026-06-09T10:21:44.000Z",
+      "updatedAt": "2026-06-09T10:21:44.000Z"
+    },
     "xlsx": {
       "source": "davila7/claude-code-templates",
       "sourceType": "github",
