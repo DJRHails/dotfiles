@@ -63,10 +63,13 @@ reconnect by hand with `ssh::durable <host> --query <name>`.
 
 ## Reaping orphaned mosh-servers
 mosh-servers linger after a client disconnects (lots of cruft over time). `ssh::durable <host> --reap`
-(also auto-fired on picker teardown) kills mosh-servers with no live local client that are >120s old.
-**Safe** — it only drops the stale transport; the zellij session persists and the picker re-moshes.
-Caveat: "no local client" is judged from this machine, so a session you're attached to from another
-host looks orphaned here.
+kills mosh-servers with no live local client that are >120s old. **Opt-in only** — it is NOT
+auto-fired on picker teardown (that was removed: a teardown reap whose live-client detection raced
+could kill still-attached mosh-servers and drop every tab, which is exactly the "lost them all
+again" failure). The green ● is computed fresh on each picker open (`compute_connf`), so it never
+depended on the reap. **Safe** — reap only drops the stale transport; the zellij session persists
+and the picker re-moshes. Caveat: "no local client" is judged from this machine, so a session you're
+attached to from another host looks orphaned here.
 
 ## cmux CLI quick ref (current)
 `cmux list-workspaces` · `cmux list-pane-surfaces --workspace <ws>` · `cmux workspace create --name <n>
