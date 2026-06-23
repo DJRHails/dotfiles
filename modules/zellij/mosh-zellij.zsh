@@ -399,14 +399,19 @@ zellij::sweep-husks() {
               for(p in par){ if(q[p]&&p!=root){ c=cmdof[p]
                 if(c ~ /^(\/[^ ]*\/)?zellij( |$)/) continue
                 if(c ~ /^(\/usr\/bin\/|\/bin\/)?-?(zsh|bash|sh|login)( |$)/) continue
-                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
+                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|ps -ao ppid|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
                 print c } } }')
         if [[ -n $meaningful ]]; then
             print -r -- "  keep(active)  $sess  [${$(print -r -- "$meaningful" | head -1)[1,60]}]"
         elif (( dry )); then
             print -r -- "  idle→kill     $sess"
         else
-            zellij delete-session --force "$sess" >/dev/null 2>&1 && print -r -- "  killed idle   $sess"
+            # Kill the server PID directly, NOT `zellij delete-session` — when husks have piled up
+            # (zellij 0.44.3 spawns a `ps -ao ppid,args` per server; at scale they wedge the macOS
+            # proc table in uninterruptible state), the zellij CLI itself hangs, so delete-session
+            # would block on the exact failure this is meant to clear. SIGTERM stops the server (and
+            # its ps storm); the EXITED entry is cosmetic and zellij prunes it.
+            kill "$spid" 2>/dev/null && print -r -- "  killed idle   $sess"
         fi
     done
 }
