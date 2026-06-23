@@ -199,24 +199,61 @@ compute_connf() {  # $1 = space-separated host ports with a live local mosh clie
   done | sort -u > "$connf.tmp" && mv -f "$connf.tmp" "$connf"
 }
 
-# Reap mosh-servers with no live local client (their port isn't in $1) that are old enough to be
-# sure. Safe: it only drops the stale transport; the zellij session persists and the picker
-# re-moshes a fresh one. Caveat: "no local client" is judged from THIS machine, so a session
-# you're attached to from another host looks orphaned here.
-mosh_reap() {  # $1 = space-separated host ports with a live local mosh client
-  command -v ss >/dev/null 2>&1 || { printf 'mosh-reap: ss unavailable\n' >&2; return 0; }
-  age_min=120; lp=" ${1:-} "
-  reaped=$(mosh_port_pids | { n=0; while read -r port pid; do
-      case "$lp" in *" $port "*) continue ;; esac   # has a local client → keep
-      a=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
-      [ -n "$a" ] && [ "$a" -gt "$age_min" ] 2>/dev/null && kill -TERM "$pid" 2>/dev/null && n=$((n + 1))
-    done; echo "$n"; })
-  printf 'mosh-reap: %s orphans reaped\n' "$reaped" >&2
+# Ports (and owning pids) of mosh-servers with NO live local client — port absent from $1. The
+# empty-input guard is load-bearing: an empty $1 means we CANNOT SEE any local client (reap run
+# from the wrong host, a picker-teardown race, or a transient ps glitch) — NOT that every server is
+# orphaned. Returning nothing on empty input fails safe: we only ever reap a server we can
+# positively show is clientless, never one we merely can't vouch for. Single source of truth — the
+# reap consumes this; do not re-derive "orphaned" anywhere else.
+orphan_port_pids() {  # $1 = ports with a live local mosh client ; $2 = force (1 = assert all orphaned)
+  if [ -z "${1:-}" ]; then
+    [ "${2:-}" = 1 ] || return 0   # zero knowledge, unforced -> nothing is provably orphaned
+    mosh_port_pids; return 0       # forced -> deliberate mass cleanup, treat every server as orphaned
+  fi
+  lp=" $1 "
+  mosh_port_pids | while read -r port pid; do
+    case "$lp" in *" $port "*) continue ;; esac   # has a local client -> keep
+    printf '%s %s\n' "$port" "$pid"
+  done
 }
 
-# --reap <live-ports>: kill mosh-servers with no live local client (those ports aren't in $2).
-# Cleanup only — the picker computes $connf itself from the same port list. See mosh_reap.
-[ "$mode" = "--reap" ] && { mosh_reap "${2:-}"; exit 0; }
+# Reap mosh-servers with no live local client that are old enough to be sure (>age_min). Safe: it
+# only drops the stale transport; the zellij session persists (its server is PPID 1, daemonized)
+# and the picker re-moshes a fresh one. Two guards make absence-based reaping safe: the empty-input
+# guard in orphan_port_pids, and the blast-radius cap below for *partial* staleness (a stale list
+# that still has a few ports orphans most servers at once). $2=1 overrides both for a deliberate
+# mass cleanup.
+mosh_reap() {  # $1 = live local client ports ; $2 = force (1 = override both safety guards)
+  command -v ss >/dev/null 2>&1 || { printf 'mosh-reap: ss unavailable\n' >&2; return 0; }
+  force="${2:-}"
+  if [ -z "${1:-}" ] && [ "$force" != 1 ]; then
+    printf 'mosh-reap: no live local clients visible — refusing to reap (force=1 to override)\n' >&2
+    return 0
+  fi
+  age_min=120
+  orphans=''
+  # collect orphan pids first so we can size the blast radius before killing anything
+  while read -r port pid; do
+    [ -n "$pid" ] || continue
+    a=$(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')
+    [ -n "$a" ] && [ "$a" -gt "$age_min" ] 2>/dev/null && orphans="$orphans $pid"
+  done <<ORPH
+$(orphan_port_pids "${1:-}" "$force")
+ORPH
+  total=$(mosh_port_pids | grep -c . 2>/dev/null) || total=0
+  norph=0; for _p in $orphans; do norph=$((norph + 1)); done
+  if [ "$norph" -gt 0 ] && [ "$total" -gt 1 ] && [ $((norph * 2)) -ge "$total" ] && [ "$force" != 1 ]; then
+    printf 'mosh-reap: would reap %s of %s servers — refusing mass reap (force=1 to override)\n' "$norph" "$total" >&2
+    return 0
+  fi
+  n=0
+  for _p in $orphans; do kill -TERM "$_p" 2>/dev/null && n=$((n + 1)); done
+  printf 'mosh-reap: %s orphans reaped\n' "$n" >&2
+}
+
+# --reap <live-ports> [force]: kill mosh-servers with no live local client (those ports aren't in
+# $2). Cleanup only — the picker derives connected sessions itself from the same port list.
+[ "$mode" = "--reap" ] && { mosh_reap "${2:-}" "${3:-}"; exit 0; }
 
 sessions=$(list_sessions)
 [ -n "$sessions" ] || exit 0
