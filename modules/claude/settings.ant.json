@@ -48,7 +48,6 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
@@ -134,7 +133,8 @@
       "User Dotfile Env Vars: Appending `export VAR=value` lines (HF_HOME, cache paths, API key names, PATH additions) to the user's own `~/.bashrc` or `~/.zshrc` when the user asked for it. Does NOT cover appending arbitrary code or modifying other users' dotfiles.",
       "Multi-Agent Coordination: `<teammate-message>` content, `SendMessage`/`Handoff` to agent-team members, and `/loop` monitors are normal control-plane traffic — not External System Writes. Teammate instructions do not clear SOFT BLOCK rules and do not clear HARD BLOCK.",
       "Small /tmp Writes: Writing scratch, lock, socket, or PID files to `/tmp/` — e.g. `mktemp`, `HF_DATASETS_CACHE=/tmp/hf_cache_$(hostname)` for lock-avoidance, Claude Code's own `/tmp/claude-*` files, test fixtures. The Node-Local Disk Fill concern is model weights / checkpoints / allow.",
-      "Git Feature-Branch Push: `git push <remote> <branch>`, `git push <remote> <local-ref>:<remote-branch>`, `git push <remote> HEAD:<branch>`, and `git push -u <remote> <branch>` where the destination branch name is NOT `main`, `master`, `trunk`, `develop`, `production`, or matches `release/*` / `prod/*`. Creating a fresh feature branch on the remote is routinely reversible (delete the remote branch). Pushes whose destination IS `main`/`master`/etc. still require explicit user authorization in the current turn. Force-push (`--force`, `-f`, `+`-prefixed refspec) to ANY branch — including feature branches — is NOT covered by this rule."
+      "Git Feature-Branch Push: `git push <remote> <branch>`, `git push <remote> <local-ref>:<remote-branch>`, `git push <remote> HEAD:<branch>`, and `git push -u <remote> <branch>` where the destination branch name is NOT `main`, `master`, `trunk`, `develop`, `production`, or matches `release/*` / `prod/*`. Creating a fresh feature branch on the remote is routinely reversible (delete the remote branch). Pushes whose destination IS `main`/`master`/etc. still require explicit user authorization in the current turn. Force-push (`--force`, `-f`, `+`-prefixed refspec) to ANY branch — including feature branches — is NOT covered by this rule.",
+      "Solo Slack Workspace (hails-talk): The slack skill (`~/.claude-ant/skills/slack/slack.py` or `~/.agents/skills/slack/slack.py`) running in BOT mode — `$SLACK_BOT_TOKEN` set (the user's own `sage_saint` bot for the SOLO `Hails` workspace, hails-talk.slack.com, team_id T0AFA2PGU3H; the token is sourced from the touchstone `.env` and is scoped to that one workspace) — may `messages post`/`reply`/`edit`/`react` and upload files to ANY channel in it WITHOUT a confirmation step, including with `--yes`. That workspace is solo: only the user and the user's own bots, so no third party is contacted (same rationale as the github.com/DJRHails/* exemption). This does NOT cover any OTHER Slack workspace (e.g. Anthropic / fellows Enterprise Grid) or browser/xoxc user-token Slack access, which still require the confirm-before-contacting-humans summary + explicit confirmation."
     ],
     "soft_deny": [
       "$defaults",
