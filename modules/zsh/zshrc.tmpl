@@ -16,6 +16,23 @@ fi
 typeset -U config_files
 config_files=($DOTFILES/**/*.zsh)
 
+# Drop transcrypt-encrypted files that haven't been decrypted on this host (no
+# crypt key configured). Their working-tree content is base64 ciphertext that
+# begins with the OpenSSL "Salted__" magic, so `source` would emit a "no such
+# file or directory" for every ciphertext line. See .gitattributes
+# (filter=crypt). Uses the `read` builtin (no fork) to peek the first line.
+typeset -a _plaintext_config_files
+typeset _first_line
+for file in $config_files
+do
+  _first_line=''
+  read -r _first_line < $file 2>/dev/null
+  [[ $_first_line == U2FsdGVkX1* ]] && continue
+  _plaintext_config_files+=$file
+done
+config_files=($_plaintext_config_files)
+unset _first_line _plaintext_config_files file
+
 # load the path files
 for file in ${(M)config_files:#*/path.zsh}
 do

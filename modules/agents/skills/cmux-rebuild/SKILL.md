@@ -1,6 +1,6 @@
 ---
 name: cmux-rebuild
-description: Manage the user's durable remote dev sessions — mosh+zellij sessions on a remote host (default bonbon), surfaced as cmux tabs via `ssh::durable`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, reconnect/sort remote sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: "ssh::durable", "durable sessions", "resurrect/rebuild cmux", "lost my bonbon connections", "reap mosh-servers", "the green dot".
+description: "Manage the user's durable remote dev sessions — mosh+zellij sessions on a remote host (default bonbon), surfaced as cmux tabs via `ssh::durable`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, reconnect/sort remote sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: 'ssh::durable', 'durable sessions', 'resurrect/rebuild cmux', 'lost my bonbon connections', 'reap mosh-servers', 'the green dot'."
 ---
 
 # cmux durable sessions

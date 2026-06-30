@@ -264,6 +264,8 @@
 
 [fetch]
     prune = true
+    # Fetch submodule commits during fetch/pull so submodule.recurse can check them out.
+    recurseSubmodules = on-demand
 
 [rebase]
   autosquash = true
@@ -275,12 +277,18 @@
 
 [pull]
 	rebase = true
+
+[submodule]
+	# `git pull`/`checkout` auto-init + update submodules to the recorded commit, so vendored
+	# skills (e.g. graph-design) never end up uninitialised/stale. Bump a pin with
+	# `git submodule update --remote <path>` + commit.
+	recurse = true
 [credential "https://github.com"]
 	helper = 
-	helper = !gh auth git-credential
+	helper = !/opt/homebrew/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-	helper =
-	helper = !gh auth git-credential
+	helper = 
+	helper = !/opt/homebrew/bin/gh auth git-credential
 
 [include]
 

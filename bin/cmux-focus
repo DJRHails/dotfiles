@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+##? cmux-focus — bring a cmux workspace (tab) to the foreground.
+##?
+##? Self-contained: defaults the control socket and CLI path so it works from
+##? contexts that don't inherit a cmux surface's env (notification click
+##? handlers, launchd, a URL-scheme bridge).
+##?
+##? USAGE:
+##?    cmux-focus <workspace-id>
+
+set -euo pipefail
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { sed -n 's/^##? \{0,1\}//p' "$0"; exit 0; }
+
+workspace="${1:?workspace id required (CMUX_WORKSPACE_ID)}"
+
+# Persistent log so notification-click invocations are always debuggable.
+log_dir="${XDG_STATE_HOME:-$HOME/.local/state}/cmux"
+mkdir -p "$log_dir" 2>/dev/null || true
+log_file="$log_dir/cmux-focus.log"
+log() { printf '%s  %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >>"$log_file" 2>/dev/null || true; }
+log "invoked ws=$workspace socket=${CMUX_SOCKET_PATH:-default} user=$(id -un)"
+
+export CMUX_QUIET=1
+: "${CMUX_SOCKET_PATH:=$HOME/.local/state/cmux/cmux.sock}"
+export CMUX_SOCKET_PATH
+cli="${CMUX_BUNDLED_CLI_PATH:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
+
+[[ -x "$cli" ]] || { log "FAIL: cmux CLI not executable at $cli"; echo "cmux CLI not found at $cli" >&2; exit 1; }
+
+# Switch to the session's workspace tab (accepts the UUID directly). This is the
+# step that actually brings the right tab forward.
+"$cli" select-workspace --workspace "$workspace" >>"$log_file" 2>&1 || log "select-workspace failed"
+
+# Bring the OS window holding that workspace to the front. list-windows format:
+#   "  0: <WINDOW-UUID> selected_workspace=<WS-UUID> workspaces=N"
+# Find the line now showing our workspace as selected, take the bare UUID (the
+# window id), skipping the "selected_workspace=<uuid>" token.
+window=$("$cli" list-windows 2>/dev/null | awk -v ws="$workspace" '
+  index($0, "selected_workspace=" ws) {
+    for (i = 1; i <= NF; i++) if ($i ~ /^[0-9A-Fa-f-]{36}$/) { print $i; exit }
+  }' || true)
+log "window=$window"
+[[ -n "$window" ]] && { "$cli" focus-window --window "$window" >>"$log_file" 2>&1 || log "focus-window failed"; }
+
+# Belt-and-braces: make sure cmux is the frontmost app.
+osascript -e 'tell application "cmux" to activate' 2>/dev/null || log "activate failed"
+log "done"

@@ -18,9 +18,9 @@
 #   ssh::durable <host> --query <str> [mosh…]  attach the most-recent session whose menu line
 #                                              contains <str> (case-insensitive fixed string,
 #                                              not a regex); no match → fresh
-#   ssh::durable <host> --reap                 refresh the connected-session cache + kill orphaned
-#                                              (disconnected) mosh-servers; ~60s, safe to loop. The
-#                                              picker also fires this in the background on teardown.
+#   ssh::durable <host> --reap                 kill orphaned (disconnected, >120s) mosh-servers;
+#                                              ~60s, safe to loop. Opt-in only — NOT auto-fired, so
+#                                              it can never drop a still-attached tab.
 # --attach/--query exec mosh when run outside a local zellij (via ssh::durable::go), so they
 # still work as a cmux workspace --command; inside one they de-nest like the interactive path.
 #
@@ -98,7 +98,11 @@ ssh::durable::stream_supervisor() {
         [[ -f $req ]] && { ttl=0; command rm -f "$req" "$autherr"; }
         command rm -f "$done"
         lp=$(ssh::durable::live_ports "$host")  # recomputed each stream so the ● stays current
-        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" "$lp" \
+        # ${(q)lp} is load-bearing: $lp is a space-separated port list, and ssh flattens its argv
+        # into one string the remote shell re-splits — so an unquoted "$lp" arrives as N args and
+        # the remote only reads $6 (the first port). That made the ● mark a single session. Quote it
+        # so the whole list survives as one remote arg.
+        ssh "$host" sh -s -- --stream "$host" "$DURABLE_SUMMARY_MODEL" "$ttl" "$DURABLE_SUMMARY_PAR" "${(q)lp}" \
             < "$rscript" 2>/dev/null | ssh::durable::stream_apply "$mirror" "$autherr" "$statusf" &
         pp=$!
         print -r -- "$pp" > "$pidf"
@@ -222,11 +226,27 @@ ssh::durable() {
             return $?
             ;;
         --reap|--sweep-mosh)
-            # Refresh the connected-session cache + reap disconnected mosh-servers (~60s on the
-            # host). Safe to loop. The picker reads the cache this leaves behind for its ● + count.
+            # Reap disconnected mosh-servers (no live local client, >120s old) on the host. Opt-in
+            # cleanup only — drops stale transports; the zellij sessions persist and re-mosh on the
+            # next attach. The green ● is computed fresh by the picker on each open, independent of
+            # this.
             local rscript="${DOTFILES:-$HOME/.files}/modules/zellij/durable-remote.sh"
             [[ -r $rscript ]] || { print -u2 "ssh::durable: missing $rscript"; return 1; }
-            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "$(ssh::durable::live_ports "$host")" < "$rscript"
+            local reap_force=""
+            [[ "${2:-}" == (--force|-f) || -n ${DURABLE_REAP_FORCE:-} ]] && reap_force=1
+            local reap_lp; reap_lp="$(ssh::durable::live_ports "$host")"
+            # Without a single live mosh-client to $host *from this machine*, the remote reap would
+            # see an empty port list and treat every server as orphaned. Refuse here too (the remote
+            # guards as well — defense in depth) unless explicitly forced. Run --reap from the host
+            # actually attached to the sessions, or pass --force for a deliberate mass cleanup.
+            if [[ -z $reap_lp && $reap_force != 1 ]]; then
+                print -u2 "ssh::durable --reap: no live mosh-client to $host from this host — refusing (would target every server). Run from the attached host, or pass --force."
+                return 0
+            fi
+            # ${(q)reap_lp} for the same reason as the stream path: an unquoted space-separated
+            # port list is flattened by ssh and the remote reads only its first port — which made
+            # the reap treat every other server as orphaned and kill it. Quote it intact.
+            ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "${(q)reap_lp}" "$reap_force" < "$rscript"
             return $?
             ;;
         --attach|-a)
@@ -338,10 +358,10 @@ KILL
         rmdir "$tmpd" 2>/dev/null
         [[ -n $authmsg ]] && print -u2 -- "ssh::durable: ⚠ $authmsg"
 
-        # Self-maintain the connected cache: fire a detached, lock-guarded reap on the host (it
-        # samples mosh-servers for ~60s, refreshes the cache, kills disconnected ones). Decoupled
-        # from this picker's lifetime; flock -n means concurrent opens don't pile up.
-        ( ssh "$host" flock -n /tmp/durable-reap.lock sh -s -- --reap "$(ssh::durable::live_ports "$host")" < "$rscript" >/dev/null 2>&1 & ) 2>/dev/null
+        # Reap is opt-in only (ssh::durable <host> --reap). Auto-firing it on every teardown could
+        # kill mosh-servers whose live-client detection raced at teardown — dropping tabs that were
+        # actually still attached. The green ● is computed fresh on each open (compute_connf), so it
+        # never depended on this reap.
 
         if [[ $pick -eq 0 && -n $chosen ]]; then
             ssh::durable::attach "$host" "${chosen%%$'\t'*}" "$@"
@@ -379,14 +399,19 @@ zellij::sweep-husks() {
               for(p in par){ if(q[p]&&p!=root){ c=cmdof[p]
                 if(c ~ /^(\/[^ ]*\/)?zellij( |$)/) continue
                 if(c ~ /^(\/usr\/bin\/|\/bin\/)?-?(zsh|bash|sh|login)( |$)/) continue
-                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
+                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|ps -ao ppid|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
                 print c } } }')
         if [[ -n $meaningful ]]; then
             print -r -- "  keep(active)  $sess  [${$(print -r -- "$meaningful" | head -1)[1,60]}]"
         elif (( dry )); then
             print -r -- "  idle→kill     $sess"
         else
-            zellij delete-session --force "$sess" >/dev/null 2>&1 && print -r -- "  killed idle   $sess"
+            # Kill the server PID directly, NOT `zellij delete-session` — when husks have piled up
+            # (zellij 0.44.3 spawns a `ps -ao ppid,args` per server; at scale they wedge the macOS
+            # proc table in uninterruptible state), the zellij CLI itself hangs, so delete-session
+            # would block on the exact failure this is meant to clear. SIGTERM stops the server (and
+            # its ps storm); the EXITED entry is cosmetic and zellij prunes it.
+            kill "$spid" 2>/dev/null && print -r -- "  killed idle   $sess"
         fi
     done
 }
