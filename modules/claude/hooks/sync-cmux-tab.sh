@@ -1,41 +1,46 @@
 #!/bin/bash
 set -euo pipefail
-# Hook (Stop): keep the cmux surface/tab name in step with the Claude session
-# name (the value set by /rename). cmux already syncs the *workspace* name; the
-# tab/surface is not synced, so we do it here.
+# Hook (UserPromptSubmit + Stop): keep the cmux panel (the per-surface tab in a
+# pane's tab bar) in step with the Claude session name (set by /rename). cmux
+# already syncs the *workspace* name; the panel/surface tab is not, so we do it.
 #
-#   1. Read this session's name from <config>/sessions/<pid>.json — the file whose
-#      .sessionId matches the hook's session_id (config dir derived from
-#      transcript_path so we don't hardcode ~/.claude or ~/.claude-ant).
-#   2. cmux rename-tab the caller surface ($CMUX_SURFACE_ID) to that name.
+# Event choice: /rename is a client-side metadata command that fires NO hook of
+# its own (verified on v2.1.196 — like /model), so we sync on the next event.
+# UserPromptSubmit (the user's next message) is the earliest — it fires ~1 turn
+# before Stop with the renamed .name already on disk, so the panel updates as
+# soon as the user types again. Stop is kept as a backstop and is the event
+# cmux-fork-session's pre-seed is tuned around (it writes our state file before a
+# fork's first turn so the fork keeps its "fork:" title). NOT SessionStart — it
+# fires at session boot and would race/lose that pre-seed, clobbering the fork
+# title. This hook emits nothing on stdout (safe for UserPromptSubmit, whose
+# stdout would otherwise be injected into the model's context).
 #
-# Robust + safe: silent no-op outside cmux, before any /rename, or if cmux is
-# missing; a per-session state file means we only call rename when the name
-# actually changes (no per-turn churn); never blocks the Stop event.
+# Local vs remote (this hook runs wherever `claude` runs):
+#   - Local (the cmux UI host): cmux injects a fresh, reliable $CMUX_SURFACE_ID.
+#   - Remote (durable/mosh box with no cmux, e.g. bonbon): $CMUX_SURFACE_ID is
+#     stale, and `cmux` isn't installed — so we reach the mac's cmux over ssh via
+#     run_cmux (shared with cmux-fork-session) and resolve our surface by *title*
+#     (the focus-independent key fork-session uses): the title currently holds our
+#     last-synced name, or the zellij session name before the first sync.
+#
+# Rename uses the `tab.action` JSON-RPC, not `cmux rename-tab`: the subcommand
+# fails with "Tab not found" on current cmux builds and the remote relay lacks it;
+# `tab.action` is the stable interface. It silently falls back to renaming the
+# *focused* surface on an unresolvable tab_id, so we (a) confirm our surface id is
+# a live surface before calling and (b) confirm cmux acted on *our* surface after,
+# before recording the sync — together these stop us clobbering the active tab.
+#
+# Robust: silent no-op outside cmux, before any /rename, or if the transport is
+# unreachable; a per-session state file means we only rename when the name
+# actually changes (no per-turn churn — so the remote ssh round-trips happen only
+# on a rename, never per message); always exits 0 so it never blocks the prompt.
+
+LIB="$(dirname "${BASH_SOURCE[0]}")/lib/cmux-remote.sh"
+[[ -f "$LIB" ]] || exit 0
+# shellcheck source=/dev/null
+source "$LIB"
 
 INPUT=$(cat)
-
-# Only meaningful inside a cmux-spawned surface.
-SURFACE="${CMUX_SURFACE_ID:-}"
-[[ -n "$SURFACE" ]] || exit 0
-command -v cmux >/dev/null 2>&1 || exit 0
-
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-cmux-tab"
-mkdir -p "$STATE_DIR"
-
-# Rename method depends on the host's cmux CLI: the full macOS CLI has
-# `rename-tab`; the remote relay CLI (cmuxd-remote) lacks it but forwards
-# arbitrary JSON-RPC, so we fall back to `rpc tab.action` (tab_id is the
-# surface-targeting param — `tab`/`surface` are ignored). Probe + cache per host.
-CAP_FILE="$STATE_DIR/.rename-method.$(hostname 2>/dev/null || echo unknown)"
-if [[ ! -f "$CAP_FILE" ]]; then
-  help=$(cmux --help 2>&1)
-  if grep -q 'rename-tab' <<<"$help"; then echo rename-tab >"$CAP_FILE"
-  elif grep -qE '(^| )rpc ' <<<"$help"; then echo rpc >"$CAP_FILE"
-  else echo none >"$CAP_FILE"; fi
-fi
-METHOD=$(cat "$CAP_FILE" 2>/dev/null || echo none)
-[[ "$METHOD" == "none" ]] && exit 0
 
 SESSION_ID=$(jq -r '.session_id // empty' <<<"$INPUT")
 TRANSCRIPT=$(jq -r '.transcript_path // empty' <<<"$INPUT")
@@ -51,19 +56,41 @@ NAME=$(jq -r --arg sid "$SESSION_ID" \
   'select(.sessionId==$sid) | .name // empty' "$SESSIONS_DIR"/*.json 2>/dev/null | head -1)
 [[ -n "$NAME" ]] || exit 0
 
-# Only call rename when the name actually changed since we last synced.
+# Churn guard: everything past here only runs when the name actually changed, so
+# the remote ssh round-trips fire on a rename, not on every message.
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-cmux-tab"
+mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/$SESSION_ID"
-[[ "$(cat "$STATE_FILE" 2>/dev/null || true)" == "$NAME" ]] && exit 0
+PREV="$(cat "$STATE_FILE" 2>/dev/null || true)"
+[[ "$PREV" == "$NAME" ]] && exit 0
 
-ok=""
-case "$METHOD" in
-rename-tab)
-  cmux rename-tab --surface "$SURFACE" "$NAME" >/dev/null 2>&1 && ok=1
-  ;;
-rpc)
-  params=$(jq -nc --arg t "$SURFACE" --arg n "$NAME" '{action:"rename",tab_id:$t,title:$n}')
-  cmux rpc tab.action "$params" >/dev/null 2>&1 && ok=1
-  ;;
-esac
-[[ -n "$ok" ]] && printf '%s' "$NAME" >"$STATE_FILE"
+# Resolve our cmux surface id.
+if cmux_is_local; then
+  SURFACE="${CMUX_SURFACE_ID:-}"
+  [[ -n "$SURFACE" ]] || exit 0
+  # Guard the focused-surface fallback: our id must be a live surface.
+  run_cmux --id-format both tree --all 2>/dev/null | grep -qiF "$SURFACE" || exit 0
+else
+  # Remote: match the surface whose title holds our last-synced name (or the
+  # zellij session name before the first sync). Can't clobber — no match → skip.
+  needle="${PREV:-${ZELLIJ_SESSION_NAME:-}}"
+  [[ -n "$needle" ]] || exit 0
+  SURFACE=$(run_cmux --id-format both tree --all 2>/dev/null | awk -v n="$needle" '
+    /surface surface:/ && index($0, n) {
+      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
+        print substr($0, RSTART, RLENGTH)
+        exit
+      }
+    }' || true)
+  [[ -n "$SURFACE" ]] || exit 0
+fi
+
+params=$(jq -nc --arg t "$SURFACE" --arg n "$NAME" '{action:"rename",tab_id:$t,title:$n}')
+acted=$(run_cmux rpc tab.action "$params" 2>/dev/null | jq -r '.surface_id // empty' || true)
+
+# Record the sync only if cmux renamed *our* surface (UUIDs, case-insensitive).
+lc() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+if [[ -n "$acted" && "$(lc "$acted")" == "$(lc "$SURFACE")" ]]; then
+  printf '%s' "$NAME" >"$STATE_FILE"
+fi
 exit 0

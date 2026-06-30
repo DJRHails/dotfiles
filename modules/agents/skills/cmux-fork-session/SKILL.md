@@ -28,8 +28,8 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
 1. Resolves context from env (no process-tree guessing): `CLAUDE_CODE_SESSION_ID`,
    `CLAUDE_CONFIG_DIR`. Reads the session **name** from the sessions JSON. The **live
    surface id** is then resolved on a remote by matching that name against the cmux
-   surface *titles* (`cmux tree --all`): the Stop-hook titler propagates the session
-   name out as the terminal title (Claude session → zellij/mosh → cmux surface title),
+   surface *titles* (`cmux tree --all`): the tab-sync hook (sync-cmux-tab.sh) propagates
+   the session name out as the terminal title (Claude session → zellij/mosh → cmux surface title),
    so the surface whose title contains the name is this one. That key is the only one
    that is **focus-independent** and survives cmux re-minting UUIDs across app restarts
    — unlike the forwarded `CMUX_SURFACE_ID` / the live-ids sidecar (both go stale → the
@@ -40,10 +40,14 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
    `$CLAUDE_CONFIG_DIR/sessions/<pid>.json`.
 3. Opens a split beside the caller via `cmux rpc surface.split` (or a tab via
    `surface.create`), launches the fork via `surface.send_text`, and titles it via
-   `tab.action`. Each call goes through a `run_cmux` shim: on the cmux UI host it hits
-   the local app socket directly; on a remote it ssh'es to the app host
-   (`CMUX_APP_HOST`, default `trifle`) and runs *its* cmux against *its* socket, args
-   base64-encoded per-arg so the JSON survives ssh re-quoting.
+   `tab.action`. Each call goes through `run_cmux`, the shared transport in
+   [`cmux-remote.sh`](../../../claude/hooks/lib/cmux-remote.sh) (also used by the rename
+   hook, so the two can't drift): on the cmux UI host it execs the local app binary; on a
+   remote it ssh'es (`ssh -n`) to the app host (`CMUX_APP_HOST`, default `trifle`) and runs
+   *its* cmux there, args base64-encoded per-arg so the JSON survives ssh re-quoting. It
+   does **not** force `CMUX_SOCKET_PATH` — cmux auto-discovers its socket (the path moved
+   from `~/Library/Application Support/cmux` to `~/.local/state/cmux` in a recent build, so
+   the old hardcode broke with "Socket not found"; auto-discovery is the fix).
 4. Launches the fork — `cd <cwd> && <launcher> --resume <id> --fork-session` — picking
    the launcher that matches the session's config dir: `~/.claude-ant` → `claude::ant`
    (sources `.env.ant` auth + ensure step), `~/.claude` → `claude`, anything else
@@ -51,7 +55,10 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
    `CLAUDE_CONFIG_DIR=… claude` skips `claude::ant`'s auth and lands "Not logged in".
 5. Titles the new tab `fork: <name>` (`rpc tab.action`).
 6. Pre-seeds the fork's tab-sync hook state so its first turn doesn't overwrite the
-   `fork:` title with the inherited name (see the `Stop` hook `sync-cmux-tab.sh`).
+   `fork:` title with the inherited name (see `sync-cmux-tab.sh`, which fires on
+   `UserPromptSubmit` + `Stop`). The pre-seed is tuned to win against `Stop` (fires
+   only after a full turn); it is **not** registered on `SessionStart` precisely so it
+   cannot race this pre-seed at the fork's boot.
 
 ## Local vs remote — two transports, one extra hop
 
@@ -97,6 +104,13 @@ focused surface).
 
 ## Related
 
-- `~/.files/modules/claude/hooks/sync-cmux-tab.sh` — the `Stop` hook that keeps a
-  tab's title in step with the session name (macOS `rename-tab`; remote `rpc
-  tab.action` with `tab_id`). This script's pre-seed cooperates with it.
+- `~/.files/modules/claude/hooks/sync-cmux-tab.sh` — the `UserPromptSubmit` + `Stop`
+  hook that keeps a tab's title in step with the session name (always `rpc tab.action`
+  with `tab_id`; the `rename-tab` subcommand is broken on current cmux builds — it
+  errors `not_found: Tab not found`). This script's pre-seed cooperates with it. On a
+  remote box it resolves its own surface by title (last-synced name, or the zellij
+  session name before the first sync) and renames over ssh — the same approach this skill
+  uses, so a `/rename` on a durable session retitles the cmux panel too.
+- `~/.files/modules/claude/hooks/lib/cmux-remote.sh` — the shared `run_cmux` /
+  `cmux_is_local` transport both scripts source (local exec vs `ssh -n` to the app host;
+  cmux socket auto-discovery).

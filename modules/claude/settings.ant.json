@@ -99,6 +99,17 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
