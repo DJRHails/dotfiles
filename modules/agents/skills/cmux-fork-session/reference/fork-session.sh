@@ -38,8 +38,6 @@ set -euo pipefail
 
 PREFIX="${1:-fork: }"
 WHERE="${2:-right}"
-APP_HOST="${CMUX_APP_HOST:-trifle}" # macOS host running cmux.app
-APP_CMUX="/Applications/cmux.app/Contents/Resources/bin/cmux"
 DURABLE_HOST="${CMUX_DURABLE_HOST:-$(hostname -s)}" # mosh target the fork hops back to
 
 die() {
@@ -47,23 +45,14 @@ die() {
   exit 1
 }
 
-# Run a cmux command against the app socket — locally if the app is on this host, else by
-# ssh'ing to the app host (args base64-encoded per-arg so JSON survives ssh re-quoting).
-run_cmux() {
-  if [ -x "$APP_CMUX" ]; then # on the cmux app host: local socket
-    CMUX_SOCKET_PATH="$HOME/Library/Application Support/cmux/cmux-$(id -u).sock" \
-      "$APP_CMUX" "$@"
-  else # remote: forward to the app host over ssh
-    local enc="" a
-    for a in "$@"; do enc+=" $(printf %s "$a" | base64 | tr -d '\n')"; done
-    # $enc is built client-side on purpose (base64 tokens, decoded remotely) — SC2029 is the design.
-    # shellcheck disable=SC2029
-    ssh "$APP_HOST" "C=$APP_CMUX
-      export CMUX_SOCKET_PATH=\"\$HOME/Library/Application Support/cmux/cmux-\$(id -u).sock\"
-      aa=(); for t in$enc; do aa+=(\"\$(printf %s \"\$t\" | openssl base64 -d -A)\"); done
-      exec \"\$C\" \"\${aa[@]}\""
-  fi
-}
+# Shared cmux transport (run_cmux / cmux_is_local / CMUX_APP_HOST / CMUX_APP_BIN),
+# kept in one place so this script and the rename hook can't drift — e.g. the socket
+# path move ("~/Library/Application Support/cmux" -> "~/.local/state/cmux") that
+# broke the old hardcode. APP_HOST/APP_CMUX stay as aliases for the refs below.
+# shellcheck source=/dev/null
+source "${CMUX_REMOTE_LIB:-$HOME/.files/modules/claude/hooks/lib/cmux-remote.sh}"
+APP_HOST="$CMUX_APP_HOST"
+APP_CMUX="$CMUX_APP_BIN"
 
 if [ -x "$APP_CMUX" ]; then MODE=local; else MODE=remote; fi
 
@@ -85,7 +74,7 @@ TITLE="${PREFIX}${NAME:-$SID}"
 
 # --- targeting: resolve THIS session's live cmux surface ------------------------------
 # Map the session to its surface by the one key that is focus-independent and survives cmux
-# re-minting UUIDs across app restarts: the surface *title*. The Stop-hook titler propagates
+# re-minting UUIDs across app restarts: the surface *title*. The tab-sync hook propagates
 # the Claude session name out as the terminal title (Claude session → zellij/mosh → cmux
 # surface title), so the surface whose title contains NAME is ours. Locally we trust the
 # fresh $CMUX_SURFACE_ID instead (cmux injects it per surface; no app round-trip needed).
@@ -109,7 +98,7 @@ if [ "$MODE" = remote ]; then
   SURFACE="${match%% *}"
   LIVE_WS="${match#* }"
   [ -n "$SURFACE" ] || die "no cmux surface titled with session name \"$NAME\" (is the tab-sync hook running?)"
-  # Heal the sidecar so cmux-session-tab / the Stop-hook titler pick up the live id too.
+  # Heal the sidecar so cmux-session-tab / the tab-sync hook pick up the live id too.
   if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
     mkdir -p "$(dirname "$sidecar")"
     printf '%s %s\n' "${LIVE_WS:-unknown}" "$SURFACE" >"$sidecar"
