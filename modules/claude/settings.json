@@ -44,8 +44,12 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5",
+  "model": "opus",
   "enableAllProjectMcpServers": false,
+  "skillOverrides": {
+    "code-review": "off",
+    "simplify": "off"
+  },
   "hooks": {
     "Notification": [
       {
@@ -105,14 +109,11 @@
     "swift-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true
   },
-  "skillOverrides": {
-    "code-review": "off",
-    "simplify": "off"
-  },
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
+  "skipAutoPermissionPrompt": true,
   "autoMode": {
     "allow": [
       "$defaults",
@@ -130,6 +131,5 @@
       "Trusted internal domains: docs.google.com and drive.google.com (Google Docs/Drive sources for bin/sync_google_docs.py and `gog docs export`), hails.info (personal domain)",
       "Key internal services: local qmd hybrid search CLI at ~/.local/bin/qmd (indexes the KB), gog CLI for Google Docs export, mcporter-managed MCP servers (context7, playwriter, figma-dev-mode)"
     ]
-  },
-  "skipAutoPermissionPrompt": true
+  }
 }
