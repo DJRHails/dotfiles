@@ -285,10 +285,10 @@
 	recurse = true
 [credential "https://github.com"]
 	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = !gh auth git-credential
 [credential "https://gist.github.com"]
 	helper = 
-	helper = !/opt/homebrew/bin/gh auth git-credential
+	helper = !gh auth git-credential
 
 # Use SSH for GitHub everywhere: the SSH key set up by setup.github.sh is
 # authorised on every host (macOS + Linux), but the HTTPS helper above is macOS
