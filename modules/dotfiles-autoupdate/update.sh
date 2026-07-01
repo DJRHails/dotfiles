@@ -33,7 +33,8 @@ if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; the
   exit 0
 fi
 
-if ! git fetch --quiet --prune origin 2>>"$LOG"; then
+# Superproject only — never let a submodule fetch failure block the daily pull.
+if ! git fetch --quiet --prune --no-recurse-submodules origin 2>>"$LOG"; then
   log "skip: fetch failed (offline?)"
   exit 0
 fi
@@ -47,6 +48,9 @@ fi
 
 # Fast-forward only — a diverged branch needs a human, never an auto-merge.
 if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
+  # Follow submodule pins best-effort (now that HTTPS->SSH makes them fetch);
+  # non-fatal so a submodule hiccup never fails the superproject update.
+  git submodule update --init --recursive --quiet 2>>"$LOG" || log "note: submodule sync incomplete"
   log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
 else
   log "skip: $branch diverged from upstream — needs a manual pull"

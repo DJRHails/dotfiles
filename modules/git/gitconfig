@@ -290,6 +290,13 @@
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
 
+# Use SSH for GitHub everywhere: the SSH key set up by setup.github.sh is
+# authorised on every host (macOS + Linux), but the HTTPS helper above is macOS
+# gh-only — so HTTPS submodules (e.g. askllm) can't authenticate on the Linux
+# servers. Rewriting HTTPS -> SSH makes them use the key that already works.
+[url "git@github.com:"]
+	insteadOf = https://github.com/
+
 [include]
 
     # Load local configs.
