@@ -21,8 +21,10 @@ cd "$DOTFILES" 2>/dev/null || {
   exit 0
 }
 
-# Never touch a tree with local changes — a human owns those.
-if [ -n "$(git status --porcelain)" ]; then
+# Never touch a tree with local changes in the superproject — a human owns those.
+# Submodule state is ignored: it's managed separately (a submodule pinned to a
+# non-HEAD commit is the normal steady state) and must not block the pull.
+if [ -n "$(git status --porcelain --ignore-submodules=all)" ]; then
   log "skip: working tree has local changes"
   exit 0
 fi
@@ -47,10 +49,9 @@ if [ "$local_rev" = "$remote_rev" ]; then
 fi
 
 # Fast-forward only — a diverged branch needs a human, never an auto-merge.
+# Submodules are left untouched (never checked out over possible in-submodule
+# WIP); run `git submodule update` by hand to follow a bumped pin.
 if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
-  # Follow submodule pins best-effort (now that HTTPS->SSH makes them fetch);
-  # non-fatal so a submodule hiccup never fails the superproject update.
-  git submodule update --init --recursive --quiet 2>>"$LOG" || log "note: submodule sync incomplete"
   log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
 else
   log "skip: $branch diverged from upstream — needs a manual pull"
