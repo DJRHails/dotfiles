@@ -44,7 +44,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "fable",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
@@ -93,6 +93,17 @@
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/experiment-log.sh"
           },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
