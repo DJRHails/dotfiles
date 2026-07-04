@@ -2,7 +2,7 @@
 # Note: skills live at modules/agents/skills/ (moved from modules/claude/skills/
 # in commit 4b592454a738). Validated by scripts/check-crypt-patterns.sh.
 modules/agents/skills/discord/**                   filter=crypt diff=crypt merge=crypt
-modules/agents/skills/explanatory-diagram/**       filter=crypt diff=crypt merge=crypt
+modules/agents/skills/diagram-design/**             filter=crypt diff=crypt merge=crypt
 modules/agents/skills/gantry-cli/**                filter=crypt diff=crypt merge=crypt
 modules/agents/skills/research-meeting-playbook/** filter=crypt diff=crypt merge=crypt
 modules/agents/skills/runpod-ant-cluster/**        filter=crypt diff=crypt merge=crypt
