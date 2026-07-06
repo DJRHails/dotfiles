@@ -27,6 +27,6 @@ elif platform::is_osx; then
   corepack enable pnpm 2>/dev/null || npm install -g pnpm
   log::result $? "pnpm"
 else
-  sudo corepack enable pnpm 2>/dev/null || sudo npm install -g pnpm
+  platform::sudo corepack enable pnpm 2>/dev/null || platform::sudo npm install -g pnpm
   log::result $? "pnpm"
 fi

@@ -10,7 +10,7 @@ elif platform::is_osx; then
   log::execute "npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
 else
-  log::execute "sudo npm install -g @earendil-works/pi-coding-agent" \
+  log::execute "platform::sudo npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
 fi
 
