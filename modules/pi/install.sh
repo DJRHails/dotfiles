@@ -4,19 +4,22 @@
 # Linux node comes from the NodeSource apt repo (modules/node), whose global
 # prefix is system-owned — npm -g needs sudo there, like the node module's own
 # pnpm fallback. macOS (brew) keeps a user-writable node bin dir.
-if platform::command_exists "pi"; then
-  log::success "pi-coding-agent"
-elif platform::is_osx; then
-  log::execute "npm install -g @earendil-works/pi-coding-agent" \
-    "pi-coding-agent"
+if ! platform::command_exists "pi"; then
+  if platform::is_osx; then
+    log::execute "npm install -g @earendil-works/pi-coding-agent" \
+      "pi-coding-agent"
+  else
+    log::execute "platform::sudo npm install -g @earendil-works/pi-coding-agent" \
+      "pi-coding-agent"
+  fi
 elif npm ls -g @mariozechner/pi-coding-agent > /dev/null 2>&1; then
   # The @mariozechner name is deprecated on npm and receives no new releases.
+  sudo_npm="$(platform::sudo_prefix)npm"
   log::execute \
-    "npm uninstall -g @mariozechner/pi-coding-agent && npm install -g @earendil-works/pi-coding-agent" \
+    "$sudo_npm uninstall -g @mariozechner/pi-coding-agent && $sudo_npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent (migrate to @earendil-works)"
 else
-  log::execute "platform::sudo npm install -g @earendil-works/pi-coding-agent" \
-    "pi-coding-agent"
+  log::success "pi-coding-agent"
 fi
 
 # Install pi extensions
