@@ -1,5 +1,9 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
+# A non-zero UserPromptSubmit hook BLOCKS the prompt — including automated wakes
+# (background-task notifications), which stranded headless gantry workers when
+# this hook died under set -e. Fail open: any unexpected error is a silent no-op.
+trap 'exit 0' ERR
 # Hook (UserPromptSubmit + Stop): keep the cmux panel (the per-surface tab in a
 # pane's tab bar) in step with the Claude session name (set by /rename). cmux
 # already syncs the *workspace* name; the panel/surface tab is not, so we do it.
@@ -52,8 +56,10 @@ SESSIONS_DIR="$CONFIG_DIR/sessions"
 [[ -d "$SESSIONS_DIR" ]] || exit 0
 
 # The session name (.name) is absent until the first /rename — no clobber then.
+# `|| true`: an empty *.json glob reaches jq unexpanded and fails the pipeline
+# under pipefail (the exact silent-block seen in headless workers).
 NAME=$(jq -r --arg sid "$SESSION_ID" \
-  'select(.sessionId==$sid) | .name // empty' "$SESSIONS_DIR"/*.json 2>/dev/null | head -1)
+  'select(.sessionId==$sid) | .name // empty' "$SESSIONS_DIR"/*.json 2>/dev/null | head -1 || true)
 [[ -n "$NAME" ]] || exit 0
 
 # Churn guard: everything past here only runs when the name actually changed, so
