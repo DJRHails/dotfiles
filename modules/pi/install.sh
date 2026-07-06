@@ -9,6 +9,11 @@ if platform::command_exists "pi"; then
 elif platform::is_osx; then
   log::execute "npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
+elif npm ls -g @mariozechner/pi-coding-agent > /dev/null 2>&1; then
+  # The @mariozechner name is deprecated on npm and receives no new releases.
+  log::execute \
+    "npm uninstall -g @mariozechner/pi-coding-agent && npm install -g @earendil-works/pi-coding-agent" \
+    "pi-coding-agent (migrate to @earendil-works)"
 else
   log::execute "platform::sudo npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
