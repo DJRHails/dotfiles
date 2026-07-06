@@ -2,7 +2,7 @@
 . "$DOTFILES/scripts/core/main.sh"
 
 if ! platform::command_exists "pi"; then
-  log::execute "npm install -g @mariozechner/pi-coding-agent" \
+  log::execute "npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
 else
   log::success "pi-coding-agent"
@@ -25,4 +25,16 @@ if platform::command_exists "pi"; then
   log::execute \
     "pi install npm:pi-multi-pass" \
     "pi-multi-pass"
+
+  log::execute \
+    "pi install npm:pi-web-access" \
+    "pi-web-access"
+
+  log::execute \
+    "pi install npm:pi-subagents" \
+    "pi-subagents"
+
+  log::execute \
+    "pi install npm:@ff-labs/pi-fff" \
+    "pi-fff"
 fi
