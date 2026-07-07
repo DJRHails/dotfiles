@@ -23,7 +23,7 @@ SESSION_ID=$(jq -r '.session_id // empty' <<<"$INPUT")
 TRANSCRIPT=$(jq -r '.transcript_path // empty' <<<"$INPUT")
 CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
 
-# Resolve the session's display name (same source as sync-cmux-tab.sh): the
+# Resolve the session's display name (same source as sync_cmux_tab.py): the
 # sessions file whose .sessionId matches, .name present only after /rename.
 NAME=""
 if [[ -n "$SESSION_ID" && -n "$TRANSCRIPT" ]]; then

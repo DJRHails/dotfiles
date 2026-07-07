@@ -99,7 +99,7 @@
           },
           {
             "type": "command",
-            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
+            "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
           }
         ]
       }
@@ -110,7 +110,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.files/modules/claude/hooks/sync-cmux-tab.sh"
+            "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
           }
         ]
       }

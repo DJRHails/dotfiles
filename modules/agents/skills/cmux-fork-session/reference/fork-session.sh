@@ -5,7 +5,7 @@ set -euo pipefail
 # Opens a split (or sibling tab) in the caller's cmux workspace, launches a forked copy of
 # the current session in it (claude --resume <id> --fork-session, with the right
 # CLAUDE_CONFIG_DIR), and titles it "<prefix><session-name>". The title survives the
-# fork's own tab-sync hook because sync-cmux-tab.sh treats a terminal tab whose title
+# fork's own tab-sync hook because sync_cmux_tab.py treats a terminal tab whose title
 # contains the session name as already in sync.
 #
 # Context is read from the env cmux + Claude Code inject: CLAUDE_CODE_SESSION_ID,

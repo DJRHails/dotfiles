@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared cmux transport: talk to the cmux app socket from either the cmux UI host
 # (the mac) or a durable/mosh remote (e.g. bonbon, which has no cmux installed).
-# Sourced by sync-cmux-tab.sh (the rename hook) and cmux-fork-session.
+# Sourced by cmux-fork-session (the rename hook is now sync_cmux_tab.py, python).
 #
 # Do NOT force CMUX_SOCKET_PATH: cmux auto-discovers its own socket, and the path
 # moved from "~/Library/Application Support/cmux" to "~/.local/state/cmux" in a

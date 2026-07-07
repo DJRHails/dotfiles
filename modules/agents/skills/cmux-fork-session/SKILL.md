@@ -28,7 +28,7 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
 1. Resolves context from env (no process-tree guessing): `CLAUDE_CODE_SESSION_ID`,
    `CLAUDE_CONFIG_DIR`. Reads the session **name** from the sessions JSON. The **live
    surface id** is then resolved on a remote by matching that name against the cmux
-   surface *titles* (`cmux tree --all`): the tab-sync hook (sync-cmux-tab.sh) propagates
+   surface *titles* (`cmux tree --all`): the tab-sync hook (sync_cmux_tab.py) propagates
    the session name out as the terminal title (Claude session → zellij/mosh → cmux surface title),
    so the surface whose title contains the name is this one. That key is the only one
    that is **focus-independent** and survives cmux re-minting UUIDs across app restarts
@@ -55,7 +55,7 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
    `CLAUDE_CONFIG_DIR=… claude` skips `claude::ant`'s auth and lands "Not logged in".
 5. Titles the new tab `fork: <name>` (`rpc tab.action`).
 6. The `fork: <name>` title survives the fork's own tab-sync hook without any
-   pre-seed: `sync-cmux-tab.sh` (stateless, fires on `UserPromptSubmit` + `Stop`) treats a terminal tab
+   pre-seed: `sync_cmux_tab.py` (stateless, fires on `UserPromptSubmit` + `Stop`) treats a terminal tab
    whose title *contains* the session name as already in sync, and `fork: <name>`
    contains the inherited name by construction.
 
@@ -103,7 +103,7 @@ focused surface).
 
 ## Related
 
-- `~/.files/modules/claude/hooks/sync-cmux-tab.sh` — the stateless `UserPromptSubmit` + `Stop` hook that
+- `~/.files/modules/claude/hooks/sync_cmux_tab.py` — the stateless `UserPromptSubmit` + `Stop` hook that
   keeps a tab's title in step with the session name (always `rpc tab.action` with
   `tab_id`; the `rename-tab` subcommand is broken on current cmux builds — it errors
   `not_found: Tab not found`). It skips any terminal tab whose title contains the
