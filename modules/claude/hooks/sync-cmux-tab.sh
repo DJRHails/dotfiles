@@ -38,6 +38,13 @@ trap 'exit 0' ERR
 # unreachable; a per-session state file means we only rename when the name
 # actually changes (no per-turn churn — so the remote ssh round-trips happen only
 # on a rename, never per message); always exits 0 so it never blocks the prompt.
+#
+# Manual invocation (debugging / one-shot repair of another session's tab): the
+# process fallback keys on the INVOKER's $ZELLIJ_SESSION_NAME, so running this by
+# hand for a different session renames YOUR tab unless you override it:
+#   printf '{"session_id":"<sid>","transcript_path":"<path>"}' \
+#     | ZELLIJ_SESSION_NAME=<that session's zellij name> bash sync-cmux-tab.sh
+# (In production the hook always runs inside the session's own env — not an issue.)
 
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/cmux-remote.sh"
 [[ -f "$LIB" ]] || exit 0
@@ -63,12 +70,20 @@ NAME=$(jq -r --arg sid "$SESSION_ID" \
 [[ -n "$NAME" ]] || exit 0
 
 # Churn guard: everything past here only runs when the name actually changed, so
-# the remote ssh round-trips fire on a rename, not on every message.
+# the remote ssh round-trips fire on a rename, not on every message. But the
+# state file is only a cache of what we last SET, not proof the tab still shows
+# it — cmux restarts and out-of-band renames clobber titles while the cache
+# still claims synced-ness. So a matching cache older than 10 minutes falls
+# through to a full (idempotent) re-sync: steady state stays ssh-free, and a
+# clobbered tab self-heals within one event after the window expires.
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-cmux-tab"
 mkdir -p "$STATE_DIR"
 STATE_FILE="$STATE_DIR/$SESSION_ID"
 PREV="$(cat "$STATE_FILE" 2>/dev/null || true)"
-[[ "$PREV" == "$NAME" ]] && exit 0
+if [[ "$PREV" == "$NAME" ]]; then
+  fresh=$(find "$STATE_FILE" -newermt '-10 minutes' 2>/dev/null || true)
+  [[ -n "$fresh" ]] && exit 0
+fi
 
 # Resolve our cmux surface id.
 if cmux_is_local; then
