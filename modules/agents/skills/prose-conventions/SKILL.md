@@ -249,13 +249,15 @@ Style guides are heuristics, not laws. Break any rule when following it would ma
 
 When editing AI-generated or AI-assisted text, do a final pass: ask "What still reads as obviously machine-generated?" Fix those tells, then check once more.
 
-When editing, preserve the author's voice. Do not:
+When editing, protect register — punctuation, rhythm, informality — but nothing else. Do not:
 
 - **Standardise punctuation that carries tone** — a casual hyphen-dash or exclamation mark often signals self-aware humour. "even if I know a few!" is wry; "even if I know a few." is flat.
 - **Remove personality for consistency** — mechanical uniformity kills voice. A deliberate exclamation or informal dash is not an error.
 - **Over-correct based on word counts** — if a "long sentence" reads well aloud, leave it.
 
 The author has a penchant for semi-colons; leave them be.
+
+Register protection is never an exemption from the content rules. A slogan, an unglossed metaphor pair, or a having-it-both-ways verdict fails this guide whether it is new text or carried over verbatim from an earlier draft — "it was already there" and "that's the author's framing" are not defences. Pre-existing prose gets the same pass as new prose. (This clause exists because a carried-over maxim — "survived as structure, failed as arithmetic" — was once waved through as voice; it was spin.)
 
 Ask: does this change make the writing better, or just more uniform?
 
