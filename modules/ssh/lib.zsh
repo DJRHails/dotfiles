@@ -19,12 +19,19 @@ ssh::self() {
 }
 
 ssh::ui_host() {
+  # Fall back at call time, not just source time: non-interactive shells
+  # (Claude Code's Bash tool, cron) inherit the functions but not the
+  # array — zsh arrays can't be exported — so an empty CODE_UI_HOSTS here
+  # must still resolve rather than yield `ssh ""`.
   local self h
+  local -a hosts
   self=$(ssh::self)
-  for h in "${CODE_UI_HOSTS[@]}"; do
+  hosts=("${CODE_UI_HOSTS[@]}")
+  (( ${#hosts[@]} )) || hosts=(trifle)
+  for h in "${hosts[@]}"; do
     [[ "$h" == "$self" ]] && { echo "$self"; return; }
   done
-  echo "${CODE_UI_HOSTS[1]}"
+  echo "${hosts[1]}"
 }
 
 ssh::open_url() {
