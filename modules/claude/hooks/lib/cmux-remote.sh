@@ -8,7 +8,15 @@
 # recent build — so any hardcoded value goes stale ("Socket not found"). We let
 # the app find it (and inherit the env value cmux already injected, when present).
 
-CMUX_APP_HOST="${CMUX_APP_HOST:-trifle}" # macOS host running cmux.app
+# macOS host running cmux.app — resolved through the ssh::ui_host convention
+# (modules/ssh/lib.zsh: first CODE_UI_HOSTS entry, default trifle) so the UI
+# host is configured in one place. The lib is zsh (its array can't be exported
+# to this bash hook), so ask a zsh for the answer; hard fallback stays trifle.
+if [[ -z "${CMUX_APP_HOST:-}" ]]; then
+  _ssh_lib="$(dirname "${BASH_SOURCE[0]}")/../../../ssh/lib.zsh"
+  CMUX_APP_HOST=$(zsh -c "source '$_ssh_lib' 2>/dev/null && ssh::ui_host" 2>/dev/null || true)
+  CMUX_APP_HOST="${CMUX_APP_HOST:-trifle}"
+fi
 CMUX_APP_BIN="/Applications/cmux.app/Contents/Resources/bin/cmux"
 
 # True on the cmux UI host: the app binary is installed here.

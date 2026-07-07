@@ -54,11 +54,10 @@ for a sibling tab. (The skill base directory is printed when the skill loads.)
    → `CLAUDE_CONFIG_DIR=<cfg> claude`. Matching the wrapper matters — a bare
    `CLAUDE_CONFIG_DIR=… claude` skips `claude::ant`'s auth and lands "Not logged in".
 5. Titles the new tab `fork: <name>` (`rpc tab.action`).
-6. Pre-seeds the fork's tab-sync hook state so its first turn doesn't overwrite the
-   `fork:` title with the inherited name (see `sync-cmux-tab.sh`, which fires on
-   `UserPromptSubmit` + `Stop`). The pre-seed is tuned to win against `Stop` (fires
-   only after a full turn); it is **not** registered on `SessionStart` precisely so it
-   cannot race this pre-seed at the fork's boot.
+6. The `fork: <name>` title survives the fork's own tab-sync hook without any
+   pre-seed: `sync-cmux-tab.sh` (stateless, fires on `Stop`) treats a terminal tab
+   whose title *contains* the session name as already in sync, and `fork: <name>`
+   contains the inherited name by construction.
 
 ## Local vs remote — two transports, one extra hop
 
@@ -97,20 +96,21 @@ focused surface).
 ## Robustness / edge cases
 
 - Not inside cmux, no `cmux`/`jq`, or no `CLAUDE_CODE_SESSION_ID` → clear error, no action.
-- Session never `/rename`d (no `.name`) → titles the tab `fork: <session-id>` and
-  skips the hook pre-seed (nothing to preserve).
-- All cmux writes are best-effort; the fork still launches even if the rename or
-  pre-seed step fails.
+- Session never `/rename`d (no `.name`) → titles the tab `fork: <session-id>`
+  (the tab-sync hook has no name to sync, so the title is safe).
+- All cmux writes are best-effort; the fork still launches even if the rename
+  fails.
 
 ## Related
 
-- `~/.files/modules/claude/hooks/sync-cmux-tab.sh` — the `UserPromptSubmit` + `Stop`
-  hook that keeps a tab's title in step with the session name (always `rpc tab.action`
-  with `tab_id`; the `rename-tab` subcommand is broken on current cmux builds — it
-  errors `not_found: Tab not found`). This script's pre-seed cooperates with it. On a
-  remote box it resolves its own surface by title (last-synced name, or the zellij
-  session name before the first sync) and renames over ssh — the same approach this skill
-  uses, so a `/rename` on a durable session retitles the cmux panel too.
+- `~/.files/modules/claude/hooks/sync-cmux-tab.sh` — the stateless `Stop` hook that
+  keeps a tab's title in step with the session name (always `rpc tab.action` with
+  `tab_id`; the `rename-tab` subcommand is broken on current cmux builds — it errors
+  `not_found: Tab not found`). It skips any terminal tab whose title contains the
+  session name — which is what protects this skill's `fork:` titles. On a remote box it
+  resolves its own surface deterministically (cmux `top` pid → the mosh/zellij args
+  carry the zellij session name) and renames over ssh — so a `/rename` on a durable
+  session retitles the cmux panel too.
 - `~/.files/modules/claude/hooks/lib/cmux-remote.sh` — the shared `run_cmux` /
   `cmux_is_local` transport both scripts source (local exec vs `ssh -n` to the app host;
   cmux socket auto-discovery).

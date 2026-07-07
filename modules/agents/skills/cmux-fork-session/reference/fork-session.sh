@@ -4,9 +4,9 @@ set -euo pipefail
 #
 # Opens a split (or sibling tab) in the caller's cmux workspace, launches a forked copy of
 # the current session in it (claude --resume <id> --fork-session, with the right
-# CLAUDE_CONFIG_DIR), titles it "<prefix><session-name>", and pre-seeds the fork's
-# tab-sync hook state so the title is not overwritten on the fork's first turn
-# (see sync-cmux-tab.sh).
+# CLAUDE_CONFIG_DIR), and titles it "<prefix><session-name>". The title survives the
+# fork's own tab-sync hook because sync-cmux-tab.sh treats a terminal tab whose title
+# contains the session name as already in sync.
 #
 # Context is read from the env cmux + Claude Code inject: CLAUDE_CODE_SESSION_ID,
 # CLAUDE_CONFIG_DIR, CMUX_SURFACE_ID, CMUX_WORKSPACE_ID — except the surface id, which we
@@ -117,8 +117,6 @@ esac
 FORK_CMD="cd $(printf '%q' "$PROJ") && $LAUNCH --resume $(printf '%q' "$SID") --fork-session"
 
 # --- create the new surface ---------------------------------------------------
-before=$(jq -r '.sessionId' "$SESSIONS_DIR"/*.json 2>/dev/null | sort -u)
-
 case "$WHERE" in
 left | right | up | down)
   res=$(run_cmux rpc surface.split \
@@ -216,22 +214,8 @@ fi
 run_cmux rpc tab.action \
   "$(jq -nc --arg s "$NEW" --arg n "$TITLE" '{action:"rename",tab_id:$s,title:$n}')" >/dev/null 2>&1 || true
 
-# Keep the title: the fork inherits NAME, so its own tab-sync hook would reset the tab to
-# NAME on its first turn. Pre-seeding state=NAME makes that hook a no-op. Poll briefly for
-# the fork's freshly-written sessions file (on this host — that's where the fork runs).
-if [[ -n "$NAME" ]]; then
-  state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/claude-cmux-tab"
-  mkdir -p "$state_dir"
-  for _ in $(seq 1 20); do
-    fork_id=$(jq -r --arg s "$SID" --arg p "$PROJ" --arg n "$NAME" \
-      'select(.sessionId!=$s and .cwd==$p and .name==$n) | .sessionId' \
-      "$SESSIONS_DIR"/*.json 2>/dev/null | grep -vxF "$before" | head -1) || true
-    if [[ -n "$fork_id" ]]; then
-      printf '%s' "$NAME" >"$state_dir/$fork_id"
-      break
-    fi
-    sleep 1
-  done
-fi
+# Title survival: the fork inherits NAME, and the (stateless) tab-sync hook
+# treats any terminal tab whose title CONTAINS the session name as in sync — so
+# the "fork: <NAME>" title set above already satisfies it. No state pre-seed.
 
 echo "forked $SID -> $WHERE ($NEW) [$MODE] titled '$TITLE'"
