@@ -77,17 +77,54 @@ if cmux_is_local; then
   # Guard the focused-surface fallback: our id must be a live surface.
   run_cmux --id-format both tree --all 2>/dev/null | grep -qiF "$SURFACE" || exit 0
 else
-  # Remote: match the surface whose title holds our last-synced name (or the
-  # zellij session name before the first sync). Can't clobber — no match → skip.
+  # Remote: fetch the tree once — both resolution strategies below read it.
+  TREE=$(run_cmux --id-format both tree --all 2>/dev/null || true)
+  [[ -n "$TREE" ]] || exit 0
+
+  # By title first (one round trip, the steady-state path): the surface whose
+  # title holds our last-synced name, or the zellij session name before the
+  # first sync. Can't clobber — no match falls through to process resolution.
   needle="${PREV:-${ZELLIJ_SESSION_NAME:-}}"
-  [[ -n "$needle" ]] || exit 0
-  SURFACE=$(run_cmux --id-format both tree --all 2>/dev/null | awk -v n="$needle" '
-    /surface surface:/ && index($0, n) {
-      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
-        print substr($0, RSTART, RLENGTH)
-        exit
-      }
-    }' || true)
+  SURFACE=""
+  if [[ -n "$needle" ]]; then
+    SURFACE=$(awk -v n="$needle" '
+      /surface surface:/ && index($0, n) {
+        if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
+          print substr($0, RSTART, RLENGTH)
+          exit
+        }
+      }' <<<"$TREE" || true)
+  fi
+
+  # Title matching breaks whenever anything else renames the tab (the user, a
+  # sibling session, cmux titling the surface with the SHORT zellij name — the
+  # full-name needle can never substring-match a shorter title) — and the
+  # per-session state file doesn't cross a /clear or compact-continue session
+  # boundary, so a fresh session in an already-renamed tab was unresolvable.
+  # Deterministic fallback: cmux `top` exposes the mac-side process tree per
+  # surface, and the mosh-client/zellij command line carries the exact zellij
+  # session name ("… mosh-client -# bonbon -- zellij attach <name> | …").
+  # Match ours → pid → surface ref → UUID via the tree. Two extra round trips,
+  # paid only on this recovery path.
+  if [[ -z "$SURFACE" && -n "${ZELLIJ_SESSION_NAME:-}" ]]; then
+    pairs=$(run_cmux top --all --processes --flat --format tsv 2>/dev/null |
+      awk -F'\t' '$4=="process" && $6 ~ /^surface:/ {print $5 "\t" $6}' || true)
+    if [[ -n "$pairs" ]]; then
+      pids=$(cut -f1 <<<"$pairs" | paste -sd, -)
+      # shellcheck disable=SC2029 # $pids expands client-side by design
+      psout=$(ssh -n "$CMUX_APP_HOST" "ps -o pid=,args= -p $pids" 2>/dev/null || true)
+      # Session names are [a-z0-9-], so the dynamic regex is literal-safe; the
+      # boundary match stops "…-1-x" claiming "…-1-xy".
+      owner=$(awk -v n="$ZELLIJ_SESSION_NAME" \
+        '$0 ~ ("[ /]" n "( |$)") {print $1; exit}' <<<"$psout" || true)
+      if [[ -n "$owner" ]]; then
+        ref=$(awk -F'\t' -v p="$owner" '$1==p {print $2; exit}' <<<"$pairs")
+        [[ -n "$ref" ]] && SURFACE=$(grep -F "surface $ref " <<<"$TREE" |
+          grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' |
+          head -1 || true)
+      fi
+    fi
+  fi
   [[ -n "$SURFACE" ]] || exit 0
 fi
 
