@@ -84,11 +84,20 @@ NAME=$(jq -r --arg sid "$SESSION_ID" \
 TREE=$(run_cmux --id-format both tree --all 2>/dev/null || true)
 [[ -n "$TREE" ]] || exit 0
 
-# In-sync shortcut (and the fork rule): any live *terminal* tab whose title
-# contains the session name means there is nothing to do.
-if awk -v n="$NAME" \
-  '/surface surface:/ && /\[terminal\]/ && index($0, n) {found=1; exit} END {exit !found}' \
-  <<<"$TREE"; then
+# In-sync shortcut (and the fork rule): a live *terminal* tab already titled
+# with the session name — exactly, or as a prefixed form like "fork: <name>" —
+# means there is nothing to do. The match is boundary-anchored on the quoted
+# title, not a raw substring: renaming "abstract-iteration-2" back to
+# "abstract-iteration" must NOT count the old title as in sync (substring
+# would), and a title merely *containing* the name mid-word must not either.
+if awk -v n="$NAME" '
+  /surface surface:/ && /\[terminal\]/ && match($0, /"[^"]*"/) {
+    t = substr($0, RSTART + 1, RLENGTH - 2)
+    if (t == n) { found = 1; exit }
+    if (length(t) > length(n) && substr(t, length(t) - length(n) + 1) == n &&
+        substr(t, length(t) - length(n), 1) !~ /[A-Za-z0-9-]/) { found = 1; exit }
+  }
+  END { exit !found }' <<<"$TREE"; then
   exit 0
 fi
 
