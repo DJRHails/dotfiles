@@ -114,6 +114,17 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

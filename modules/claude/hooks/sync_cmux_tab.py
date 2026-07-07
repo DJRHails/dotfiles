@@ -223,7 +223,7 @@ def run_hook() -> None:
     evt = payload.get("hook_event_name", "Stop")
     sid = payload.get("session_id", "")
     transcript = payload.get("transcript_path", "")
-    if evt not in ("Stop", "UserPromptSubmit"):
+    if evt not in ("Stop", "UserPromptSubmit", "SessionStart"):
         log("outcome=gated-event", sid=sid or "?", evt=evt, t0=t0)
         return
     if not sid or not transcript:
