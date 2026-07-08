@@ -41,7 +41,11 @@ ENCRYPTED_FILES=$(git ls-crypt 2>/dev/null || true)
 # 100 chars), hashed per-platform: md5 on darwin, md5sum elsewhere.
 content_signature() {
     local normalized
-    normalized=$(head -c 500 "$1" 2>/dev/null | tr -d '[:space:]' | head -c 100)
+    # LC_ALL=C: macOS tr aborts on bytes that are invalid UTF-8, which made
+    # every binary file hash to the empty string and collide with each other.
+    # \0 stripped explicitly: bash command substitution warns on (and drops)
+    # null bytes, which encrypted binary content is full of
+    normalized=$(head -c 500 "$1" 2>/dev/null | LC_ALL=C tr -d '[:space:]\0' | head -c 100)
     if [[ "$(uname)" == "Darwin" ]]; then
         printf '%s' "$normalized" | md5 -q
     else
@@ -62,8 +66,9 @@ matches_crypt_pattern() {
     local filepath="$1"
     local regex
     for pattern in "${CRYPT_PATTERNS[@]}"; do
-        # Convert glob to regex
-        regex=$(echo "$pattern" | sed 's/\*\*/.*/g' | sed 's/\*/[^\/]*/g')
+        # Convert glob to regex; placeholder keeps the second sed from
+        # rewriting the '*' inside the '.*' that '**' just produced
+        regex=$(echo "$pattern" | sed -e 's/\*\*/__GLOBSTAR__/g' -e 's/\*/[^\/]*/g' -e 's/__GLOBSTAR__/.*/g')
         if [[ "$filepath" =~ ^$regex$ ]]; then
             return 0
         fi
@@ -89,6 +94,9 @@ while IFS= read -r file; do
 
     if [[ -n "${ENCRYPTED_SIGNATURES[$sig]:-}" ]]; then
         original="${ENCRYPTED_SIGNATURES[$sig]}"
+        # A file matching itself is inside the boundary by definition
+        # (git ls-crypt only lists files the crypt attribute covers)
+        [[ "$original" == "$file" ]] && continue
         ERRORS+=("'$file' appears to contain content from encrypted file '$original' but is not in an encrypted path")
     fi
 done <<< "$STAGED_FILES"
