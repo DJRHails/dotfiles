@@ -257,6 +257,34 @@ the next step needs it. Never dump a 2000-line file into the chat to
 "make sure the other side can see it" — the other side is the same
 token budget.
 
+### Capture full output to `.data/` — don't truncate with `tail`/`head`
+
+When a command's output matters for debugging, **`tee` or redirect the
+full output to a file under `.data/` (gitignored), then inspect the file**
+— do not pipe straight through `| tail -25` / `| head`. Truncation throws
+away exactly the lines you'll need two steps later (the first error, the
+stack frame above the one you saw, the warning before the failure), and
+re-running to "get the rest" is slow and often non-deterministic
+(timestamps, ports, random seeds, flaky networks). Capturing once and
+grepping the file is ~100× faster to debug than re-running with different
+truncation each time.
+
+- **Do:** `cmd 2>&1 | tee .data/run-<name>.log` then
+  `rg -n "error|warn|traceback" .data/run-<name>.log` (or read the file,
+  with offset/limit for big ones). The full log stays on disk for the
+  whole session.
+- **For long-running jobs:** redirect and background —
+  `cmd >.data/<name>.log 2>&1 &` — then `tail -f`/`rg` the file as needed
+  instead of blocking on a truncated pipe.
+- **`tail`/`head` are fine** for a genuine one-glance sanity check on
+  output you will never need again (e.g. `ls | head`), or to preview the
+  *tail of a file you already captured* (`tail -50 .data/<name>.log`).
+  The anti-pattern is discarding un-captured output through a truncating
+  pipe.
+- Put these under `.data/` (already the convention for worktrees), keep
+  it gitignored, and prefer a descriptive `<name>` so parallel runs don't
+  clobber each other.
+
 ## Git Hygiene
 
 - **Always gitignore `.agents/settings.local.json`** (and `.claude/settings.local.json`) - If you see these files in `git status` or `git diff`, add them to `.gitignore` before committing. These files contain local permissions and should never be tracked.
