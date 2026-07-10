@@ -163,6 +163,16 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 - One tack per subagent for focused execution
 - For complex problems, throw more compute at it via subagents
 
+### Pi-specific configuration
+
+- **Always pin spawned subagents to the `anthropic-api` provider and the `claude-opus-4-8[fast]`
+  model** — pass `model="claude-opus-4-8[fast]"` on every `subagent` spawn. The default/inherited
+  provider is unreliable on some hosts (e.g. the CPU dev box `taffy`): a subagent left on the
+  default silently **stalls and exits with no output** (observed: four 21–55 min no-op subagents
+  on taffy). `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_*` keys from `.env` and
+  works wherever those keys resolve; `[fast]` selects the fast tier. Easy to forget when moving
+  hosts — set it on every spawn.
+
 **Before committing:**
 
 1. Re-read your changes for unnecessary complexity, redundant code, and unclear naming
