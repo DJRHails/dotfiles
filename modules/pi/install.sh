@@ -35,4 +35,8 @@ if platform::command_exists "pi"; then
   log::execute \
     "pi install git:github.com/DJRHails/pi-cc-patch" \
     "pi-cc-patch"
+
+  log::execute \
+    "pi install npm:@ff-labs/pi-fff" \
+    "pi-fff"
 fi

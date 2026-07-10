@@ -3,9 +3,10 @@
     "git:github.com/DJRHails/pi-interactive-subagents",
     "git:github.com/DJRHails/pi-smart-sessions",
     "npm:pi-multi-pass",
-    "git:github.com/DJRHails/pi-cc-patch"
+    "git:github.com/DJRHails/pi-cc-patch",
+    "npm:@ff-labs/pi-fff"
   ],
-  "lastChangelogVersion": "0.80.3",
+  "lastChangelogVersion": "0.80.6",
   "defaultProvider": "anthropic-api",
   "defaultModel": "claude-opus-4-8[fast]",
   "defaultThinkingLevel": "xhigh",
