@@ -48,6 +48,25 @@ const GEN5_THINKING_LEVEL_MAP: NonNullable<ProviderModelConfig["thinkingLevelMap
   xhigh: "xhigh",
 };
 
+// Cost in USD per MILLION tokens — pi's own unit: calculateCost() computes
+// `model.cost.<field> / 1_000_000 * tokens`, so these are raw per-Mtok dollars,
+// NOT per token (the ProviderModelConfig "per token" doc comment is misleading).
+// cacheWrite is the 5-minute rate; pi bills 1h writes at 2× input internally.
+//
+// Values are copied verbatim from pi-ai's built-in `ANTHROPIC_MODELS`
+// (@earendil-works/pi-ai/providers/anthropic.models). That module can't be
+// imported here: pi's extension loader aliases only the pi-ai root/compat/oauth
+// (exact-match), the subpath is not aliased, no aliased entry re-exports the
+// catalog, and createModels() is empty until the coding-agent wires providers in.
+// So mirror it, keyed by model id — re-check when bumping a model version.
+type Cost = ProviderModelConfig["cost"];
+const COST: Record<"opus" | "sonnet" | "haiku" | "fable", Cost> = {
+  opus: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  sonnet: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  haiku: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+  fable: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+};
+
 type OnPayload = NonNullable<SimpleStreamOptions["onPayload"]>;
 type AnthropicModel = Model<"anthropic-messages">;
 
@@ -153,7 +172,7 @@ function opusModel(id: string): ProviderModelConfig {
     name: id.endsWith(FAST_SUFFIX) ? "Claude Opus 4.8 (fast)" : "Claude Opus 4.8",
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    cost: COST.opus,
     contextWindow: 1_000_000,
     maxTokens: 128_000,
     compat: { forceAdaptiveThinking: true },
@@ -161,13 +180,13 @@ function opusModel(id: string): ProviderModelConfig {
   };
 }
 
-function gen5Model(id: string, name: string): ProviderModelConfig {
+function gen5Model(id: string, name: string, cost: Cost): ProviderModelConfig {
   return {
     id,
     name,
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    cost,
     contextWindow: 1_000_000,
     maxTokens: 64_000,
     compat: { forceAdaptiveThinking: true },
@@ -178,14 +197,14 @@ function gen5Model(id: string, name: string): ProviderModelConfig {
 const MODELS: ProviderModelConfig[] = [
   opusModel("claude-opus-4-8"),
   opusModel(`claude-opus-4-8${FAST_SUFFIX}`),
-  gen5Model("claude-sonnet-5", "Claude Sonnet 5"),
-  gen5Model("claude-fable-5", "Claude Fable 5"),
+  gen5Model("claude-sonnet-5", "Claude Sonnet 5", COST.sonnet),
+  gen5Model("claude-fable-5", "Claude Fable 5", COST.fable),
   {
     id: "claude-haiku-4-5",
     name: "Claude Haiku 4.5",
     reasoning: true,
     input: ["text", "image"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    cost: COST.haiku,
     contextWindow: 200_000,
     maxTokens: 64_000,
   },
