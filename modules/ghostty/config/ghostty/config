@@ -5,3 +5,9 @@
 # Tradeoff: Shift+drag no longer extends selection *inside* the multiplexer —
 # native terminal selection takes over instead.
 mouse-shift-capture = never
+
+# Left Option sends Alt (ESC-prefixed), so zellij's Alt binds (Alt n new pane,
+# Alt hjkl focus, Alt +/- resize) work. `left` not `true`: the RIGHT Option key
+# keeps macOS character composition, so Option-composed symbols (#, €, dead
+# keys) still type via right Option.
+macos-option-as-alt = left
