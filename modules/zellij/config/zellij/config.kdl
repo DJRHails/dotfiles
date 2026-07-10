@@ -22,16 +22,12 @@ mouse_mode true
 copy_on_select true
 scroll_buffer_size 100000
 
+// Tile normally up to a 2x2 grid; past four panes the bottom-right cell
+// becomes a stack absorbing the overflow (see layouts/grid-then-stack.kdl,
+// shared via the ~/.config/zellij/layouts symlink). Alt n just follows the
+// active swap layout; Alt [ / ] switches to a focus-plus-stack arrangement.
+default_layout "grid-then-stack"
+
 // Don't nag about updates
 show_startup_tips false
 show_release_notes false
-
-// New panes join a stack by default (title-bar strips, focused pane expanded)
-// instead of splitting the tab into ever-smaller tiles. Directional splits are
-// still there in pane mode: Ctrl p then d (down) / r (right). Merges with the
-// default keybinds — only Alt n is overridden.
-keybinds {
-    shared_except "locked" {
-        bind "Alt n" { NewPane "stacked"; }
-    }
-}

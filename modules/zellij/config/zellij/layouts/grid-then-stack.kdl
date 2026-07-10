@@ -1,0 +1,72 @@
+// Default layout: tile normally up to a 2x2 grid, then stop shrinking —
+// the bottom-right cell becomes a stack that absorbs every further pane
+// (title-bar strips, focused one expanded). Alt [ / ] swaps to the stock
+// "focus + stack" arrangement when a big main pane is wanted.
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="tab-bar"
+        }
+        children
+        pane size=1 borderless=true {
+            plugin location="status-bar"
+        }
+    }
+
+    tab
+
+    swap_tiled_layout name="grid-then-stack" {
+        tab max_panes=2 {
+            pane split_direction="vertical" {
+                pane
+                pane { children; }
+            }
+        }
+        tab max_panes=3 {
+            pane split_direction="vertical" {
+                pane
+                pane split_direction="horizontal" {
+                    pane
+                    pane { children; }
+                }
+            }
+        }
+        tab max_panes=4 {
+            pane split_direction="horizontal" {
+                pane split_direction="vertical" {
+                    pane
+                    pane
+                }
+                pane split_direction="vertical" {
+                    pane
+                    pane { children; }
+                }
+            }
+        }
+        tab {
+            pane split_direction="horizontal" {
+                pane split_direction="vertical" {
+                    pane
+                    pane
+                }
+                pane split_direction="vertical" {
+                    pane
+                    pane stacked=true { children; }
+                }
+            }
+        }
+    }
+
+    swap_tiled_layout name="focus-plus-stack" {
+        tab min_panes=2 {
+            pane split_direction="vertical" {
+                pane
+                pane stacked=true { children; }
+            }
+        }
+    }
+
+    swap_floating_layout name="staggered" {
+        floating_panes
+    }
+}
