@@ -3,7 +3,7 @@
     "git:github.com/DJRHails/pi-interactive-subagents",
     "git:github.com/DJRHails/pi-smart-sessions",
     "npm:pi-multi-pass",
-    "git:github.com/picassio/pi-cc-patch"
+    "git:github.com/DJRHails/pi-cc-patch"
   ],
   "lastChangelogVersion": "0.80.3",
   "defaultProvider": "anthropic-api",
