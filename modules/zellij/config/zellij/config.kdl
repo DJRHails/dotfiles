@@ -6,11 +6,16 @@ session_serialization true
 serialize_pane_viewport true
 scrollback_lines_to_serialize 10000
 
-// Keep things quiet
-pane_frames false
-simplified_ui true
-default_layout "compact"
+// Frames on, full default layout (tab bar + status bar with keybind hints —
+// still learning the binds, so keep the hints visible)
+pane_frames true
 default_mode "normal"
+
+// Per-host accent: "host" is a symlink ~/.config/zellij/themes/host.kdl ->
+// modules/zellij/config/zellij/themes/<hostname>.kdl, created by setup.sh.
+// Frame/tab colour tells you at a glance which machine a session is on
+// (bonbon=red/prod, taffy=pink, tiramisu=coffee, trifle=blue).
+theme "host"
 
 // Mouse: scroll wheel pages through scrollback, click selects pane
 mouse_mode true
