@@ -33,7 +33,7 @@ if platform::command_exists "pi"; then
     "pi-multi-pass"
 
   log::execute \
-    "pi install git:github.com/picassio/pi-cc-patch" \
+    "pi install git:github.com/DJRHails/pi-cc-patch" \
     "pi-cc-patch"
 
   log::execute \
