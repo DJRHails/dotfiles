@@ -13,14 +13,14 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 //
 // Replaces the default two-line footer with a richer, coloured status block:
 //
-//   claude-opus-4-8[fast]  📁 <cwd> @ <host>  │  🌿 <branch> <commit>
-//   <ctx-bar> NN%  │  ↑in ↓out R<read> W<write> ⚡hit%  │  $cost (sub)  │  ⏱ <elapsed>  ↺NN%
-//   <extension statuses…>
+//   <model> (<provider>) 📁 <cwd> @ <host> │ 🌿 <branch> <commit>
+//   <ctx-bar> NN% │ ↑in ↓out R<read> W<write> ⚡hit% │ $cost (sub) │ ⏱ <elapsed> ↺NN%
+//   <full-session-id> │ <extension statuses…>
 //
-// setFooter() replaces the ENTIRE built-in footer, so we re-render the
-// extension-status line ourselves to keep contributions like "✓ fzf agents".
-// Widgets (above/below the editor, e.g. the subagents "auto mode" hint) are
-// unaffected.
+// setFooter() replaces the ENTIRE built-in footer, so the third line re-renders
+// the extension statuses ourselves (to keep contributions like "✓ fzf agents")
+// alongside the full session id. Widgets (above/below the editor, e.g. the
+// subagents "auto mode" hint) are unaffected.
 //
 // The context bar and the ↺ headroom number are two views of the same figure —
 // pi only exposes context-window usage to extensions, so the bar tracks context
@@ -143,9 +143,10 @@ function headroom(theme: Theme, percent: number | null): string {
 function identityLine(theme: Theme, ctx: ExtensionContext, branch: string | null, commit: string): string {
   const sep = theme.fg("dim", "│");
   const model = theme.fg("dim", ctx.model?.id ?? "no-model");
+  const provider = ctx.model?.provider ? theme.fg("dim", ` (${ctx.model.provider})`) : "";
   const folder = `📁 ${paint(PALETTE.path, basename(ctx.cwd) || ctx.cwd)}`;
   const host = `${theme.fg("dim", "@")} ${paint(PALETTE.host, hostname().split(".")[0])}`;
-  let line = `${model} ${folder} ${host}`;
+  let line = `${model}${provider} ${folder} ${host}`;
   if (branch) {
     const commitStr = commit ? ` ${theme.fg("dim", commit)}` : "";
     line += ` ${sep} 🌿 ${paint(PALETTE.branch, branch)}${commitStr}`;
@@ -186,9 +187,11 @@ function renderPowerline(
 ): string[] {
   if (!ctx) return [];
   const branch = footerData.getGitBranch();
-  const lines = [identityLine(theme, ctx, branch, commit), metricsLine(theme, ctx)];
+  const sep = theme.fg("dim", "│");
+  const sessionId = theme.fg("dim", ctx.sessionManager.getSessionId());
   const statuses = statusLine(footerData);
-  if (statuses) lines.push(statuses);
+  const contextLine = statuses ? `${sessionId} ${sep} ${statuses}` : sessionId;
+  const lines = [identityLine(theme, ctx, branch, commit), metricsLine(theme, ctx), contextLine];
   return lines.map((line) => truncateToWidth(line, width, theme.fg("dim", "…")));
 }
 
