@@ -54,7 +54,7 @@ parse_args() {
             allModules=true
           ;;
           -c|--cli)
-            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/python" "$DOTFILES/modules/node" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/cloudflared" "$DOTFILES/modules/claude" "$DOTFILES/modules/dotfiles-autoupdate")
+            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/python" "$DOTFILES/modules/node" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/cloudflared" "$DOTFILES/modules/claude" "$DOTFILES/modules/agents" "$DOTFILES/modules/dotfiles-autoupdate")
           ;;
           *)
             if [ -d "$DOTFILES/modules/$1" ]; then
