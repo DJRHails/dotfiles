@@ -1,11 +1,13 @@
 {
   "packages": [
     "git:github.com/DJRHails/pi-interactive-subagents",
-    "git:github.com/pasky/chrome-cdp-skill",
     "git:github.com/DJRHails/pi-smart-sessions",
     "npm:pi-multi-pass",
-    "npm:pi-web-access",
-    "npm:pi-subagents",
-    "npm:@ff-labs/pi-fff"
-  ]
+    "git:github.com/picassio/pi-cc-patch"
+  ],
+  "lastChangelogVersion": "0.80.3",
+  "defaultProvider": "anthropic-api",
+  "defaultModel": "claude-opus-4-8[fast]",
+  "defaultThinkingLevel": "xhigh",
+  "theme": "dark"
 }

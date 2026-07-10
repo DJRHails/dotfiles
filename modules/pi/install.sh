@@ -19,13 +19,10 @@ fi
 
 # Install pi extensions
 if platform::command_exists "pi"; then
+  # Canonical package set (mirrors modules/pi/settings.json `packages`).
   log::execute \
     "pi install git:github.com/DJRHails/pi-interactive-subagents" \
     "pi-interactive-subagents"
-
-  log::execute \
-    "pi install git:github.com/pasky/chrome-cdp-skill" \
-    "chrome-cdp-skill"
 
   log::execute \
     "pi install git:github.com/DJRHails/pi-smart-sessions" \
@@ -36,14 +33,6 @@ if platform::command_exists "pi"; then
     "pi-multi-pass"
 
   log::execute \
-    "pi install npm:pi-web-access" \
-    "pi-web-access"
-
-  log::execute \
-    "pi install npm:pi-subagents" \
-    "pi-subagents"
-
-  log::execute \
-    "pi install npm:@ff-labs/pi-fff" \
-    "pi-fff"
+    "pi install git:github.com/picassio/pi-cc-patch" \
+    "pi-cc-patch"
 fi
