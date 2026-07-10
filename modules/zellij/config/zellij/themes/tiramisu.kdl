@@ -1,0 +1,56 @@
+// tiramisu — coffee/amber accent (saint / Sage host).
+// Only accent components are overridden; everything else falls back to the
+// zellij default theme (per-component fallback, zellij-utils kdl parser).
+// Numeric values are ANSI-256 indices matching zellij's DEFAULT_STYLES.
+themes {
+    host {
+        frame_selected {
+            base "#d19a66"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 201
+            emphasis_3 215
+        }
+        frame_highlight {
+            base "#e8c49a"
+            background "#d19a66"
+            emphasis_0 201
+            emphasis_1 99
+            emphasis_2 "#d19a66"
+            emphasis_3 "#d19a66"
+        }
+        ribbon_selected {
+            base 16
+            background "#d19a66"
+            emphasis_0 124
+            emphasis_1 166
+            emphasis_2 201
+            emphasis_3 45
+        }
+        table_title {
+            base "#d19a66"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 "#d19a66"
+            emphasis_3 201
+        }
+        table_cell_selected {
+            base "#d19a66"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+        list_selected {
+            base "#d19a66"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+    }
+}

@@ -1,0 +1,56 @@
+// trifle — blue accent: the local MacBook, home base.
+// Only accent components are overridden; everything else falls back to the
+// zellij default theme (per-component fallback, zellij-utils kdl parser).
+// Numeric values are ANSI-256 indices matching zellij's DEFAULT_STYLES.
+themes {
+    host {
+        frame_selected {
+            base "#61afef"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 201
+            emphasis_3 215
+        }
+        frame_highlight {
+            base "#a3d3f7"
+            background "#61afef"
+            emphasis_0 201
+            emphasis_1 99
+            emphasis_2 "#61afef"
+            emphasis_3 "#61afef"
+        }
+        ribbon_selected {
+            base 16
+            background "#61afef"
+            emphasis_0 124
+            emphasis_1 166
+            emphasis_2 201
+            emphasis_3 45
+        }
+        table_title {
+            base "#61afef"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 "#61afef"
+            emphasis_3 201
+        }
+        table_cell_selected {
+            base "#61afef"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+        list_selected {
+            base "#61afef"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+    }
+}

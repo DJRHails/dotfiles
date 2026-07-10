@@ -1,0 +1,56 @@
+// bonbon — PROD server. Red accent: the "be careful here" colour.
+// Only accent components are overridden; everything else falls back to the
+// zellij default theme (per-component fallback, zellij-utils kdl parser).
+// Numeric values are ANSI-256 indices matching zellij's DEFAULT_STYLES.
+themes {
+    host {
+        frame_selected {
+            base "#ff5555"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 201
+            emphasis_3 215
+        }
+        frame_highlight {
+            base "#ff9999"
+            background "#ff5555"
+            emphasis_0 201
+            emphasis_1 99
+            emphasis_2 "#ff5555"
+            emphasis_3 "#ff5555"
+        }
+        ribbon_selected {
+            base 16
+            background "#ff5555"
+            emphasis_0 124
+            emphasis_1 166
+            emphasis_2 201
+            emphasis_3 45
+        }
+        table_title {
+            base "#ff5555"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 "#ff5555"
+            emphasis_3 201
+        }
+        table_cell_selected {
+            base "#ff5555"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+        list_selected {
+            base "#ff5555"
+            background 238
+            emphasis_0 166
+            emphasis_1 51
+            emphasis_2 124
+            emphasis_3 201
+        }
+    }
+}
