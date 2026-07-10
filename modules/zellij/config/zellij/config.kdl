@@ -25,3 +25,13 @@ scroll_buffer_size 100000
 // Don't nag about updates
 show_startup_tips false
 show_release_notes false
+
+// New panes join a stack by default (title-bar strips, focused pane expanded)
+// instead of splitting the tab into ever-smaller tiles. Directional splits are
+// still there in pane mode: Ctrl p then d (down) / r (right). Merges with the
+// default keybinds — only Alt n is overridden.
+keybinds {
+    shared_except "locked" {
+        bind "Alt n" { NewPane "stacked"; }
+    }
+}
