@@ -77,6 +77,5 @@ log/*.log
 # ----------------------------------------------------------------------
 
 .agents/worktrees/
-.agents/settings.local.json
-.claude/settings.local.json
+**/.agents/settings.local.json
 **/.claude/settings.local.json
