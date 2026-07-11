@@ -158,6 +158,13 @@
     # app surface regardless of the stale env. The picker re-attach path writes this too.
     { print -r -- "${CMUX_WORKSPACE_ID} ${CMUX_SURFACE_ID}" > "$logdir/live-$session" } 2>/dev/null
 
+    # Reap leaked sessions in the background (throttled to once per 6h inside
+    # the script) so tab churn can't re-accumulate hundreds of idle servers.
+    local gc_script="${DOTFILES:-$HOME/.files}/modules/zellij/zellij-gc"
+    if [[ -x $gc_script ]]; then
+        zsh -f "$gc_script" >/dev/null 2>&1 &!
+    fi
+
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
 
