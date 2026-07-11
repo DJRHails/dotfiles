@@ -9,6 +9,7 @@ modules/agents/skills/runpod-ant-cluster/**        filter=crypt diff=crypt merge
 modules/agents/skills/saint-chrome/**              filter=crypt diff=crypt merge=crypt
 modules/agents/skills/slack/**                      filter=crypt diff=crypt merge=crypt
 modules/agents/skills/tailscale-topology/**        filter=crypt diff=crypt merge=crypt
+modules/agents/skills/uptime-alerts/**             filter=crypt diff=crypt merge=crypt
 modules/agents/skills/web-animation-design/**      filter=crypt diff=crypt merge=crypt
 modules/agents/commands/archive-book.md      filter=crypt diff=crypt merge=crypt
 modules/claude/safe.zsh                      filter=crypt diff=crypt merge=crypt
