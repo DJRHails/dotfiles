@@ -89,4 +89,52 @@ link::extract_and_link() {
     local dst=${line#*$sep}
     link::file "$(dirname "$1")/$src" "${dst/#\~/$HOME}"
   done < "$1"
+
+  link::prune_stale "$1"
+}
+
+# Remove symlinks left behind by earlier revisions of a symlinks.conf: a link
+# that lives in one of the conf's destination directories and points into this
+# module's dir, but is no longer declared, is drift (renamed/removed conf
+# entries otherwise linger on every machine forever). Links owned by other
+# modules or created by hand point elsewhere and are never touched, and the
+# linker's own *.backup copies are spared.
+link::prune_stale() {
+  local conf=$1
+  # Match on the same literal prefix link::file writes (dirname of the conf),
+  # with the physical path as a fallback for links made from a resolved cwd.
+  local module_dir module_dir_phys
+  module_dir="$(dirname "$conf")"
+  module_dir_phys="$(cd "$module_dir" && pwd -P)"
+
+  local -A declared=()
+  local -A parents=()
+  local sep=' -> '
+  local line dst
+  while read -r line || [[ -n "$line" ]]
+  do
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    dst=${line#*$sep}
+    dst=${dst/#\~/$HOME}
+    declared["$dst"]=1
+    parents["$(dirname "$dst")"]=1
+  done < "$conf"
+
+  local dir entry target
+  for dir in "${!parents[@]}"
+  do
+    [ -d "$dir" ] || continue
+    while IFS= read -r entry
+    do
+      [[ -n "${declared[$entry]:-}" ]] && continue
+      case "$entry" in *.backup | *.backup.*) continue ;; esac
+      target=$(readlink "$entry")
+      case "$target" in
+        "$module_dir"/* | "$module_dir_phys"/*)
+          rm "$entry"
+          log::success "pruned stale link $entry (was -> $target)"
+          ;;
+      esac
+    done < <(find "$dir" -maxdepth 1 -type l 2>/dev/null)
+  done
 }
