@@ -71,14 +71,23 @@ real note).
 ## Markdown dialect
 
 Top-level frontmatter: `theme:`, `deck:`. Slides separated by `---`; each slide
-may have its own frontmatter (`id:`, `template:`, `layout:`).
+may have its own frontmatter (`id:`, `template:`, `layout:`, `hidden:`).
 
 - `# h1` = headline, `## h2` above an h1 = kicker; a lone `##` is the title.
+- `hidden: true` (or `hide: true`) marks a slide **skipped** in the deck — still
+  a native, editable slide, just hidden in present mode (Slides API `isSkipped`),
+  the analogue of Slidev's `hidden`. Part of the content hash (toggling re-pushes)
+  and round-trips: `pull` reads the live skipped state back to `hidden: true`.
+  Needs slidesync ≥0.9.0.
 - Bullets `-`/`*`; ordered `1.` (nest with 2-space indent). Inline
   `**bold**` / `*italic*` / `` `code` `` / `[link](url)` (rendered brand-red +
   underlined). GFM tables. `![alt](path)`
   images (uploaded to Drive; `alt` becomes the image's accessibility
-  description via `updatePageElementAltText`, round-tripped on pull). Blank
+  description via `updatePageElementAltText`, round-tripped on pull).
+  **Linked images** `[![alt](img)](href)` (≥0.11.2, the deck-variant crop →
+  full-figure convention): parse as the image; an absolute http(s) `href`
+  lands on the live element as its link, a relative repo path round-trips in
+  the source but emits no live link. Blank
   lines preserved as spacing. `<!-- notes -->`
   become speaker notes — and (v0.2+) round-trip as **comments, in place**: on
   template slides `pull` re-emits each comment where it was written, not as one
@@ -101,7 +110,7 @@ Select per slide via `template:` — native styled boxes, no in-deck templates:
 | `question` / `label` | kicker + headline + **centred** body |
 | `topic` | kicker + headline + **left** body (and/or image) |
 | `content` | red kicker-as-title + left body |
-| `graph` / `full` | **text-free**: a single image scaled to fill the page (aspect preserved, centred, thin margin); title/body ignored — for self-titled figures |
+| `graph` / `full` | **text-free** apart from one optional link line: a single image scaled to fill the page (aspect preserved, centred, thin margin). A single link-only paragraph (`[a →](url) · [b →](url)`, ≥0.13.0) renders as an 11pt right-aligned bottom footer — wide images keep full size (footer sits in the free strip), taller ones shrink just enough; no links ⇒ no footer space. Any other title/body content is a slot ERROR (see validation below) |
 | `prompt` / `code` | red kicker title + full body in **11pt Roboto Mono** filling the slide — for verbatim system prompts / code; one source line per paragraph, wraps naturally |
 
 Slides with no `template:` fall back to a generative path (section /
@@ -140,6 +149,35 @@ Inherent limits (the API forbids setting them, so they inherit defaults on a
 *recreate-from-missing* only — the live slide is never degraded): `shadow` and
 `autofit` are read-only; element **connections** are dropped; image `contentUrl`s
 expire, so a long-after recreate may lose the image.
+
+## Overlays — raw requests on top of a templated slide (≥0.11.0)
+
+A ```` ```gslides-overlay ```` block rides on a **normal templated/generative
+slide** (unlike ```` ```gslides ````, which replaces the whole slide): its
+literal Slides API requests are replayed **after** the slide's own render on
+every push, `__PAGE__` substituted with the slide page id. Use it for the
+annotation layer a template can't express — label text boxes on a text-free
+`graph` figure, arrows, callouts. Opposite authority to custom slides: the
+**markdown is the source of truth** — the block folds into the content hash
+(edits re-push), round-trips through the notes marker on `pull`, and a
+content-changing push recreates the drawn elements; native edits to them in
+Slides are NOT captured back. Drift/clobber checks count the overlay's
+`insertText` lines as visible text (never its raw JSON), so an overlaid slide
+reads as clean. Prefix element ids with `__PAGE__` to stay unique across
+re-pushes. To seed a block from boxes already drawn live, capture them with
+`slidesync._sync._elements_to_requests` (emits `__PAGE__`-relative requests).
+For a text note under a `template: equation` maths block, prefer LaTeX inside
+the `$$` (`\underset{\uparrow\ \text{note}}{...}` — mathtext has no
+`\underbrace`) over an overlay box.
+
+## Template-slot validation (≥0.12.0)
+
+`push`/`sync` exit 1 up front when a slide carries content its template
+silently drops: heading/table/prose-paragraph on text-free `graph`/`full`
+(link-only lines exempt — they render as the footer; >1 link line is also an
+error), `# h1` alongside the kicker on `equation`, image/table on
+`prompt`/`code`, image on `equation`. Fix: move it into a `<!-- comment -->`
+(speaker notes) or a template with the right slot.
 
 ## Notes & footguns
 
