@@ -142,8 +142,12 @@ for sess in $(zellij list-sessions 2>/dev/null | perl -pe 's/\e\[[0-9;]*m//g' \
   (( last > exited_before )) && continue
   if (( dry_run )); then
     log "would-delete exited sess=$sess"
-  else
-    zellij delete-session "$sess" >/dev/null 2>&1 && log "deleted exited sess=$sess"
+  elif zellij delete-session "$sess" >/dev/null 2>&1; then
+    # The record is gone; drop its sidecar files too (the stamp, plus
+    # auto-attach's live-ids), else every deletion strands one file in the
+    # very directory this script exists to keep bounded.
+    rm -f -- "$stamp" "$logdir/live-$sess" 2>/dev/null
+    log "deleted exited sess=$sess"
   fi
   (( deleted++ ))
 done
