@@ -1,5 +1,11 @@
 #!/bin/bash
 #
+# Subagent pane startup: this interactive zsh takes ~1.1-1.4s to boot, well over the
+# subagents extension's 500ms default wait before it writes the launch command into a
+# fresh pane. That race dropped the command -> blank pane -> "stalled" subagent. Give
+# it comfortable headroom so the launch always lands.
+export PI_SUBAGENT_SHELL_READY_DELAY_MS=3000
+#
 # Subscription switchers for pi (@earendil-works/pi-coding-agent).
 #
 # Unlike Claude Code (one account per CLAUDE_CONFIG_DIR), pi keeps every
