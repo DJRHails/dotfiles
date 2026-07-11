@@ -297,6 +297,12 @@
 [url "git@github.com:"]
 	insteadOf = https://github.com/
 
+# hails.info is checked out on shared boxes where root/runners also touch the
+# repo; safe.directory keeps git's dubious-ownership check quiet. Inert on
+# hosts without the path.
+[safe]
+	directory = /home/d/projects/github.com/DJRHails/hails.info
+
 [include]
 
     # Load local configs.
