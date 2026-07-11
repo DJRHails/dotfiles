@@ -8,4 +8,8 @@ fi
 
 # Cached: `sheldon source` spawns a ~90ms subprocess but its output only
 # changes when the binary or plugins.toml does.
-_cached_eval -d "${XDG_CONFIG_HOME:-$HOME/.config}/sheldon/plugins.toml" sheldon source
+if (( $+commands[sheldon] )); then
+  _cached_eval -d "${XDG_CONFIG_HOME:-$HOME/.config}/sheldon/plugins.toml" sheldon source
+else
+  print -u2 "warning: sheldon not installed; zsh plugins skipped"
+fi

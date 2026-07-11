@@ -61,12 +61,21 @@ freload $^fpath/*(N-.x:t)
 # initialize autocomplete here, otherwise functions won't be loaded
 autoload -U compinit
 # Full compinit (with compaudit) at most once every 24 hours; -C trusts the
-# existing dump file and skips the ~60ms audit on every other shell.
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
-  compinit
-else
-  compinit -C
-fi
+# existing dump file and skips the ~60ms audit on every other shell. In an
+# anonymous function because (#q) glob qualifiers need extended_glob, which
+# must stay off in the interactive shell (it changes glob semantics), and
+# because compinit leaves an up-to-date dump's mtime alone — the touch is
+# what actually advances the 24h clock.
+() {
+  setopt localoptions extendedglob
+  local dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  if [[ -n $dump(#qN.mh-24) ]]; then
+    compinit -C
+  else
+    compinit
+    [[ -f $dump ]] && touch "$dump"
+  fi
+}
 
 # replay compdef calls queued by plugins loaded before compinit (see sheldon.zsh)
 for d in $__deferred_compdefs

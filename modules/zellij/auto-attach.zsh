@@ -201,6 +201,12 @@
         eval "exec ${hop}"
     fi
 
+    # Refresh the stamp on detach: zellij-gc reads it as "when did this session
+    # last have a user", so a just-detached session gets the full stale window
+    # before becoming reap-eligible (the attach-time write above would already
+    # be old after a long attached stretch).
+    { date +%s > "$stamp" } 2>/dev/null
+
     # Intentionally NOT `exec`: on detach (Ctrl+O d / `zellij action detach`) or
     # quit, control returns here, the rest of zshrc runs, and you land in a plain
     # non-zellij shell in the SAME surface instead of the window closing.

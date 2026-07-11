@@ -11,17 +11,23 @@
 #
 # Only touches sessions named cmux-* . A session is reaped when it is:
 #   - not attached (no `zellij attach <name>` client process), and
-#   - idle (no pane shell has a child process other than ps), and
+#   - idle (every server child is a plain shell, and no pane shell has a
+#     child process other than ps), and
 #   - stale (its auto-attach stamp $logdir/last-<name> is older than
 #     $CMUX_ZELLIJ_GC_STALE_HOURS, default 48; missing stamp counts as stale).
 # Reaped live sessions get SIGTERM — serialized state stays on disk, so they
-# remain resurrectable. EXITED session records older than 7 days are deleted.
+# remain resurrectable — and their stamp is reset so the EXITED sweep below
+# won't delete them for another $exited_max_days. EXITED records are deleted
+# once their stamp is older than 7 days; a record with no usable stamp gets
+# one seeded now, so deletion happens no earlier than 7 days after first
+# sighting.
 #
 # Usage: zellij-gc [--dry-run] [--force]
-#   --dry-run  print what would be reaped, change nothing
+#   --dry-run  print what would be reaped; touches no sessions, stamps, or logs
 #   --force    ignore the 6h throttle stamp
 
 set -u
+setopt extended_glob  # (#q...) glob qualifiers below are inert without this
 zmodload zsh/datetime
 
 dry_run=0 force=0
@@ -37,13 +43,17 @@ logdir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
 gc_log="$logdir/gc.log"
 throttle_stamp="$logdir/gc-last-run"
 stale_hours="${CMUX_ZELLIJ_GC_STALE_HOURS:-48}"
+[[ $stale_hours == <-> ]] || stale_hours=48
 exited_max_days=7
 
 mkdir -p "$logdir" 2>/dev/null || exit 0
 
 log() {
-  print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' $EPOCHSECONDS) $*" >> "$gc_log" 2>/dev/null
-  (( dry_run )) && print -r -- "$*"
+  if (( dry_run )); then
+    print -r -- "$*"
+  else
+    print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' $EPOCHSECONDS) $*" >> "$gc_log" 2>/dev/null
+  fi
 }
 
 # Throttle: bail if we ran within the last 6 hours (unless --force / --dry-run).
@@ -72,9 +82,17 @@ ps -eo pid,args 2>/dev/null | grep 'zellij --server' | grep -v grep | while read
   [[ $sess == cmux-* ]] || continue
   [[ -n ${protected[$sess]:-} ]] && continue
 
-  # busy check: any pane shell with a non-ps child means real work is running
+  # busy check: a direct server child that isn't a plain shell is a command
+  # pane (`zellij run -- cmd`, an exec'd program) — real work even with no
+  # children. For shell children, any non-ps grandchild means a running job.
   busy=0
   for shell_pid in $(pgrep -P "$pid" 2>/dev/null); do
+    child_comm="${$(ps -p "$shell_pid" -o comm= 2>/dev/null):t}"
+    case ${child_comm#-} in
+      zsh|bash|fish|sh|dash) ;;
+      '') continue ;;  # vanished between pgrep and ps; nothing to inspect
+      *) busy=1; break ;;
+    esac
     for job in $(pgrep -P "$shell_pid" 2>/dev/null); do
       [[ "$(ps -p "$job" -o comm= 2>/dev/null)" == ps ]] && continue
       busy=1; break 2
@@ -91,27 +109,45 @@ ps -eo pid,args 2>/dev/null | grep 'zellij --server' | grep -v grep | while read
 
   if (( dry_run )); then
     log "would-reap live sess=$sess pid=$pid"
-  else
-    kill -TERM "$pid" 2>/dev/null && log "reaped live sess=$sess pid=$pid"
+  elif kill -TERM "$pid" 2>/dev/null; then
+    # Reset the stamp so the EXITED sweep below treats the reap as t=0 and
+    # keeps the serialized state resurrectable for $exited_max_days.
+    print $EPOCHSECONDS > "$stamp" 2>/dev/null
+    log "reaped live sess=$sess pid=$pid"
   fi
   (( reaped++ ))
 done
 
 # Delete EXITED cmux-* records whose stamp is older than $exited_max_days.
+# A record with no usable stamp (predates the gc, or only ever attached via
+# the mosh/durable paths which bypass auto-attach) gets one seeded now, so
+# it is deleted no earlier than $exited_max_days from first sighting.
 exited_before=$(( now - exited_max_days * 86400 ))
+deleted=0
 for sess in $(zellij list-sessions 2>/dev/null | perl -pe 's/\e\[[0-9;]*m//g' \
     | grep EXITED | awk '{print $1}'); do
   [[ $sess == cmux-* ]] || continue
   stamp="$logdir/last-$sess"
-  if [[ -f $stamp ]]; then
-    last=$(<"$stamp") 2>/dev/null
-    [[ $last == <-> ]] && (( last > exited_before )) && continue
+  last=''
+  [[ -f $stamp ]] && last=$(<"$stamp") 2>/dev/null
+  if [[ $last != <-> ]]; then
+    if (( dry_run )); then
+      log "would-seed stamp for exited sess=$sess"
+    else
+      print $EPOCHSECONDS > "$stamp" 2>/dev/null
+      log "seeded stamp for exited sess=$sess"
+    fi
+    continue
   fi
+  (( last > exited_before )) && continue
   if (( dry_run )); then
     log "would-delete exited sess=$sess"
   else
     zellij delete-session "$sess" >/dev/null 2>&1 && log "deleted exited sess=$sess"
   fi
+  (( deleted++ ))
 done
+
+log "run complete reaped=$reaped deleted=$deleted"
 
 exit 0
