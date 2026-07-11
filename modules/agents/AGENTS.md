@@ -162,6 +162,12 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 - Offload research, exploration, and parallel analysis to subagents
 - One tack per subagent for focused execution
 - For complex problems, throw more compute at it via subagents
+- **On stall, always cancel and restart — proactively, don't wait for the user.** The harness
+  pings the parent when an autonomous subagent stalls; treat that ping as an action item, not a
+  notification. Immediately: (1) check whether it committed/pushed anything salvageable (branch,
+  worktree, PR) so you don't lose or duplicate work; (2) cancel/kill it; (3) re-spawn with the
+  same task (fresh spawn if it left no trace, else resume its session). A stalled agent never
+  self-recovers — every minute you wait for it is wasted. Never leave a stalled subagent sitting.
 
 ### Pi-specific configuration
 
