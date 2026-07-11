@@ -5,7 +5,8 @@
     "npm:pi-multi-pass",
     "git:github.com/DJRHails/pi-cc-patch",
     "npm:@ff-labs/pi-fff",
-    "npm:pi-web-access"
+    "npm:pi-web-access",
+    "npm:@narumitw/pi-goal"
   ],
   "lastChangelogVersion": "0.82.0",
   "defaultProvider": "anthropic-api",
