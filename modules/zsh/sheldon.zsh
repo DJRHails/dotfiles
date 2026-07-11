@@ -6,4 +6,6 @@ if (( ! $+functions[compdef] )); then
   compdef() { __deferred_compdefs+=("${(j: :)@}") }
 fi
 
-eval "$(sheldon source)"
+# Cached: `sheldon source` spawns a ~90ms subprocess but its output only
+# changes when the binary or plugins.toml does.
+_cached_eval -d "${XDG_CONFIG_HOME:-$HOME/.config}/sheldon/plugins.toml" sheldon source
