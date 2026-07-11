@@ -1,0 +1,13 @@
+# Homebrew environment, cached via _cached_eval (zshenv) — `brew shellenv`
+# output is static exports but the subprocess costs ~40ms per login shell.
+# Probe the standard prefixes: Apple Silicon, Intel macOS, Linuxbrew.
+for _brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew; do
+  [[ -x $_brew ]] || continue
+  if (( $+functions[_cached_eval] )); then
+    _cached_eval "$_brew" shellenv
+  else
+    eval "$("$_brew" shellenv)"
+  fi
+  break
+done
+unset _brew

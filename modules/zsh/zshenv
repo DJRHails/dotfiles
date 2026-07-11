@@ -15,6 +15,67 @@ done
 # (scripts, `zsh -c`, Claude Code's tool shell) — not just interactive ones.
 disable log 2>/dev/null
 
+# _cached_eval [-d dep_file]... cmd [args...]
+#
+# Source `cmd args...` output through an on-disk cache so startup skips the
+# subprocess (each `eval "$(tool init zsh)"` costs 20-90ms). The cache header
+# records the resolved binary's mtime+size, so upgrades regenerate it even
+# when the new binary's mtime is older (Homebrew bottles do this); `-d` files
+# (e.g. a plugins.toml) invalidate on their mtime. Writes are atomic
+# (tmp + mv) so concurrent shells never source a half-written cache, and any
+# cache-layer failure — unwritable dir, corrupt file — falls back to a live
+# `eval "$(cmd ...)"`, so caching can never change shell behaviour. Returns 1
+# only when the command itself is missing. In .zshenv so zprofile and
+# zshrc.local can use it too.
+_cached_eval() {
+  emulate -L zsh
+  local -a deps
+  while [[ $1 == -d ]]; do
+    deps+=("$2")
+    shift 2
+  done
+  local bin="${commands[$1]:-$1}"
+  [[ -x $bin ]] || return 1
+
+  local cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/zsh-eval-cache"
+  local cache="$cache_dir/${${(j:-:)@}//\//_}.zsh"
+
+  zmodload -F zsh/stat b:zstat 2>/dev/null
+  local -A binstat
+  local header=''
+  if zstat -H binstat -- "$bin" 2>/dev/null; then
+    header="# _cached_eval: $bin mtime=$binstat[mtime] size=$binstat[size]"
+  fi
+
+  local fresh=0 first_line='' dep
+  if [[ -n $header && -s $cache ]]; then
+    IFS= read -r first_line < "$cache" 2>/dev/null
+    if [[ $first_line == "$header" ]]; then
+      fresh=1
+      for dep in "${deps[@]}"; do
+        [[ -e $dep && $dep -nt $cache ]] && { fresh=0; break }
+      done
+    fi
+  fi
+
+  if (( ! fresh )); then
+    local tmp="$cache.$$.tmp"
+    if ! { command mkdir -p -- "$cache_dir" \
+        && builtin print -r -- "$header" > "$tmp" \
+        && "$@" >> "$tmp" \
+        && command mv -f -- "$tmp" "$cache" } 2>/dev/null; then
+      command rm -f -- "$tmp" 2>/dev/null
+      eval "$("$@")"
+      return
+    fi
+  fi
+
+  if ! builtin source "$cache"; then
+    command rm -f -- "$cache" 2>/dev/null
+    eval "$("$@")"
+  fi
+}
+
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 
 [[ -d "$HOME/.foundry/bin" ]] && export PATH="$PATH:$HOME/.foundry/bin"

@@ -1,0 +1,117 @@
+#!/usr/bin/env zsh
+# Garbage-collect leaked cmux zellij sessions.
+#
+# cmux re-mints workspace/surface UUIDs on every app restart, so auto-attach
+# (auto-attach.zsh) creates a fresh session per surface and the old ones stay
+# behind as live-but-unattached servers. Each zellij server polls
+# `ps -ao ppid,args` for session serialization, so a few weeks of tab churn
+# (observed: 137 live servers) drives system load high enough that new ptys
+# take seconds to spawn. This script reaps them; auto-attach spawns it in the
+# background, throttled by a stamp file.
+#
+# Only touches sessions named cmux-* . A session is reaped when it is:
+#   - not attached (no `zellij attach <name>` client process), and
+#   - idle (no pane shell has a child process other than ps), and
+#   - stale (its auto-attach stamp $logdir/last-<name> is older than
+#     $CMUX_ZELLIJ_GC_STALE_HOURS, default 48; missing stamp counts as stale).
+# Reaped live sessions get SIGTERM — serialized state stays on disk, so they
+# remain resurrectable. EXITED session records older than 7 days are deleted.
+#
+# Usage: zellij-gc [--dry-run] [--force]
+#   --dry-run  print what would be reaped, change nothing
+#   --force    ignore the 6h throttle stamp
+
+set -u
+zmodload zsh/datetime
+
+dry_run=0 force=0
+for arg in "$@"; do
+  case $arg in
+    --dry-run) dry_run=1 ;;
+    --force) force=1 ;;
+    *) print -u2 "zellij-gc: unknown flag $arg"; exit 2 ;;
+  esac
+done
+
+logdir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
+gc_log="$logdir/gc.log"
+throttle_stamp="$logdir/gc-last-run"
+stale_hours="${CMUX_ZELLIJ_GC_STALE_HOURS:-48}"
+exited_max_days=7
+
+mkdir -p "$logdir" 2>/dev/null || exit 0
+
+log() {
+  print -r -- "$(strftime '%Y-%m-%d %H:%M:%S' $EPOCHSECONDS) $*" >> "$gc_log" 2>/dev/null
+  (( dry_run )) && print -r -- "$*"
+}
+
+# Throttle: bail if we ran within the last 6 hours (unless --force / --dry-run).
+if (( ! force && ! dry_run )) && [[ -n $throttle_stamp(#qN.mh-6) ]]; then
+  exit 0
+fi
+(( dry_run )) || print $EPOCHSECONDS > "$throttle_stamp"
+
+command -v zellij >/dev/null 2>&1 || exit 0
+
+# Sessions with an attach client anywhere on this machine are in active use.
+typeset -A protected
+for name in $(ps -eo args 2>/dev/null | grep -E 'zellij attach' | grep -v grep \
+    | sed -E 's/.*attach (-c )?//' | awk '{print $1}'); do
+  protected[$name]=1
+done
+[[ -n ${ZELLIJ_SESSION_NAME:-} ]] && protected[$ZELLIJ_SESSION_NAME]=1
+
+now=$EPOCHSECONDS
+stale_before=$(( now - stale_hours * 3600 ))
+reaped=0
+
+# Reap live-but-unattached idle stale servers.
+ps -eo pid,args 2>/dev/null | grep 'zellij --server' | grep -v grep | while read -r pid args; do
+  sess="${args##*/}"
+  [[ $sess == cmux-* ]] || continue
+  [[ -n ${protected[$sess]:-} ]] && continue
+
+  # busy check: any pane shell with a non-ps child means real work is running
+  busy=0
+  for shell_pid in $(pgrep -P "$pid" 2>/dev/null); do
+    for job in $(pgrep -P "$shell_pid" 2>/dev/null); do
+      [[ "$(ps -p "$job" -o comm= 2>/dev/null)" == ps ]] && continue
+      busy=1; break 2
+    done
+  done
+  (( busy )) && continue
+
+  # stale check via auto-attach's per-session stamp
+  stamp="$logdir/last-$sess"
+  if [[ -f $stamp ]]; then
+    last=$(<"$stamp") 2>/dev/null
+    [[ $last == <-> ]] && (( last > stale_before )) && continue
+  fi
+
+  if (( dry_run )); then
+    log "would-reap live sess=$sess pid=$pid"
+  else
+    kill -TERM "$pid" 2>/dev/null && log "reaped live sess=$sess pid=$pid"
+  fi
+  (( reaped++ ))
+done
+
+# Delete EXITED cmux-* records whose stamp is older than $exited_max_days.
+exited_before=$(( now - exited_max_days * 86400 ))
+for sess in $(zellij list-sessions 2>/dev/null | perl -pe 's/\e\[[0-9;]*m//g' \
+    | grep EXITED | awk '{print $1}'); do
+  [[ $sess == cmux-* ]] || continue
+  stamp="$logdir/last-$sess"
+  if [[ -f $stamp ]]; then
+    last=$(<"$stamp") 2>/dev/null
+    [[ $last == <-> ]] && (( last > exited_before )) && continue
+  fi
+  if (( dry_run )); then
+    log "would-delete exited sess=$sess"
+  else
+    zellij delete-session "$sess" >/dev/null 2>&1 && log "deleted exited sess=$sess"
+  fi
+done
+
+exit 0
