@@ -32,9 +32,16 @@ The script (mirrors `DJRHails/kb` `bin/r2_upload.py`):
 ## Embedding in a GitHub PR/issue (the common case)
 
 1. `url=$(.../scripts/cdn-upload figures/foo.png)`
-2. Put `![caption]($url)` in the PR/issue body.
+2. Put `![figures/foo.png]($url)` in the PR/issue body — the **alt text is the file's original
+   repo-relative path** (the CDN key is a content hash, so the alt is the only provenance the
+   embed keeps); the human description goes in a bold caption line below the image, not in the alt.
 3. Update an existing PR body with the REST API (avoids a `gh pr edit` bug that fails on
    Projects-classic GraphQL): `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md`.
+
+When repairing an old/merged PR whose embed is broken (relative path, dead branch blob link),
+upload the bytes the PR actually referenced — `git fetch origin pull/<n>/head` and
+`git show <headRefOid>:figures/foo.png` — not the current main copy, which may have been
+regenerated since.
 
 ## Notes
 
