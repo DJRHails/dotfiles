@@ -106,3 +106,8 @@ export PATH=${PATH:+$PATH:}${DOTFILES}/bin
 
 # Starship prompt (cached: skips the ~40ms init subprocess; see zshenv)
 (( $+commands[starship] )) && _cached_eval starship init zsh
+
+# direnv: auto-load .envrc (which dotenvs .env) per directory, cached like
+# starship (see zshenv's _cached_eval). Guarded on $+commands so it no-ops
+# on hosts where direnv isn't installed.
+(( $+commands[direnv] )) && _cached_eval direnv hook zsh
