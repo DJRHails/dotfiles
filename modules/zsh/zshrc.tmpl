@@ -108,6 +108,9 @@ export PATH=${PATH:+$PATH:}${DOTFILES}/bin
 (( $+commands[starship] )) && _cached_eval starship init zsh
 
 # direnv: auto-load .envrc (which dotenvs .env) per directory, cached like
-# starship (see zshenv's _cached_eval). Guarded on $+commands so it no-ops
-# on hosts where direnv isn't installed.
-(( $+commands[direnv] )) && _cached_eval direnv hook zsh
+# starship (see zshenv's _cached_eval). `if` rather than `guard && cmd`
+# because this is the file's last command: a failed `&&` guard would leak
+# status 1 into the first precmd, and starship paints its prompt red on it.
+if (( $+commands[direnv] )); then
+  _cached_eval direnv hook zsh
+fi
