@@ -22,11 +22,14 @@ ssh::ui_host() {
   # Fall back at call time, not just source time: non-interactive shells
   # (Claude Code's Bash tool, cron) inherit the functions but not the
   # array — zsh arrays can't be exported — so an empty CODE_UI_HOSTS here
-  # must still resolve rather than yield `ssh ""`.
+  # must still resolve rather than yield `ssh ""`. Shell snapshots can also
+  # resurrect the array as an empty *scalar*, which quoted `[@]` expands to
+  # one empty element; the unquoted expansion drops empties (zsh doesn't
+  # word-split, and hostnames contain no glob chars).
   local self h
   local -a hosts
   self=$(ssh::self)
-  hosts=("${CODE_UI_HOSTS[@]}")
+  hosts=(${CODE_UI_HOSTS[@]})
   (( ${#hosts[@]} )) || hosts=(trifle)
   for h in "${hosts[@]}"; do
     [[ "$h" == "$self" ]] && { echo "$self"; return; }
