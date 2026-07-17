@@ -39,4 +39,8 @@ if platform::command_exists "pi"; then
   log::execute \
     "pi install npm:@ff-labs/pi-fff" \
     "pi-fff"
+
+  log::execute \
+    "pi install npm:@narumitw/pi-goal" \
+    "pi-goal"
 fi
