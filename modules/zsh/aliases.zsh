@@ -6,7 +6,12 @@ alias cls='clear' # Good 'ol Clear Screen command
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-alias open='platform::open'
+# macOS ships /usr/bin/open natively; on Linux map `open` to xdg-open.
+# (scripts/core/platform.sh is installer-only — its platform::open never
+# exists in interactive shells, so aliasing to it broke `open` entirely.)
+if [[ "$(uname -s)" == "Linux" ]] && (( $+commands[xdg-open] )); then
+  alias open='xdg-open'
+fi
 
 if [[ "$(uname -s)" == "Linux" ]] && (( $+commands[trash-put] )); then
   alias trash='trash-put'
