@@ -1,6 +1,6 @@
 ---
 name: worktree
-description: Manage git worktrees — setup and cleanup. Use when the user asks to clean up, prune, create, or sync worktrees, create worktrees for open PRs, or create a worktree. Also load proactively when the session starts inside a worktree (working directory contains .data/worktrees/).
+description: Manage git worktrees — setup, cleanup, and recovery. Use when the user asks to clean up, prune, create, or sync worktrees, create worktrees for open PRs, or create a worktree — and whenever a git command inside a worktree fails with "fatal: not a git repository ... .git/worktrees/<name>" (dangling worktree; recover in place, do not delete it). Also load proactively when the session starts inside a worktree (working directory contains .data/worktrees/).
 ---
 
 # Worktree Management
@@ -137,6 +137,50 @@ Copied:   12 node_modules (CoW) across 3 worktrees
 ```
 
 ---
+
+## Recovering a dangling worktree
+
+Symptom: every git command inside a worktree fails with
+
+```
+fatal: not a git repository: <repo-root>/.git/worktrees/<name>
+```
+
+while the worktree's working files are all still there. The worktree's admin
+dir (`.git/worktrees/<name>` — its HEAD, index, and back-pointer) was removed
+from the parent checkout while the worktree directory survived. On gantry
+workers this is the normal container lifecycle, not sabotage: the checkout's
+`.git` dies with the container and is re-cloned fresh on rebuild, while
+`.data/` (including `.data/worktrees/`) persists — so after an idle reap or
+image rebuild every worktree dangles exactly like this. It also happens
+anywhere the parent repo was re-cloned or its `.git` rebuilt.
+
+**Recover in place** — do NOT delete the worktree and re-add it (the mv-aside
+dance loses nothing but wastes minutes and risks the uncommitted files).
+Reconstruct the admin dir instead; working files, uncommitted edits included,
+are untouched:
+
+```bash
+name=<worktree-name> branch=<branch>
+cd "$(git rev-parse --show-toplevel)"   # the parent checkout
+# if this root checkout has $branch checked out, detach it first:
+#   git checkout --detach
+git branch -f "$branch" "origin/$branch"
+mkdir -p ".git/worktrees/$name"
+echo "$PWD/.data/worktrees/$name/.git" > ".git/worktrees/$name/gitdir"
+echo "ref: refs/heads/$branch" > ".git/worktrees/$name/HEAD"
+echo "../.." > ".git/worktrees/$name/commondir"
+git -C ".data/worktrees/$name" reset -q
+```
+
+`git status` in the worktree then shows the surviving uncommitted work as the
+delta against the pushed tip. Caveats:
+
+- Unpushed commits are only recoverable if the parent's object store still has
+  them; after a fresh re-clone they are gone — the pushed tip is the best
+  possible base. (On gantry: push early and often.)
+- Pick `origin/$branch` deliberately: everything committed-but-unpushed shows
+  up as uncommitted changes against it, which is correct, not data loss.
 
 ## Notes
 
