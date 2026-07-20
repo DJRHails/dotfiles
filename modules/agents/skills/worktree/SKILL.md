@@ -170,6 +170,8 @@ mkdir -p ".git/worktrees/$name"
 echo "$PWD/.data/worktrees/$name/.git" > ".git/worktrees/$name/gitdir"
 echo "ref: refs/heads/$branch" > ".git/worktrees/$name/HEAD"
 echo "../.." > ".git/worktrees/$name/commondir"
+# re-point the worktree at THIS checkout (no-op unless the repo root moved)
+echo "gitdir: $PWD/.git/worktrees/$name" > ".data/worktrees/$name/.git"
 git -C ".data/worktrees/$name" reset -q
 ```
 
