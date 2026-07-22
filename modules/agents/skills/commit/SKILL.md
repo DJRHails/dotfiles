@@ -26,6 +26,21 @@ Create a git commit for the current changes using a concise Conventional Commits
   - File paths or globs should limit which files to commit. If files are specified, only stage/commit those unless the user explicitly asks otherwise.
   - If arguments combine files and instructions, honor both.
 
+## If CI doesn't start after a push
+
+A push to a PR branch that spawns no workflow run is almost never a credential problem. Check the
+cheap causes first, in order:
+
+1. **Conflicted PR** — `gh pr view <n> --json mergeable,mergeStateStatus`. A PR with
+   `mergeable: false` / `mergeStateStatus: DIRTY` creates **no** `pull_request` runs at all:
+   GitHub can't build the `refs/pull/<n>/merge` test-merge commit those runs execute against.
+   Merge or rebase the base branch, resolve, push — CI resumes on its own.
+2. **Trigger filters** — read the workflow's `on:` block. `push: branches: [main]` means
+   feature-branch pushes get CI only via the `pull_request` event; `paths:` filters can skip a
+   commit entirely.
+3. **Token type** — only then suspect the credential (`gh auth status`): an Actions-issued
+   `ghs_` token suppresses workflow triggering; a user PAT (`ghp_`/`github_pat_`) does not.
+
 ## Steps
 
 1. Infer from the prompt if the user provided specific file paths/globs and/or additional instructions.
