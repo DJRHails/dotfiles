@@ -32,7 +32,7 @@ A push to a PR branch that spawns no workflow run is almost never a credential p
 cheap causes first, in order:
 
 1. **Conflicted PR** — `gh pr view <n> --json mergeable,mergeStateStatus`. A PR with
-   `mergeable: false` / `mergeStateStatus: DIRTY` creates **no** `pull_request` runs at all:
+   `mergeable: CONFLICTING` / `mergeStateStatus: DIRTY` creates **no** `pull_request` runs at all:
    GitHub can't build the `refs/pull/<n>/merge` test-merge commit those runs execute against.
    Merge or rebase the base branch, resolve, push — CI resumes on its own.
 2. **Trigger filters** — read the workflow's `on:` block. `push: branches: [main]` means
