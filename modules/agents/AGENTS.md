@@ -171,13 +171,22 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 
 ### Pi-specific configuration
 
-- **Always pin spawned subagents to the `anthropic-api` provider and the `claude-opus-4-8[fast]`
-  model** — pass `model="claude-opus-4-8[fast]"` on every `subagent` spawn. The default/inherited
-  provider is unreliable on some hosts (e.g. the CPU dev box `taffy`): a subagent left on the
-  default silently **stalls and exits with no output** (observed: four 21–55 min no-op subagents
-  on taffy). `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_*` keys from `.env` and
-  works wherever those keys resolve; `[fast]` selects the fast tier. Easy to forget when moving
-  hosts — set it on every spawn.
+- **Spawn subagents on the `anthropic-api` provider (the configured default); pick the model to
+  fit the task — no Opus pin.** `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_*` keys
+  and works wherever they resolve. **Any registered `anthropic-api` model works, including non-Opus
+  (`claude-fable-5`, `claude-haiku-4-5`, `claude-sonnet-5`)** — use a cheap/small model for recon,
+  reviews, and parallel fan-out; reserve `claude-opus-4-8[fast]` for work that needs the frontier.
+  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for a real bug, now fixed
+  in `DJRHails/pi-interactive-subagents`: a bare/ambiguous model id (e.g. `claude-fable-5`) fell
+  through to pi's keyless built-in `anthropic` provider and the subagent "stalled and exited with
+  no output" on hosts like `taffy` — only `claude-opus-4-8[fast]` survived because its id is unique
+  to `anthropic-api`. Fixed by reading the parent provider from `ctx.model` (not the nonexistent
+  `ctx.getModel()`) so bare ids route to the parent's provider (PR #9), plus recovering the zellij
+  `new-pane` id by pane-diff so parallel/crowded-tab spawns don't orphan panes (PR #12). If you're
+  on a checkout that predates those, either pull them or keep passing an `anthropic-api/<model>`
+  prefix. **This is about the agent-harness *subagent spawn* only — it does NOT relax any
+  project's monitor/eval sweep rule (frontier monitors, Sonnet-and-above with an Opus arm), which
+  lives in that project's CLAUDE.md.**
 
 **Before committing:**
 
