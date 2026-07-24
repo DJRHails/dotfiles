@@ -43,6 +43,8 @@ CODE_UI_HOSTS entry, default trifle); override with CMUX_APP_HOST.
 Log: ~/.local/state/claude-cmux-tab/sync.log (1 MB, one rotation).
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
