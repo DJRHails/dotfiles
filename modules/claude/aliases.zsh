@@ -75,7 +75,7 @@ claude::ant() {
   )
 }
 
-# claude::ant::safe lives in modules/claude/safe.zsh (transcrypt-encrypted).
+# claude::ant::safe lives in modules/claude/safe.zsh (glassine-encrypted).
 
 # One-shot prompt via `ant messages create`, parameterized by env so a session
 # can set the target once: ANT_MODEL (required), ANT_PROFILE (default safe),

@@ -1,15 +1,17 @@
-# Transcrypt encryption for sensitive skills.
+# Glassine (sops-backed) encryption for sensitive skills.
 # Note: skills live at modules/agents/skills/ (moved from modules/claude/skills/
 # in commit 4b592454a738). Validated by scripts/check-crypt-patterns.sh.
-modules/agents/skills/discord/**                   filter=crypt diff=crypt merge=crypt
-modules/agents/skills/diagram-design/**             filter=crypt diff=crypt merge=crypt
-modules/agents/skills/gantry-cli/**                filter=crypt diff=crypt merge=crypt
-modules/agents/skills/research-meeting-playbook/** filter=crypt diff=crypt merge=crypt
-modules/agents/skills/runpod-ant-cluster/**        filter=crypt diff=crypt merge=crypt
-modules/agents/skills/saint-chrome/**              filter=crypt diff=crypt merge=crypt
-modules/agents/skills/slack/**                      filter=crypt diff=crypt merge=crypt
-modules/agents/skills/tailscale-topology/**        filter=crypt diff=crypt merge=crypt
-modules/agents/skills/uptime-alerts/**             filter=crypt diff=crypt merge=crypt
-modules/agents/skills/web-animation-design/**      filter=crypt diff=crypt merge=crypt
-modules/agents/commands/archive-book.md      filter=crypt diff=crypt merge=crypt
-modules/claude/safe.zsh                      filter=crypt diff=crypt merge=crypt
+# Pre-migration history is transcrypt-encrypted — see docs/legacy-transcrypt.md.
+modules/agents/skills/discord/**                   filter=glassine diff=glassine merge=glassine
+modules/agents/skills/diagram-design/**            filter=glassine diff=glassine merge=glassine
+modules/agents/skills/gantry-cli/**                filter=glassine diff=glassine merge=glassine
+modules/agents/skills/research-meeting-playbook/** filter=glassine diff=glassine merge=glassine
+modules/agents/skills/runpod-ant-cluster/**        filter=glassine diff=glassine merge=glassine
+modules/agents/skills/saint-chrome/**              filter=glassine diff=glassine merge=glassine
+modules/agents/skills/slack/**                     filter=glassine diff=glassine merge=glassine
+modules/agents/skills/tailscale-topology/**        filter=glassine diff=glassine merge=glassine
+modules/agents/skills/uptime-alerts/**             filter=glassine diff=glassine merge=glassine
+modules/agents/skills/web-animation-design/**      filter=glassine diff=glassine merge=glassine
+modules/agents/commands/archive-book.md            filter=glassine diff=glassine merge=glassine
+modules/claude/safe.zsh                            filter=glassine diff=glassine merge=glassine
+docs/legacy-transcrypt.md                          filter=glassine diff=glassine merge=glassine

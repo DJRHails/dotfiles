@@ -38,7 +38,16 @@ setup_gitconfig () {
 setup_gitconfig
 
 install::package "Git LFS" "git-lfs"
-install::package "Transcrypt" "transcrypt"
+install::release_binary "sops" "sops" "getsops/sops" \
+  "https://github.com/getsops/sops/releases/download/@TAG@/sops-@TAG@.linux.@ARCH_DEB@"
+# Glassine (sops-backed git encryption, replaces transcrypt): a single script
+# with no release artifacts — install straight from the repo's main branch.
+if platform::command_exists glassine; then
+  log::success "Glassine"
+else
+  mkdir -p "$HOME/.local/bin"
+  log::execute "curl -fsSL https://raw.githubusercontent.com/DJRHails/glassine/main/glassine -o \$HOME/.local/bin/glassine && chmod +x \$HOME/.local/bin/glassine" "Glassine"
+fi
 github::install_cli
 
 # Hook enforcement: point init.templateDir at ~/.git-template and populate it
