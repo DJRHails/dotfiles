@@ -1,15 +1,23 @@
 # shellcheck shell=bash
 . "$DOTFILES/scripts/core/main.sh"
 
-# Linux node comes from the NodeSource apt repo (modules/node), whose global
-# prefix is system-owned — npm -g needs sudo there, like the node module's own
-# pnpm fallback. macOS (brew) keeps a user-writable node bin dir.
+# npm -g installs to the configured prefix. Prefer a user-writable prefix
+# (`npm config set prefix ~/.npm-global`, on PATH via modules/zsh/zshenv) so no
+# sudo is needed; fall back to sudo only when the prefix is system-owned (e.g.
+# a bare NodeSource install on Linux). `sudo npm` reads root's config, so mixing
+# the two leaves divergent copies — /usr/bin/pi is shadowed by PATH order.
+npm_prefix="$(npm config get prefix 2>/dev/null)"
+if [[ -w "$npm_prefix" ]]; then
+  sudo_npm="npm"
+else
+  sudo_npm="$(platform::sudo_prefix)npm"
+fi
+
 if ! platform::command_exists "pi"; then
-  log::execute "$(platform::sudo_prefix)npm install -g @earendil-works/pi-coding-agent" \
+  log::execute "$sudo_npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent"
 elif npm ls -g @mariozechner/pi-coding-agent > /dev/null 2>&1; then
   # The @mariozechner name is deprecated on npm and receives no new releases.
-  sudo_npm="$(platform::sudo_prefix)npm"
   log::execute \
     "$sudo_npm uninstall -g @mariozechner/pi-coding-agent && $sudo_npm install -g @earendil-works/pi-coding-agent" \
     "pi-coding-agent (migrate to @earendil-works)"

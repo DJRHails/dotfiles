@@ -86,3 +86,8 @@ _cached_eval() {
 
 # Go: default `go install` target (GOPATH/bin)
 [[ -d "$HOME/go/bin" ]] && export PATH="$PATH:$HOME/go/bin"
+
+# npm: user-writable global prefix (`npm config set prefix ~/.npm-global`).
+# Prepended so user-level `npm install -g` (no sudo) shadows the system
+# NodeSource prefix in /usr/bin.
+[[ -d "$HOME/.npm-global/bin" ]] && export PATH="$HOME/.npm-global/bin:$PATH"

@@ -166,10 +166,10 @@ function streamSimple(
   });
 }
 
-function opusModel(id: string): ProviderModelConfig {
+function opusModel(id: string, displayName: string): ProviderModelConfig {
   return {
     id,
-    name: id.endsWith(FAST_SUFFIX) ? "Claude Opus 4.8 (fast)" : "Claude Opus 4.8",
+    name: id.endsWith(FAST_SUFFIX) ? `${displayName} (fast)` : displayName,
     reasoning: true,
     input: ["text", "image"],
     cost: COST.opus,
@@ -195,8 +195,13 @@ function gen5Model(id: string, name: string, cost: Cost): ProviderModelConfig {
 }
 
 const MODELS: ProviderModelConfig[] = [
-  opusModel("claude-opus-4-8"),
-  opusModel(`claude-opus-4-8${FAST_SUFFIX}`),
+  // Opus 5 (released 2026-07-24): $5/$25 per MTok — same as Opus 4.8, so COST.opus
+  // applies. 1M context / 128K output / adaptive-only thinking per the Models API;
+  // fast mode verified working (usage.speed: "fast" under fast-mode-2026-02-01).
+  opusModel("claude-opus-5", "Claude Opus 5"),
+  opusModel(`claude-opus-5${FAST_SUFFIX}`, "Claude Opus 5"),
+  opusModel("claude-opus-4-8", "Claude Opus 4.8"),
+  opusModel(`claude-opus-4-8${FAST_SUFFIX}`, "Claude Opus 4.8"),
   gen5Model("claude-sonnet-5", "Claude Sonnet 5", COST.sonnet),
   gen5Model("claude-fable-5", "Claude Fable 5", COST.fable),
   {
