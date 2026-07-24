@@ -39,10 +39,13 @@ prints the offending lines and CHECK FAILED (never a false OK).
 Notes:
 
 - **Recipients.** `.sops.yaml` holds the six keys published at
-  github.com/DJRHails.keys. A host whose key is not among them cannot decrypt
-  — add it from an authorized host with `glassine allow <key.pub | github:user>`
-  and push (glassine rotates the envelopes automatically). Passphrase-protected
-  SSH keys are not supported by sops' SSH support.
+  github.com/DJRHails.keys plus one key per gantry agent (`gantry:<agent>`,
+  private halves at `~/.gantry/agent-keys/` on bonbon); scoped rules may add
+  per-folder guests (e.g. diagram-design). A host whose key is not among them
+  cannot decrypt — add it from an authorized host with
+  `glassine allow [--path <glob>] <key.pub | github:user>` and push (glassine
+  rotates the envelopes automatically). Passphrase-protected SSH keys are not
+  supported by sops' SSH support.
 - **Mass "RECIPIENT DRIFT" from `glassine check` = stale glassine, not drift.**
   Scoped `path_regex` recipient rules (e.g. the diagram-design grant) need
   glassine ≥ 0.7.0; a 0.6.0 `check` flattens the policy, false-flags every
