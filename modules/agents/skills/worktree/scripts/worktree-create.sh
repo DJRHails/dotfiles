@@ -316,6 +316,18 @@ worktree::bootstrap() {
     direnv allow "$wt" 2>/dev/null || true
   fi
 
+  # Python/uv repos: install the project venv so the worktree is runnable, not just checked out —
+  # the Python analogue of the node_modules CoW clone above (a fresh worktree has no .venv, and .venv
+  # lives at the repo root, not under the symlinked .data, so it is not shared). uv's global cache
+  # hardlinks packages, so this is fast. Base deps only; a repo's dev extra is installed on demand.
+  if [[ -f "$wt/pyproject.toml" ]] && command -v uv >/dev/null 2>&1; then
+    if (cd "$wt" && uv sync >/dev/null 2>&1); then
+      echo "  [$branch] uv sync"
+    else
+      worktree::warn "  [$branch] uv sync failed — run 'uv sync' in the worktree manually"
+    fi
+  fi
+
   worktree::info "bootstrapped: $wt"
 }
 
