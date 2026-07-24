@@ -12,19 +12,26 @@ After pulling the migration commit, run once per clone:
 
 ```bash
 cd ~/.files \
-  && command -v sops >/dev/null || brew install sops \
+  && { command -v sops >/dev/null || brew install sops 2>/dev/null \
+      || { mkdir -p ~/.local/bin \
+           && curl -fsSL "https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+              -o ~/.local/bin/sops && chmod +x ~/.local/bin/sops; }; } \
   ; command -v glassine >/dev/null || { mkdir -p ~/.local/bin \
       && curl -fsSL https://raw.githubusercontent.com/DJRHails/glassine/main/glassine \
          -o ~/.local/bin/glassine && chmod +x ~/.local/bin/glassine; } \
   ; glassine init \
   && transcrypt --uninstall --yes 2>/dev/null \
-  ; glassine status | awk '$1 != "encrypted"' | grep . && echo 'CHECK FAILED' || echo OK
+  ; { glassine status || echo 'status-failed'; } \
+      | awk '$1 !~ /^(encrypted|empty)$/' | grep . && echo 'CHECK FAILED' || echo OK
 ```
 
-What it does: installs sops (≥3.10) + glassine if missing, `glassine init`
+What it does: installs sops (≥3.10) + glassine if missing (brew where present,
+else the GitHub release binary — bonbon and taffy have no brew), `glassine init`
 configures the filters and re-smudges any still-ciphertext worktree files,
 then transcrypt's config/hooks/cached-plaintext are removed. The last line
-prints nothing but OK when every managed file is an envelope.
+prints nothing but OK when every managed file is an envelope; any other
+outcome — a plaintext blob, a missing tool, `glassine status` itself failing —
+prints the offending lines and CHECK FAILED (never a false OK).
 
 Notes:
 
