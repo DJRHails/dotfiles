@@ -439,7 +439,7 @@ zellij::sweep-husks() {
               for(p in par){ if(q[p]&&p!=root){ c=cmdof[p]
                 if(c ~ /^(\/[^ ]*\/)?zellij( |$)/) continue
                 if(c ~ /^(\/usr\/bin\/|\/bin\/)?-?(zsh|bash|sh|login)( |$)/) continue
-                if(c ~ /snapshot-zsh.*eval/ || c ~ /(ps -axww|ps -ao ppid|[ \/]awk |sed -|grep |head -|caffeinate)/) continue
+                if(c ~ /snapshot-zsh.*eval/ || c ~ /^(\/[^ ]*\/)?(ps|awk|sed|grep|head|caffeinate)( |$)/) continue
                 print c } } }')
         if [[ -n $meaningful ]]; then
             print -r -- "  keep(active)  $sess  [${$(print -r -- "$meaningful" | head -1)[1,60]}]"

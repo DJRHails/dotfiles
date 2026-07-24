@@ -39,6 +39,7 @@ _ARG_HOSTS = [a for a in sys.argv[1:] if not a.startswith("-")]
 HOSTS = _ARG_HOSTS or ([os.environ["DURABLE_HOST"]] if os.environ.get("DURABLE_HOST")
                        else ["bonbon", "taffy", LOCAL_HOST])
 DRY = "--dry-run" in sys.argv
+MODE_FLAGS = {"--retry", "--retitle", "--bind"}
 PROJECTS = Path.home() / "projects"
 NAME_OVERRIDES = {"one-billion": "$1bn", "d": "home", "dh": "home"}  # cwd basename -> workspace
 
@@ -68,8 +69,7 @@ HUSK_NOISE = re.compile(
       ^ (?: /[^\ ]*/ )? zellij (?: \s | $ )                                   # zellij client/server
     | ^ (?: /usr/bin/ | /bin/ )? -? (?: zsh | bash | sh | login ) (?: \s | $ )  # bare shells
     | snapshot-zsh .* eval                                                    # prompt snapshot
-    | ps\ -axww | ps\ -ao\ ppid | [\ /] awk\  | sed\ - | grep\  | head\ -     # transient helpers
-    | caffeinate
+    | ^ (?: /[^\ ]*/ )? (?: ps | awk | sed | grep | head | caffeinate ) (?: \s | $ )  # transient helpers
     """
 )
 
@@ -251,7 +251,7 @@ def local_repo_dir(name: str) -> str:
 
 def list_ws() -> dict[str, str]:
     res = {}
-    for ln in sh(["cmux", "list-workspaces"]).stdout.splitlines():
+    for ln in cmux("list-workspaces").splitlines():
         m = re.search(r"workspace:\d+", ln)
         if not m:
             continue
@@ -266,7 +266,7 @@ def idle_surfaces(wref: str, repo_name: str, husks: set[str]) -> list[str]:
     (title empty or the repo name) and auto-attach wrappers whose session is a bare husk. A
     `cmux-<local>-*` title whose session holds real work is a RESUMED local tab — never reuse it."""
     idle = []
-    for ln in sh(["cmux", "list-pane-surfaces", "--workspace", wref]).stdout.splitlines():
+    for ln in cmux("list-pane-surfaces", "--workspace", wref).splitlines():
         m = re.search(r"surface:\d+", ln)
         if not m:
             continue
@@ -325,12 +325,12 @@ def resolve_surfaces(hosts: list[str]) -> list[tuple[str, str, str, str]]:
         return m
 
     out = []
-    for wl in sh(["cmux", "list-workspaces"]).stdout.splitlines():
+    for wl in cmux("list-workspaces").splitlines():
         wm = re.search(r"workspace:\d+", wl)
         if not wm:
             continue
         wref = wm.group(0)
-        for ln in sh(["cmux", "list-pane-surfaces", "--workspace", wref]).stdout.splitlines():
+        for ln in cmux("list-pane-surfaces", "--workspace", wref).splitlines():
             sm = re.search(r"surface:\d+", ln)
             if not sm:
                 continue
@@ -379,6 +379,13 @@ def bind(hosts: list[str]) -> int:
 
 
 def main() -> int:
+    # Reject mistyped flags up front — the non-dry default pass mutates the live cmux layout,
+    # so a typo'd --dry-run must not silently fall through to it.
+    unknown = [a for a in sys.argv[1:] if a.startswith("-") and a not in MODE_FLAGS | {"--dry-run"}]
+    if unknown:
+        sys.exit(f"unknown flag(s): {' '.join(unknown)} — known: --dry-run {' '.join(sorted(MODE_FLAGS))}")
+    if DRY and MODE_FLAGS & set(sys.argv):
+        sys.exit("--dry-run only applies to the default pass; --retry/--retitle/--bind run live")
     if "--retitle" in sys.argv:
         return retitle(HOSTS)
     if "--bind" in sys.argv:
@@ -418,7 +425,7 @@ def main() -> int:
             # `workspace create` spawns an initial surface — use it before minting extras,
             # otherwise every fresh workspace strands one idle wrapper surface.
             spare[ws[rp]] = re.findall(
-                r"surface:\d+", sh(["cmux", "list-pane-surfaces", "--workspace", ws[rp]]).stdout)
+                r"surface:\d+", cmux("list-pane-surfaces", "--workspace", ws[rp]))
         if spare.get(ws[rp]):
             sref = spare[ws[rp]].pop(0)
         else:

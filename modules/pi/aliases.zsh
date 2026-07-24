@@ -48,11 +48,20 @@ pi::glm() {
   fi
 
   # Probe /models before launching. A rotated trycloudflare tunnel (its DNS no
-  # longer resolves) is the usual failure; on any error point at the file to fix.
-  if ! curl -fsS --connect-timeout 3 --max-time 6 -o /dev/null \
-    -H "Authorization: Bearer $api_key" "${base_url%/}/models" 2>/dev/null; then
-    echo "pi::glm: GLM endpoint not responding at ${base_url%/}/models" >&2
-    echo "pi::glm: the trycloudflare tunnel likely rotated — update GLM_BASE_URL (and key) in: $env_file" >&2
+  # longer resolves) is the usual failure, but an HTTP rejection means the tunnel
+  # is up and the key is wrong — branch on the code so the error names the right
+  # variable to fix.
+  local http_code
+  http_code=$(curl -s --connect-timeout 3 --max-time 6 -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $api_key" "${base_url%/}/models" 2>/dev/null)
+  if [[ $http_code != 2* ]]; then
+    if [[ -z $http_code || $http_code == 000 ]]; then
+      echo "pi::glm: GLM endpoint not responding at ${base_url%/}/models" >&2
+      echo "pi::glm: the trycloudflare tunnel likely rotated — update GLM_BASE_URL (and key) in: $env_file" >&2
+    else
+      echo "pi::glm: GLM endpoint rejected the probe (HTTP $http_code) at ${base_url%/}/models" >&2
+      echo "pi::glm: the tunnel is up — check GLM_API_KEY in: $env_file" >&2
+    fi
     return 1
   fi
 

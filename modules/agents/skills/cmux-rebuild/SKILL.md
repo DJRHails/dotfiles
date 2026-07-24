@@ -55,8 +55,10 @@ python3 scripts/rebuild-durable.py [hosts...] --bind      # backfill cmux resume
 It sorts each live session into a cmux workspace named after its repo (cwd basename), grabs a
 surface (the workspace's initial one first, then `new-surface`), and `cmux send`s the attach —
 `ssh::durable <host> --attach <session>` for remote hosts, `zellij::resume <session>` for local
-ones. Idempotent — connected sessions are skipped (remote: exact mosh-port check; local: a live
-`zellij attach` client process), so re-running is safe.
+ones. Idempotent once connections settle — connected sessions are skipped (remote: exact
+mosh-port check; local: a live `zellij attach` client process). Mid-settle, use `--retry` (which
+reuses idle surfaces) rather than re-running the default pass — that would mint a duplicate
+surface for every still-connecting session.
 
 **Local sessions are filtered by work, not just liveness.** A local session is resumed only if it
 is DETACHED (no attach client) and MEANINGFUL — its pane process tree runs something real (claude,
