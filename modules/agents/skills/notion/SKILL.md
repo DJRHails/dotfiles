@@ -62,7 +62,7 @@ Browser cookies do everything — no env vars, no tokens to manage. If a profile
 ```bash
 # Import a guest-shared RunPod page into the KB
 ./notion.py get https://www.notion.so/Creating-an-Account-and-SSH-into-Cluster-292ff732fc3480d0a39ee6a78db70f82 \
-  -o projects/anthropic-fellows/program-handbook/runpod-ssh.md
+  -o projects/local/anthropic-fellows/program-handbook/runpod-ssh.md
 
 # List which Notion accounts you're signed into across Arc profiles
 ./notion.py whoami
