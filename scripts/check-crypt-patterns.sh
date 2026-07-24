@@ -22,11 +22,12 @@ fi
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
-# Collect all .gitattributes files (excluding nested repos and .git internals)
+# Collect all .gitattributes files (excluding .git internals and all of .data/
+# — worktrees live at .data/worktrees/ and carry their own .gitattributes copy)
 mapfile -t attr_files < <(
   find . -name .gitattributes -type f \
     -not -path "./.git/*" \
-    -not -path "./.data/repo/*" \
+    -not -path "./.data/*" \
     2>/dev/null
 )
 
