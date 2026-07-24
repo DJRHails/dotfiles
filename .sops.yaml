@@ -3,12 +3,7 @@ creation_rules:
   - path_regex: '^modules/agents/skills/diagram-design/.*$' # glob: modules/agents/skills/diagram-design/**
     key_groups:
       - age:
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4o3vHL7V102YlbjGkjVGerufdgSm7V9xjHGuWaqZPJ' # gantry:sage
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAvA0G+Kb1y72dceASbVdS1tU58PYdaYsi2LBHovMkQX' # gantry:pr-reviewer
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL79c0ABaglvUVYgF2MAabMvcaFPR0CnayNGiI4J4dDL' # gantry:guarded-dev
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDgVBcMfDRmqpxzMaWuAlATJxaUgb3IzPgAEblU5dK4D' # gantry:djrhails-dev
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjqE84uWxrdkSJtCtBRXnSN1kFe7gRwOLhDPZUJZBM9' # gantry:baked-alaska
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID8RlfXSlj42csvPTnFfQOHHK7894yyneyaRto8crrb+' # gantry:ant-cluster
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIESvGuL264sdGqVwDkWPw/nkSI/cQKCnqCOhzEigF6xV' # gantry-bot
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJLQyH6488PfF9QzyV+OB+Qh26Pgy552/aKtsWD6fZu7' # github:NxtGenLegend
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFUXjq+3oXIFC6WhwqlW8XcPhLGWxVzShqhSs3SzuHI' # github:NxtGenLegend
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETQ46yzkqHYQoUKHsXGOX6DI6ADgXn1+mJFvtBfxXFa' # github:NxtGenLegend
@@ -22,12 +17,7 @@ creation_rules:
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGayLhDYjABZUNZKUfOMZeo4zka57Sl12wUHdt0zr7p' # github:DJRHails
   - key_groups:
       - age:
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG4o3vHL7V102YlbjGkjVGerufdgSm7V9xjHGuWaqZPJ' # gantry:sage
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAvA0G+Kb1y72dceASbVdS1tU58PYdaYsi2LBHovMkQX' # gantry:pr-reviewer
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL79c0ABaglvUVYgF2MAabMvcaFPR0CnayNGiI4J4dDL' # gantry:guarded-dev
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDgVBcMfDRmqpxzMaWuAlATJxaUgb3IzPgAEblU5dK4D' # gantry:djrhails-dev
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMjqE84uWxrdkSJtCtBRXnSN1kFe7gRwOLhDPZUJZBM9' # gantry:baked-alaska
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID8RlfXSlj42csvPTnFfQOHHK7894yyneyaRto8crrb+' # gantry:ant-cluster
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIESvGuL264sdGqVwDkWPw/nkSI/cQKCnqCOhzEigF6xV' # gantry-bot
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+bl01iRKRVYvOtFYSQWqKtqo2N2TG9H5+nGSxJSxE0' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQpQsoOwzcytS+AjXSB7bZbHjI90oX2uf80xNDBjXaL' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC/+Ziaqy11tLwos1sVvaBo+kKI14Y/zRtMTUK85rSL8' # github:DJRHails
