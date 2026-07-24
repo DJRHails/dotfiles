@@ -223,8 +223,11 @@
         # TMPDIR must match the attach above: zellij's socket dir follows TMPDIR, and this shell's
         # default (/var/folders/… on macOS) can't see sessions created under /tmp — the delete was
         # silently failing and stranding every hop's husk.
-        { TMPDIR="$short_tmp" zellij delete-session --force "$session" } >/dev/null 2>&1
-        _log husk-deleted "session=$session"
+        if { TMPDIR="$short_tmp" zellij delete-session --force "$session" } >/dev/null 2>&1; then
+            _log husk-deleted "session=$session"
+        else
+            _log husk-delete-FAILED "session=$session"
+        fi
         eval "exec ${hop}"
     fi
 

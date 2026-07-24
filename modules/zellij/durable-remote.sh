@@ -126,7 +126,7 @@ summarise() {  # $1=session ; writes $cdir/$1 and $cdir/$1.title on success
   [ -n "$screen" ] || return 1
   out=$(printf '%s\n' "$screen" | run_claude) || return 1
   case "$out" in
-    *'API Error'* | *'authenticate'* | *'Invalid authentication'* | *'Not logged in'*) return 1 ;;
+    *'API Error'* | *'authenticate'* | *'Invalid authentication'* | *'Not logged in'* | *'Invalid API key'*) return 1 ;;
   esac
   # first two non-blank lines, tolerating a stray "Line 1:" / "Line 2." prefix from the model
   nb=$(printf '%s' "$out" | grep -v '^[[:space:]]*$' | sed -E 's/^[[:space:]]*[Ll]ine [0-9][:.][[:space:]]*//')
@@ -291,7 +291,7 @@ for s in $sessions; do stale "$cdir/$s" && { need_summaries=1; break; }; done
 
 if [ "$need_summaries" = 1 ] && ! probe=$(auth_check); then
   case "$probe" in
-    *401* | *authenticate* | *'Invalid authentication'* | *'Not logged in'*)
+    *401* | *authenticate* | *'Invalid authentication'* | *'Not logged in'* | *'Invalid API key'*)
       emit_authfail "claude auth failed on ${hostpfx:-this host} — titles unavailable. fix: ssh -t ${hostpfx:-HOST} claude setup-token"
       need_summaries=0
       ;;
