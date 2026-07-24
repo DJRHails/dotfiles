@@ -16,7 +16,7 @@ cd ~/.files \
       || { mkdir -p ~/.local/bin \
            && curl -fsSL "https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
               -o ~/.local/bin/sops && chmod +x ~/.local/bin/sops; }; } \
-  ; command -v glassine >/dev/null || { mkdir -p ~/.local/bin \
+  ; { mkdir -p ~/.local/bin \
       && curl -fsSL https://raw.githubusercontent.com/DJRHails/glassine/main/glassine \
          -o ~/.local/bin/glassine && chmod +x ~/.local/bin/glassine; } \
   ; glassine init \
@@ -25,10 +25,13 @@ cd ~/.files \
       | awk '$1 !~ /^(encrypted|empty)$/' | grep . && echo 'CHECK FAILED' || echo OK
 ```
 
-What it does: installs sops (≥3.10) + glassine if missing (brew where present,
-else the GitHub release binary — bonbon and taffy have no brew), `glassine init`
-configures the filters and re-smudges any still-ciphertext worktree files,
-then transcrypt's config/hooks/cached-plaintext are removed. The last line
+What it does: installs sops (≥3.10) if missing (brew where present, else the
+GitHub release binary — bonbon and taffy have no brew), refreshes glassine
+from main unconditionally (a single idempotent script fetch; the repo's
+scoped-recipient rules need ≥0.7.0, and a skip-if-present install would strand
+older versions), `glassine init` configures the filters and re-smudges any
+still-ciphertext worktree files, then transcrypt's config/hooks/cached-plaintext
+are removed. The last line
 prints nothing but OK when every managed file is an envelope; any other
 outcome — a plaintext blob, a missing tool, `glassine status` itself failing —
 prints the offending lines and CHECK FAILED (never a false OK).
@@ -40,6 +43,12 @@ Notes:
   — add it from an authorized host with `glassine allow <key.pub | github:user>`
   and push (glassine rotates the envelopes automatically). Passphrase-protected
   SSH keys are not supported by sops' SSH support.
+- **Mass "RECIPIENT DRIFT" from `glassine check` = stale glassine, not drift.**
+  Scoped `path_regex` recipient rules (e.g. the diagram-design grant) need
+  glassine ≥ 0.7.0; a 0.6.0 `check` flattens the policy, false-flags every
+  catch-all envelope, and blocks all commits with an error that suggests
+  `glassine rotate` — which will not fix it. Re-run the cutover one-liner (it
+  refreshes glassine) instead of rotating.
 - **Pre-commit hook.** transcrypt's vendored hook chain lived in
   `.git/hooks/pre-commit` (untracked). Replace it per clone with:
 
