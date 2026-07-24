@@ -15,8 +15,8 @@ fi
 CWD=$(echo "$INPUT" | jq -r '.cwd')
 cd "$CWD"
 
-# Check if this repo uses transcrypt
-if ! git config --get filter.crypt.clean &>/dev/null; then
+# Check if this repo uses glassine
+if ! git config --get filter.glassine.clean &>/dev/null; then
     exit 0
 fi
 
@@ -25,7 +25,7 @@ declare -a CRYPT_PATTERNS
 if [[ -f .gitattributes ]]; then
     while IFS= read -r line; do
         [[ -z "$line" || "$line" =~ ^# ]] && continue
-        if [[ "$line" =~ filter=crypt ]]; then
+        if [[ "$line" =~ filter=glassine ]]; then
             pattern=$(echo "$line" | awk '{print $1}')
             CRYPT_PATTERNS+=("$pattern")
         fi
@@ -35,7 +35,8 @@ fi
 [[ ${#CRYPT_PATTERNS[@]} -eq 0 ]] && exit 0
 
 # Get list of currently encrypted files (decrypted in worktree)
-ENCRYPTED_FILES=$(git ls-crypt 2>/dev/null || true)
+ENCRYPTED_FILES=$(git ls-files | git check-attr --stdin filter 2>/dev/null \
+    | sed -n 's/: filter: glassine$//p' || true)
 
 # Signature of a file's content (first 500 chars, whitespace-stripped, first
 # 100 chars), hashed per-platform: md5 on darwin, md5sum elsewhere.
@@ -95,7 +96,7 @@ while IFS= read -r file; do
     if [[ -n "${ENCRYPTED_SIGNATURES[$sig]:-}" ]]; then
         original="${ENCRYPTED_SIGNATURES[$sig]}"
         # A file matching itself is inside the boundary by definition
-        # (git ls-crypt only lists files the crypt attribute covers)
+        # (ENCRYPTED_FILES only lists files the glassine attribute covers)
         [[ "$original" == "$file" ]] && continue
         ERRORS+=("'$file' appears to contain content from encrypted file '$original' but is not in an encrypted path")
     fi

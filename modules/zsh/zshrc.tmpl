@@ -18,22 +18,22 @@ fi
 typeset -U config_files
 config_files=($DOTFILES/modules/*/*.zsh(N))
 
-# Drop transcrypt-encrypted files that haven't been decrypted on this host (no
-# crypt key configured). Their working-tree content is base64 ciphertext that
-# begins with the OpenSSL "Salted__" magic, so `source` would emit a "no such
-# file or directory" for every ciphertext line. See .gitattributes
-# (filter=crypt). Uses the `read` builtin (no fork) to peek the first line.
+# Drop glassine-encrypted files that haven't been decrypted on this host (no
+# recipient key). Their working-tree content is a sops JSON envelope — first
+# line "{", with an ENC[AES256_GCM,…] payload right after — so `source` would
+# error on every line. See .gitattributes (filter=glassine). Uses the `read`
+# builtin (no fork) to peek the first two lines.
 typeset -a _plaintext_config_files
-typeset _first_line
+typeset _l1 _l2
 for file in $config_files
 do
-  _first_line=''
-  read -r _first_line < $file 2>/dev/null
-  [[ $_first_line == U2FsdGVkX1* ]] && continue
+  _l1='' _l2=''
+  { IFS= read -r _l1 && IFS= read -r _l2 } < $file 2>/dev/null
+  [[ $_l1 == '{'* && $_l2 == *'ENC[AES256_GCM'* ]] && continue
   _plaintext_config_files+=$file
 done
 config_files=($_plaintext_config_files)
-unset _first_line _plaintext_config_files file
+unset _l1 _l2 _plaintext_config_files file
 
 # load the path files
 for file in ${(M)config_files:#*/path.zsh}

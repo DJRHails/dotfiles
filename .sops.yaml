@@ -1,0 +1,24 @@
+# managed by glassine — edit recipients via `glassine allow` / `glassine revoke`
+creation_rules:
+  - path_regex: '^modules/agents/skills/diagram-design/.*$' # glob: modules/agents/skills/diagram-design/**
+    key_groups:
+      - age:
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJLQyH6488PfF9QzyV+OB+Qh26Pgy552/aKtsWD6fZu7' # github:NxtGenLegend
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFUXjq+3oXIFC6WhwqlW8XcPhLGWxVzShqhSs3SzuHI' # github:NxtGenLegend
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIETQ46yzkqHYQoUKHsXGOX6DI6ADgXn1+mJFvtBfxXFa' # github:NxtGenLegend
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILifCzfxfLcXykfDfOfeJsmYBbND6Ra3DJpJUeTNorF2' # github:NxtGenLegend
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK2OfyiJtVg/5fn6njdF+jgIS4UaP/o4N0PJXvOFvxh+' # github:NxtGenLegend
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+bl01iRKRVYvOtFYSQWqKtqo2N2TG9H5+nGSxJSxE0' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQpQsoOwzcytS+AjXSB7bZbHjI90oX2uf80xNDBjXaL' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC/+Ziaqy11tLwos1sVvaBo+kKI14Y/zRtMTUK85rSL8' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUhwKeMY/N/+vFiMr/jjz1GWUZ14XgTfctDphaUIJh5' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJe3wmGlGSjzUhnmCGKKrHStmXGyZKQwCGROEfPBdTIP' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGayLhDYjABZUNZKUfOMZeo4zka57Sl12wUHdt0zr7p' # github:DJRHails
+  - key_groups:
+      - age:
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+bl01iRKRVYvOtFYSQWqKtqo2N2TG9H5+nGSxJSxE0' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQpQsoOwzcytS+AjXSB7bZbHjI90oX2uf80xNDBjXaL' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC/+Ziaqy11tLwos1sVvaBo+kKI14Y/zRtMTUK85rSL8' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUhwKeMY/N/+vFiMr/jjz1GWUZ14XgTfctDphaUIJh5' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJe3wmGlGSjzUhnmCGKKrHStmXGyZKQwCGROEfPBdTIP' # github:DJRHails
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGayLhDYjABZUNZKUfOMZeo4zka57Sl12wUHdt0zr7p' # github:DJRHails

@@ -10,7 +10,12 @@ repos:
   - repo: local
     hooks:
       - id: check-crypt-patterns
-        name: check transcrypt rules match tracked files
+        name: check glassine rules match tracked files
         entry: scripts/check-crypt-patterns.sh
         language: script
+        pass_filenames: false
+      - id: glassine-check
+        name: staged glassine-managed files are encrypted
+        entry: glassine check
+        language: system
         pass_filenames: false

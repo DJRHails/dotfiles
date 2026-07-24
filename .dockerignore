@@ -4,13 +4,19 @@
 tmp
 docs/*.gif
 
-# Transcrypt-encrypted skills: the working tree is DECRYPTED, so these must
+# Glassine-encrypted skills: the working tree is DECRYPTED, so these must
 # never enter the docker build context or they leak as plaintext image layers.
-# Keep this list in sync with the crypt patterns in .gitattributes.
+# Keep this list in sync with the glassine patterns in .gitattributes.
+modules/agents/skills/diagram-design
+modules/agents/skills/discord
 modules/agents/skills/gantry-cli
 modules/agents/skills/research-meeting-playbook
 modules/agents/skills/runpod-ant-cluster
 modules/agents/skills/saint-chrome
 modules/agents/skills/slack
 modules/agents/skills/tailscale-topology
+modules/agents/skills/uptime-alerts
 modules/agents/skills/web-animation-design
+modules/agents/commands/archive-book.md
+modules/claude/safe.zsh
+docs/legacy-transcrypt.md

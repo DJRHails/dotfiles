@@ -1,0 +1,11 @@
+# Global core.hooksPath (~/.git-hooks, lefthook shim) bypasses .git/hooks, so
+# this file is what actually enforces encryption checks at commit time on
+# hosts with that shim. Hosts without it use the .git/hooks/pre-commit chain
+# from docs/glassine-migration.md.
+pre-commit:
+  parallel: false
+  commands:
+    crypt-patterns:
+      run: scripts/check-crypt-patterns.sh
+    glassine-check:
+      run: glassine check
