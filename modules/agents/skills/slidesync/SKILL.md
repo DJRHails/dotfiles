@@ -1,7 +1,7 @@
 ---
 name: slidesync
-description: Bidirectional sync between a Slidev markdown deck and Google Slides as native, editable objects (not images). Push markdown -> Slides, pull Slides -> markdown, and round-trip. Use when the user wants to author/version a Google Slides deck from markdown, replicate a deck's styling, or keep a .slidev.md in sync with a presentation. Auth is borrowed from the `gog` CLI (no separate OAuth setup). Requires `gog` with stored credentials — currently macOS-only (reads gog's macOS Application Support path), so skip on Linux hosts.
-version: 1.0.0
+description: Bidirectional sync between a Slidev markdown deck and Google Slides as native, editable objects (not images). Push markdown -> Slides, pull Slides -> markdown, and round-trip. Use when the user wants to author/version a Google Slides deck from markdown, replicate a deck's styling, or keep a .slidev.md in sync with a presentation. Auth is borrowed from the `gog` CLI (no separate OAuth setup). Requires the `gog` CLI installed and authenticated on the host (macOS or Linux) — slidesync reads gog's stored credentials from `~/.config/gogcli/` (Linux/XDG) or `~/Library/Application Support/gogcli/` (macOS); skip only where gog is not set up.
+version: 1.1.0
 metadata:
   hermes:
     tags: [Slides, GoogleSlides, Slidev, Markdown, Presentations, gog]
@@ -21,10 +21,13 @@ Packaged at [github.com/DJRHails/slidesync](https://github.com/DJRHails/slidesyn
 
 ## Auth (no setup)
 
-Borrowed from `gog`: OAuth client id/secret from
-`~/Library/Application Support/gogcli/credentials.json`, refresh token via
-`gog auth tokens export`. The stored token already carries `slides`+`drive`
-scopes. Requires the **Slides API enabled** on the gog Cloud project.
+Borrowed from `gog`: OAuth client id/secret resolved cross-platform from
+`~/.config/gogcli/credentials.json` (Linux/XDG), falling back to
+`~/Library/Application Support/gogcli/credentials.json` (macOS) — and the
+keyring-password file at either location — mirroring gog's own resolution.
+Refresh token via `gog auth tokens export`. The stored token already carries
+`slides`+`drive` scopes. Requires the **Slides API enabled** on the gog Cloud
+project.
 The account defaults to gog's default account (override with `--account` or
 `$SLIDESYNC_ACCOUNT`).
 
