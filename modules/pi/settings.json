@@ -4,7 +4,8 @@
     "git:github.com/DJRHails/pi-smart-sessions",
     "npm:pi-multi-pass",
     "git:github.com/DJRHails/pi-cc-patch",
-    "npm:@ff-labs/pi-fff"
+    "npm:@ff-labs/pi-fff",
+    "npm:pi-web-access"
   ],
   "lastChangelogVersion": "0.80.6",
   "defaultProvider": "anthropic-api",
