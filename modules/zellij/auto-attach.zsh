@@ -168,6 +168,30 @@
     local short_tmp="/tmp"
     [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
 
+    # Surface resume binding: ask cmux to reattach THIS session when it restores the surface
+    # after an app restart (Settings → Terminal → Resume Commands; approve the
+    # `env TMPDIR=/tmp zellij attach` prefix as Auto-Restore for hands-free reattach). After a
+    # reboot the same command resurrects the session's serialized skeleton instead. Local
+    # surfaces only ($CMUX_REMOTE_TRANSPORT empty): on a durable remote this session lives on
+    # the wrong machine for a local attach — ssh::durable::attach binds the mosh command there.
+    # Self-contained (no shell functions), best-effort, backgrounded; skipped when the stored
+    # binding already matches so approved bindings aren't re-proposed.
+    if [[ -z $CMUX_REMOTE_TRANSPORT ]] && command -v cmux >/dev/null 2>&1; then
+        {
+            local want="env TMPDIR=${short_tmp} zellij attach ${(q)session}"
+            if [[ "$(cmux surface resume get --json 2>/dev/null)" == *"$want"* ]]; then
+                _log resume-bind "unchanged session=$session"
+            elif cmux surface resume set --kind zellij --name "$session" --cwd "$PWD" \
+                    --shell "$want" >/dev/null 2>&1; then
+                _log resume-bind "set session=$session"
+            else
+                _log resume-bind "set-FAILED session=$session"
+            fi
+        } &!
+    else
+        _log resume-bind "skip $([[ -n $CMUX_REMOTE_TRANSPORT ]] && print remote-transport || print no-cmux-cli)"
+    fi
+
     # Durable de-nest handoff: when `ssh::durable` is invoked from *inside* this local zellij,
     # it stages a mosh command in $handoff and detaches us, so on return we replace the surface
     # with that durable hop instead of nesting mosh inside zellij. Cleared first so a stale one
@@ -196,7 +220,10 @@
         # it so husks don't accumulate (otherwise every durable hop strands one detached session).
         # We're in the outer shell here (the `zellij attach` above returned on detach), so deleting
         # the session is safe. --force kills it even though its inner shell is still running.
-        { zellij delete-session --force "$session" } >/dev/null 2>&1
+        # TMPDIR must match the attach above: zellij's socket dir follows TMPDIR, and this shell's
+        # default (/var/folders/… on macOS) can't see sessions created under /tmp — the delete was
+        # silently failing and stranding every hop's husk.
+        { TMPDIR="$short_tmp" zellij delete-session --force "$session" } >/dev/null 2>&1
         _log husk-deleted "session=$session"
         eval "exec ${hop}"
     fi

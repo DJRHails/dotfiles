@@ -151,7 +151,47 @@ ssh::durable::attach() {
     local host="$1" sess="$2"; shift 2
     print -r -- "ssh::durable: attaching ${sess} on ${host} …"
     ssh::durable::write_live_ids "$host" "$sess"
+    # Rebind the surface's resume command so a cmux restart re-moshes THIS session here
+    # (see the binding block in auto-attach.zsh). Backgrounded — survives the exec below.
+    if [[ -z $CMUX_REMOTE_TRANSPORT ]] && command -v cmux >/dev/null 2>&1; then
+        { cmux surface resume set --kind zellij-mosh --name "$sess" \
+            --shell "mosh ${(q)host} -- zellij attach ${(q)sess}" } >/dev/null 2>&1 &!
+    fi
     ssh::durable::go "mosh ${(j: :)${(@q)@}} ${(q)host} -- zellij attach ${(q)sess}"
+}
+
+# zellij::resume <session> — reattach a detached LOCAL zellij session in this cmux surface.
+# The local analogue of `ssh::durable <host> --attach`: reuses the durable de-nest handoff
+# (ssh::durable::go), so from inside the surface's auto-attach wrapper it stages the attach,
+# detaches, and auto-attach.zsh deletes the wrapper husk and execs `zellij attach <session>`.
+# Outside a wrapper it just execs. Used by rebuild-durable.py for the cmux host's own sessions.
+zellij::resume() {
+    emulate -L zsh
+    local sess="$1"
+    if [[ -z $sess ]]; then
+        print -u2 "usage: zellij::resume <session>"
+        return 2
+    fi
+    # Same live-ids sidecar ssh::durable::write_live_ids maintains on remotes: the session's
+    # $CMUX_* env froze at creation, so persist THIS surface's current ids for cmux tooling.
+    if [[ -n $CMUX_WORKSPACE_ID && -n $CMUX_SURFACE_ID ]]; then
+        local logdir="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij"
+        [[ -d $logdir ]] || mkdir -p "$logdir" 2>/dev/null
+        { print -r -- "${CMUX_WORKSPACE_ID} ${CMUX_SURFACE_ID}" > "$logdir/live-$sess" } 2>/dev/null
+    fi
+    print -r -- "zellij::resume: attaching ${sess} …"
+    # TMPDIR=/tmp matches auto-attach.zsh: zellij's socket dir follows TMPDIR, and the surface
+    # shell's default (/var/folders/…) can't see sessions created under /tmp — the exec'd attach
+    # would exit "not found" and close the surface. Also keeps under the UNIX-socket path cap.
+    local short_tmp="/tmp"
+    [[ -d $short_tmp ]] || short_tmp="$TMPDIR"
+    # Rebind the surface's resume command so a cmux restart restores THIS session here
+    # (see the binding block in auto-attach.zsh). Backgrounded — survives the exec below.
+    if [[ -z $CMUX_REMOTE_TRANSPORT ]] && command -v cmux >/dev/null 2>&1; then
+        { cmux surface resume set --kind zellij --name "$sess" --cwd "$PWD" \
+            --shell "env TMPDIR=${short_tmp} zellij attach ${(q)sess}" } >/dev/null 2>&1 &!
+    fi
+    ssh::durable::go "env TMPDIR=${(q)short_tmp} zellij attach ${(q)sess}"
 }
 
 # If the local cwd is under $PROJECTS, echo its path relative to $PROJECTS (e.g.
