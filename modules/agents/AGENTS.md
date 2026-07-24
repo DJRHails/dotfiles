@@ -176,15 +176,16 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   and works wherever they resolve. **Any registered `anthropic-api` model works, including non-Opus
   (`claude-fable-5`, `claude-haiku-4-5`, `claude-sonnet-5`)** — use a cheap/small model for recon,
   reviews, and parallel fan-out; reserve `claude-opus-4-8[fast]` for work that needs the frontier.
-  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for a real bug, now fixed
-  in `DJRHails/pi-interactive-subagents`: a bare/ambiguous model id (e.g. `claude-fable-5`) fell
-  through to pi's keyless built-in `anthropic` provider and the subagent "stalled and exited with
-  no output" on hosts like `taffy` — only `claude-opus-4-8[fast]` survived because its id is unique
-  to `anthropic-api`. Fixed by reading the parent provider from `ctx.model` (not the nonexistent
-  `ctx.getModel()`) so bare ids route to the parent's provider (PR #9), plus recovering the zellij
-  `new-pane` id by pane-diff so parallel/crowded-tab spawns don't orphan panes (PR #12). If you're
-  on a checkout that predates those, either pull them or keep passing an `anthropic-api/<model>`
-  prefix. **This is about the agent-harness *subagent spawn* only — it does NOT relax any
+  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for a real bug, fixed by
+  `DJRHails/pi-interactive-subagents` PRs #9 and #12 (still open as of 2026-07-24, not yet on
+  `main`): a bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in
+  `anthropic` provider and the subagent "stalled and exited with no output" on hosts like `taffy` —
+  only `claude-opus-4-8[fast]` survived because its id is unique to `anthropic-api`. Fixed by
+  reading the parent provider from `ctx.model` (not the nonexistent `ctx.getModel()`) so bare ids
+  route to the parent's provider (PR #9), plus recovering the zellij `new-pane` id by pane-diff so
+  parallel/crowded-tab spawns don't orphan panes (PR #12). Until both PRs merge, a checkout on
+  `main` does NOT have the fix — run the PR branches, or keep passing an `anthropic-api/<model>`
+  prefix on every spawn. **This is about the agent-harness *subagent spawn* only — it does NOT relax any
   project's monitor/eval sweep rule (frontier monitors, Sonnet-and-above with an Opus arm), which
   lives in that project's CLAUDE.md.**
 
