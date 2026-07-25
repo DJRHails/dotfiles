@@ -7,7 +7,7 @@
     "npm:@ff-labs/pi-fff",
     "npm:pi-web-access"
   ],
-  "lastChangelogVersion": "0.80.6",
+  "lastChangelogVersion": "0.82.0",
   "defaultProvider": "anthropic-api",
   "defaultModel": "claude-opus-5[fast]",
   "defaultThinkingLevel": "xhigh",
