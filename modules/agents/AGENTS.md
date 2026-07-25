@@ -175,7 +175,7 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   fit the task — no Opus pin.** `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_*` keys
   and works wherever they resolve. **Any registered `anthropic-api` model works, including non-Opus
   (`claude-fable-5`, `claude-haiku-4-5`, `claude-sonnet-5`)** — use a cheap/small model for recon,
-  reviews, and parallel fan-out; reserve `claude-opus-4-8[fast]` for work that needs the frontier.
+  reviews, and parallel fan-out; reserve `claude-opus-5[fast]` for work that needs the frontier.
   The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for a real bug, fixed by
   `DJRHails/pi-interactive-subagents` PRs #9 and #12 (still open as of 2026-07-24, not yet on
   `main`): a bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in
