@@ -13,6 +13,12 @@ timer, or cron fallback).
 Logs to `$XDG_STATE_HOME/dotfiles/autoupdate.log` (default
 `~/.local/state/dotfiles/autoupdate.log`).
 
+## Pull now
+
+`dotfiles::update` ([`aliases.zsh`](./aliases.zsh)) is the manual counterpart —
+same fast-forward-only, submodule-skipping pull, but run on demand and with
+git's output on the terminal instead of in the log.
+
 ## Install
 
 Picked up by `bootstrap.sh` (in the `--cli` server set, so bonbon/taffy get it
