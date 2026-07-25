@@ -1,4 +1,4 @@
 ---
 name: scout
-model: claude-opus-4-8[fast]
+model: claude-opus-5[fast]
 ---
