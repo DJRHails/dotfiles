@@ -176,18 +176,34 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   and works wherever they resolve. **Any registered `anthropic-api` model works, including non-Opus
   (`claude-fable-5`, `claude-haiku-4-5`, `claude-sonnet-5`)** — use a cheap/small model for recon,
   reviews, and parallel fan-out; reserve `claude-opus-5[fast]` for work that needs the frontier.
-  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for a real bug, fixed by
-  `DJRHails/pi-interactive-subagents` PRs #9 and #12 (still open as of 2026-07-24, not yet on
-  `main`): a bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in
-  `anthropic` provider and the subagent "stalled and exited with no output" on hosts like `taffy` —
-  only `claude-opus-4-8[fast]` survived because its id is unique to `anthropic-api`. Fixed by
+  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for two real bugs in
+  `DJRHails/pi-interactive-subagents`, **both fixed and on `main` since 2026-07-24**: a
+  bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in `anthropic`
+  provider and the subagent "stalled and exited with no output" on hosts like `taffy` — fixed by
   reading the parent provider from `ctx.model` (not the nonexistent `ctx.getModel()`) so bare ids
-  route to the parent's provider (PR #9), plus recovering the zellij `new-pane` id by pane-diff so
-  parallel/crowded-tab spawns don't orphan panes (PR #12). Until both PRs merge, a checkout on
-  `main` does NOT have the fix — run the PR branches, or keep passing an `anthropic-api/<model>`
-  prefix on every spawn. **This is about the agent-harness *subagent spawn* only — it does NOT relax any
-  project's monitor/eval sweep rule (frontier monitors, Sonnet-and-above with an Opus arm), which
-  lives in that project's CLAUDE.md.**
+  route to the parent's provider (patch #9) — plus recovering the zellij `new-pane` id by pane-diff
+  so parallel/crowded-tab spawns don't orphan panes (patch #12). **This is about the agent-harness
+  *subagent spawn* only — it does NOT relax any project's monitor/eval sweep rule (frontier
+  monitors, Sonnet-and-above with an Opus arm), which lives in that project's CLAUDE.md.**
+
+- **A stalled/no-output subagent is almost always a STALE INSTALLED PACKAGE, not a model or
+  provider fault. Check the installed code's commit before theorising.** `pi` installs git packages
+  as plain clones under `~/.pi/agent/git/<host>/<owner>/<repo>` — a *separate* clone from any
+  `$PROJECTS` checkout, and nothing re-pulls it after the initial install. On 2026-07-25 that clone
+  sat 10 days stale at an old commit while the fix had long since shipped, and the whole failure
+  looked like a provider/model bug. Diagnose with `git -C ~/.pi/agent/git/github.com/<owner>/<repo>
+  log --oneline -1`; fix with `pi update <source>` (fetches + resets to `origin/HEAD`), then
+  **restart pi** — a running process has the old extension in memory. The daily dotfiles autoupdate
+  now refreshes these automatically (`modules/dotfiles-autoupdate/update.sh`).
+
+- **In a patch-stack fork, an OPEN patch PR does not mean unintegrated — never use PR state as the
+  signal.** Repos managed by `DJRHails/patch-stack-action` (commits prefixed `patch-stack:`) keep
+  every `patch/*` PR open against `base` permanently; integration happens by force-rebuilding
+  `main` from `base` + all patches. So `gh pr list --state open` listing a fix means nothing. Check
+  `git log origin/main` (after `git fetch`, since `main` is force-pushed) for the actual state, and
+  **never `gh pr merge` a `patch/*` branch** — the next rebuild discards it. Also note `gh` resolves
+  to the *upstream* parent repo by default on a fork, silently answering about the wrong repo; pass
+  `--repo <owner>/<repo>` explicitly.
 
 **Before committing:**
 
