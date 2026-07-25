@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Daily dotfiles auto-update — fast-forward pull only.
+# Daily auto-update — fast-forward pull of the dotfiles repo, then a refresh of
+# pi's installed extension packages.
 #
 # Safe by construction: never clobbers local work (skips a dirty tree), never
 # merges/rebases (fast-forward only), never pushes. Scheduled once a day by
@@ -16,43 +17,88 @@ mkdir -p "$LOG_DIR"
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$LOG"; }
 
-cd "$DOTFILES" 2>/dev/null || {
-  log "ERROR: DOTFILES=$DOTFILES not found"
-  exit 0
+# Fast-forward the dotfiles repo. Returns non-zero only for "could not even
+# start"; every ordinary skip is logged and returns 0 so the pi refresh below
+# still runs (the common case is an already-up-to-date tree).
+update_dotfiles() {
+  cd "$DOTFILES" 2>/dev/null || {
+    log "ERROR: DOTFILES=$DOTFILES not found"
+    return 0
+  }
+
+  # Never touch a tree with local changes in the superproject — a human owns those.
+  # Submodule state is ignored: it's managed separately (a submodule pinned to a
+  # non-HEAD commit is the normal steady state) and must not block the pull.
+  if [ -n "$(git status --porcelain --ignore-submodules=all)" ]; then
+    log "skip: working tree has local changes"
+    return 0
+  fi
+
+  local branch local_rev
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+    log "skip: $branch has no upstream"
+    return 0
+  fi
+
+  # Superproject only — never let a submodule fetch failure block the daily pull.
+  if ! git fetch --quiet --prune --no-recurse-submodules origin 2>>"$LOG"; then
+    log "skip: fetch failed (offline?)"
+    return 0
+  fi
+
+  local_rev="$(git rev-parse @)"
+  if [ "$local_rev" = "$(git rev-parse '@{u}')" ]; then
+    log "ok: up to date ($branch @ ${local_rev:0:8})"
+    return 0
+  fi
+
+  # Fast-forward only — a diverged branch needs a human, never an auto-merge.
+  # Submodules are left untouched (never checked out over possible in-submodule
+  # WIP); run `git submodule update` by hand to follow a bumped pin.
+  if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
+    log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
+  else
+    log "skip: $branch diverged from upstream — needs a manual pull"
+  fi
 }
 
-# Never touch a tree with local changes in the superproject — a human owns those.
-# Submodule state is ignored: it's managed separately (a submodule pinned to a
-# non-HEAD commit is the normal steady state) and must not block the pull.
-if [ -n "$(git status --porcelain --ignore-submodules=all)" ]; then
-  log "skip: working tree has local changes"
-  exit 0
-fi
+# Refresh pi's installed extension packages.
+#
+# Why this exists: `pi install git:…` clones into ~/.pi/agent/git/… once and
+# nothing ever re-pulls it, so a host silently runs whatever the code looked
+# like on install day. That cost a long debugging session on 2026-07-25 — a
+# 10-day-stale pi-interactive-subagents clone was missing a merged zellij
+# pane-id fix, and the symptom (subagents dying with no output) looked for all
+# the world like a provider/model bug.
+#
+# `pi update <source>` fetches and resets that clone to origin/HEAD. Scoped to
+# the sources listed in settings.json, deliberately NOT bare `pi update`: that
+# also self-updates the globally-installed pi, which can need sudo and should
+# stay a deliberate human action rather than a background surprise.
+refresh_pi_packages() {
+  command -v pi >/dev/null 2>&1 || return 0
+  command -v jq >/dev/null 2>&1 || {
+    log "pi: skip — jq not installed"
+    return 0
+  }
 
-branch="$(git rev-parse --abbrev-ref HEAD)"
-if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
-  log "skip: $branch has no upstream"
-  exit 0
-fi
+  local settings="$DOTFILES/modules/pi/settings.json"
+  [ -f "$settings" ] || {
+    log "pi: skip — no $settings"
+    return 0
+  }
 
-# Superproject only — never let a submodule fetch failure block the daily pull.
-if ! git fetch --quiet --prune --no-recurse-submodules origin 2>>"$LOG"; then
-  log "skip: fetch failed (offline?)"
-  exit 0
-fi
+  local source
+  while IFS= read -r source; do
+    [ -n "$source" ] || continue
+    if pi update "$source" >>"$LOG" 2>&1; then
+      log "pi: refreshed $source"
+    else
+      log "pi: FAILED to refresh $source"
+    fi
+  done < <(jq -r '.packages[]? // empty' "$settings")
+}
 
-local_rev="$(git rev-parse @)"
-remote_rev="$(git rev-parse '@{u}')"
-if [ "$local_rev" = "$remote_rev" ]; then
-  log "ok: up to date ($branch @ ${local_rev:0:8})"
-  exit 0
-fi
-
-# Fast-forward only — a diverged branch needs a human, never an auto-merge.
-# Submodules are left untouched (never checked out over possible in-submodule
-# WIP); run `git submodule update` by hand to follow a bumped pin.
-if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
-  log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
-else
-  log "skip: $branch diverged from upstream — needs a manual pull"
-fi
+update_dotfiles
+refresh_pi_packages
