@@ -81,9 +81,18 @@ fi
 
 # Match the prefix as a LITERAL (index(...)==1), so a prefix containing regex
 # metacharacters can't widen the match beyond this worker's jobs.
+#
+# Strip an optional leading "ck-" first: clusterkit names every job it submits
+# ck-<prefix>-<slug>, so a name-starts-with-prefix test would match none of them.
+# Then require the prefix to end at a component boundary, so prefix "brisk-owl"
+# cannot claim a peer's "brisk-owlet-..." jobs.
 mapfile -t job_ids < <(
   slurm squeue -h -u "$(slurm whoami)" -o '%i %j' |
-    awk -v prefix="$prefix" 'index($2, prefix) == 1 { print $1 }'
+    awk -v prefix="$prefix" '{
+      name = $2
+      sub(/^ck-/, "", name)
+      if (name == prefix || index(name, prefix "-") == 1) print $1
+    }'
 )
 
 if [[ ${#job_ids[@]} -eq 0 ]]; then

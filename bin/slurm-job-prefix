@@ -8,8 +8,13 @@ set -euo pipefail
 #
 # The prefix is the gantry thread slug ($GANTRY_THREAD_KEY without its thrd_ tag),
 # which is stable for the life of a run, unique across the fleet, and traceable back to
-# https://gantry.hails.info/run/<slug>. Off the fleet, fall back to the hostname so an
-# interactive session's jobs are still distinguishable from a worker's.
+# https://gantry.hails.info/run/<slug>. $SLURM_JOB_PREFIX overrides it.
+#
+# When neither is set there is deliberately NO fallback (an earlier version used the
+# hostname). clusterkit only prefixes a job name when it can identify a submitter, so
+# inventing a prefix here would print one that no job actually carries — and scancel-mine
+# would then report "no jobs" instead of refusing, which reads like "nothing to clean up"
+# rather than "I cannot tell which jobs are yours".
 
 prefix="${SLURM_JOB_PREFIX:-}"
 
@@ -18,9 +23,15 @@ if [[ -z "$prefix" && -n "${GANTRY_THREAD_KEY:-}" ]]; then
 fi
 
 if [[ -z "$prefix" ]]; then
-  prefix="$(hostname -s)"
+  echo "slurm-job-prefix: no \$SLURM_JOB_PREFIX and no \$GANTRY_THREAD_KEY — nothing identifies this submitter" >&2
+  exit 1
 fi
 
-# Slurm job names tolerate more, but keep it to [A-Za-z0-9_-] so the awk prefix match
-# in scancel-mine and any squeue -o parsing stay whitespace-safe.
-echo "${prefix//[^A-Za-z0-9_-]/-}"
+# Slugify EXACTLY as clusterkit.script.slugify does — lower-case, collapse anything outside
+# [a-z0-9-] to a single dash, strip the ends. This has to agree character-for-character: a
+# clusterkit job is named ck-<prefix>-<slug> using ITS slugify, and scancel-mine matches on
+# the prefix printed here. If the two disagree (say this kept case or underscores while
+# clusterkit lower-cased them) scancel-mine would silently match nothing and the operator
+# would be back to an unscoped cancel — the failure this whole path exists to prevent.
+prefix="${prefix,,}"
+printf '%s\n' "$prefix" | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//'
