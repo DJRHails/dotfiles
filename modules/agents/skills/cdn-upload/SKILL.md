@@ -35,8 +35,11 @@ The script (mirrors `DJRHails/kb` `bin/r2_upload.py`):
 2. Put `![figures/foo.png]($url)` in the PR/issue body — the **alt text is the file's original
    repo-relative path** (the CDN key is a content hash, so the alt is the only provenance the
    embed keeps); the human description goes in a bold caption line below the image, not in the alt.
-3. Update an existing PR body with the REST API (avoids a `gh pr edit` bug that fails on
-   Projects-classic GraphQL): `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md`.
+3. Update an existing PR body with the REST API: `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md`.
+   Prefer this over `gh pr edit`, which fails closed under the gantry-injected token: that
+   `GITHUB_TOKEN` is a classic PAT scoped `repo`+`workflow` only, and `gh pr edit`'s viewer/org
+   GraphQL form needs `read:org` (it queries `login`/`name`/`slug`), so it 400s and writes nothing
+   even for a body-only edit on a personal repo. The REST PATCH needs no extra scope.
 
 When repairing an old/merged PR whose embed is broken (relative path, dead branch blob link),
 upload the bytes the PR actually referenced — `git fetch origin pull/<n>/head` and

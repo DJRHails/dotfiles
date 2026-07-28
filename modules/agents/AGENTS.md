@@ -234,6 +234,7 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 ### PR workflow
 
 - **Before pushing any fix to a branch, check `gh pr view <n> --json state,mergedAt`.** If the PR is already merged, push to a new branch off `main` and open a fresh PR instead.
+- **Edit PR descriptions with `gh api`, not `gh pr edit`.** In gantry/CI containers the injected `GITHUB_TOKEN` is a classic PAT scoped `repo`+`workflow` only. `gh pr edit` (and reviewer-assigning `gh pr create`) issue a viewer/org GraphQL query that requires `read:org` and **fail closed** (exit 1, nothing written) without it — even for a body-only edit on a solo repo (`gh auth status` self-reports "Missing required token scopes: 'read:org'"). Use `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md` — scope-free and verified. Read commands (`gh pr view`, `gh pr status`) are unaffected. `gh auth refresh` can't add the scope in-container (the env token is immutable); adding `read:org` to the injected PAT is a deliberate operator call, not a default — it broadens every ephemeral worker's token, and the REST path already covers the need.
 
 ## Pixel-precise user input — build a picker, don't iterate through prose
 
