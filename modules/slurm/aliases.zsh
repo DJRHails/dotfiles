@@ -8,7 +8,22 @@ alias sqme='squeue -u $(whoami) -o "%.18i %.9P %.8j %.8u %.2t %.10M %.6D %N %.10
 # Job control
 alias sqtop='scontrol top'
 alias sqdel='scancel'
-alias sqclear='scancel -u $(whoami)'
+
+# NO alias for a user-scoped mass cancel. The clusters are shared and every gantry
+# worker logs in as the SAME unix identity (djrhails, uid 2116), so `scancel -u
+# $(whoami)` is a fleet-wide cancel, not "mine": the old `sqclear` spelling of it
+# destroyed a peer's tp=8 vLLM serve after 6.7h queued, four array tasks and a second
+# serve on 2026-07-28. Cancel by explicit job id (`sqdel <jobid>`), or sweep only this
+# worker's jobs by name prefix with `scancel-mine` (see bin/scancel-mine). A
+# block_unscoped_scancel.py PreToolUse hook blocks the unscoped forms outright.
+#
+# `squeue -n` (like `scancel --name`) is an EXACT name match with no globbing, so
+# filter the prefix ourselves rather than passing it as a name.
+sqmine() {
+  local prefix="${SLURM_JOB_PREFIX:-$(slurm-job-prefix)}"
+  squeue -u "$(whoami)" -o "%.18i %.9P %.30j %.2t %.10M %N" \
+    | awk -v prefix="$prefix" 'NR == 1 || index($3, prefix) == 1'
+}
 
 # Cluster info
 alias sqnode='sinfo -Ne --Format=NodeHost,CPUsState,Gres,GresUsed'

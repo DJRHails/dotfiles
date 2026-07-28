@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# scancel-mine — cancel only the Slurm jobs belonging to THIS worker.
+#
+# Every gantry worker reaches the clusters as the same unix identity (djrhails, uid
+# 2116), so `scancel -u $USER` is a FLEET-WIDE cancel: on 2026-07-28 one such sweep
+# killed a peer's tp=8 vLLM serve after 6.7h queued, four array tasks, and a second
+# serve. The job NAME is the only per-worker discriminator Slurm carries, so this
+# resolves a name prefix to explicit job ids and cancels those — never a user filter.
+#
+# The prefix comes from $SLURM_JOB_PREFIX (see slurm-job-prefix), and there is no
+# fallback: without one, "my jobs" is unknowable and the safe answer is to refuse.
+#
+# Usage:
+#   scancel-mine [--dry-run] [--prefix <p>] [--via <ssh-host>]
+#
+#   --dry-run          list what would be cancelled, cancel nothing
+#   --prefix <p>       override $SLURM_JOB_PREFIX
+#   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
+#                      required when squeue is not on PATH, e.g. --via ant-cluster
+
+usage() {
+  sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+dry_run=0
+prefix="${SLURM_JOB_PREFIX:-}"
+via=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --dry-run | -n) dry_run=1 ;;
+  --prefix)
+    prefix="${2:?--prefix needs a value}"
+    shift
+    ;;
+  --via)
+    via="${2:?--via needs a value}"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "scancel-mine: unknown argument '$1'" >&2
+    usage >&2
+    exit 2
+    ;;
+  esac
+  shift
+done
+
+if [[ -z "$prefix" ]]; then
+  cat >&2 <<'EOF'
+scancel-mine: no job-name prefix.
+
+  Set one for this worker (derived from $GANTRY_THREAD_KEY):
+    export SLURM_JOB_PREFIX="$(slurm-job-prefix)"
+
+  Refusing to guess: under the shared djrhails uid, a cancel without a name prefix
+  would reap every PEER worker's queued compute. To cancel a specific job instead:
+    scancel <jobid>
+EOF
+  exit 2
+fi
+
+# Run a Slurm command locally, or on the login node when this box has no Slurm.
+slurm() {
+  if [[ -n "$via" ]]; then
+    ssh "$via" "$@"
+  else
+    "$@"
+  fi
+}
+
+if [[ -z "$via" ]] && ! command -v squeue >/dev/null 2>&1; then
+  echo "scancel-mine: no squeue on PATH — pass --via <ssh-host> (e.g. ant-cluster, eur-cluster)" >&2
+  exit 2
+fi
+
+# Match the prefix as a LITERAL (index(...)==1), so a prefix containing regex
+# metacharacters can't widen the match beyond this worker's jobs.
+mapfile -t job_ids < <(
+  slurm squeue -h -u "$(slurm whoami)" -o '%i %j' |
+    awk -v prefix="$prefix" 'index($2, prefix) == 1 { print $1 }'
+)
+
+if [[ ${#job_ids[@]} -eq 0 ]]; then
+  echo "scancel-mine: no jobs with name prefix '$prefix'"
+  exit 0
+fi
+
+echo "scancel-mine: ${#job_ids[@]} job(s) with name prefix '$prefix':"
+slurm squeue -h -o '%i %j %T %M' --jobs="$(
+  IFS=,
+  echo "${job_ids[*]}"
+)"
+
+if [[ "$dry_run" -eq 1 ]]; then
+  echo "scancel-mine: --dry-run, cancelling nothing"
+  exit 0
+fi
+
+slurm scancel "${job_ids[@]}"
+echo "scancel-mine: cancelled ${job_ids[*]}"

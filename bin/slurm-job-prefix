@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# slurm-job-prefix — print THIS worker's Slurm job-name prefix.
+#
+# Under the shared djrhails uid, the job NAME is the only thing that distinguishes one
+# gantry worker's jobs from a peer's, so every job a worker submits should be named
+# "<prefix>-<what>" and every cancel scoped to that prefix (see scancel-mine).
+#
+# The prefix is the gantry thread slug ($GANTRY_THREAD_KEY without its thrd_ tag),
+# which is stable for the life of a run, unique across the fleet, and traceable back to
+# https://gantry.hails.info/run/<slug>. Off the fleet, fall back to the hostname so an
+# interactive session's jobs are still distinguishable from a worker's.
+
+prefix="${SLURM_JOB_PREFIX:-}"
+
+if [[ -z "$prefix" && -n "${GANTRY_THREAD_KEY:-}" ]]; then
+  prefix="${GANTRY_THREAD_KEY#thrd_}"
+fi
+
+if [[ -z "$prefix" ]]; then
+  prefix="$(hostname -s)"
+fi
+
+# Slurm job names tolerate more, but keep it to [A-Za-z0-9_-] so the awk prefix match
+# in scancel-mine and any squeue -o parsing stay whitespace-safe.
+echo "${prefix//[^A-Za-z0-9_-]/-}"
