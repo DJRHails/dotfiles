@@ -37,9 +37,11 @@ The script (mirrors `DJRHails/kb` `bin/r2_upload.py`):
    embed keeps); the human description goes in a bold caption line below the image, not in the alt.
 3. Update an existing PR body with the REST API: `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md`.
    Prefer this over `gh pr edit`, which fails closed under the gantry-injected token: that
-   `GITHUB_TOKEN` is a classic PAT scoped `repo`+`workflow` only, and `gh pr edit`'s viewer/org
-   GraphQL form needs `read:org` (it queries `login`/`name`/`slug`), so it 400s and writes nothing
-   even for a body-only edit on a personal repo. The REST PATCH needs no extra scope.
+   `GITHUB_TOKEN` is a classic PAT scoped `repo`+`workflow` only, and `gh pr edit` first *reads* the
+   PR through a query carrying a `Team` requested-reviewer fragment (`organization{login}`, `name`,
+   `slug`) that needs `read:org` — so it exits 1 and writes nothing even for a body-only edit on a
+   personal repo. The failure surfaces as GraphQL `INSUFFICIENT_SCOPES` inside an HTTP 200, not a
+   4xx. The REST PATCH needs no extra scope.
 
 When repairing an old/merged PR whose embed is broken (relative path, dead branch blob link),
 upload the bytes the PR actually referenced — `git fetch origin pull/<n>/head` and
