@@ -19,10 +19,18 @@ alias sqdel='scancel'
 #
 # `squeue -n` (like `scancel --name`) is an EXACT name match with no globbing, so
 # filter the prefix ourselves rather than passing it as a name.
+# Same name matching as bin/scancel-mine: strip clusterkit's ck- tag, then require the
+# prefix to end at a component boundary (so "brisk-owl" doesn't claim "brisk-owlet-...").
 sqmine() {
   local prefix="${SLURM_JOB_PREFIX:-$(slurm-job-prefix)}"
+  if [[ -z $prefix ]]; then
+    print -u2 "sqmine: nothing identifies this submitter — set SLURM_JOB_PREFIX, or use sqme to list every job under this (shared) uid"
+    return 1
+  fi
   squeue -u "$(whoami)" -o "%.18i %.9P %.30j %.2t %.10M %N" \
-    | awk -v prefix="$prefix" 'NR == 1 || index($3, prefix) == 1'
+    | awk -v prefix="$prefix" 'NR == 1 { print; next }
+      { name = $3; sub(/^ck-/, "", name)
+        if (name == prefix || index(name, prefix "-") == 1) print }'
 }
 
 # Cluster info
