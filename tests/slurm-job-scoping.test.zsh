@@ -116,6 +116,16 @@ check dry-run-cancels-nothing "" "$(grep -c 'REAL SCANCEL CALLED' "$work/err" | 
 env SLURM_JOB_PREFIX=brisk-owl "$scancel_bin" >/dev/null 2>"$work/err2"
 check cancels-explicit-ids "REAL SCANCEL CALLED: 101 102" "$(grep -o 'REAL SCANCEL CALLED: .*' "$work/err2")"
 
+# A worker with ONLY $GANTRY_THREAD_KEY must work end-to-end, with no manual export. Per
+# clusterkit's own docstring that is the DEFAULT fleet state, and it is the path every worker
+# container takes, so pin it here rather than only in slurm-job-prefix (thread-key, above):
+# scancel-mine used to refuse without an explicit export while sqmine did not, and nothing
+# would catch that asymmetry coming back. SLURM_JOB_PREFIX must be unset for this to mean
+# anything — with it set the thread key is never consulted.
+ids="$(env -u SLURM_JOB_PREFIX GANTRY_THREAD_KEY=thrd_brisk-owl "$scancel_bin" --dry-run 2>&1 |
+  grep -oE '\b10[0-9]\b' | sort -u | tr '\n' ' ')"
+check thread-key-alone-matches-end-to-end "101 102 " "$ids"
+
 # --- the two derivations must agree END-TO-END, not just in slurm-job-prefix ------------
 # The slug checks above pin the producer in isolation; these drive a NON-SLUG prefix all the
 # way through scancel-mine's matcher. clusterkit names the job with slugify(<raw prefix>),
@@ -145,6 +155,71 @@ rc=$?
 check squeue-failure-exits-nonzero "1" "$rc"
 check squeue-failure-is-not-no-jobs "" "$(print -r -- "$out" | grep -c 'no jobs with name prefix' | sed 's/^0$//')"
 check squeue-failure-says-so "1" "$(print -r -- "$out" | grep -c 'squeue failed')"
+
+# --- nor may an unknown cluster USER look like an empty queue ---------------------------
+# Same class as the squeue guard, added in the same hunk, so pin both its failure modes. The
+# empty-output one is the subtler half: whoami exiting 0 with nothing would make the
+# subsequent `squeue -u ''` mean something entirely different from "my jobs".
+cat >"$work/bin/squeue" <<'EOF'
+#!/bin/sh
+echo "101 ck-brisk-owl-vllm-serve"
+EOF
+cat >"$work/bin/whoami" <<'EOF'
+#!/bin/sh
+echo "whoami: cannot find name for user ID 2116" >&2
+exit 1
+EOF
+chmod +x "$work/bin/squeue" "$work/bin/whoami"
+out="$(env SLURM_JOB_PREFIX=brisk-owl "$scancel_bin" --dry-run 2>&1)"
+rc=$?
+check whoami-failure-exits-nonzero "1" "$rc"
+check whoami-failure-says-so "1" "$(print -r -- "$out" | grep -c 'could not determine the cluster user')"
+
+cat >"$work/bin/whoami" <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+chmod +x "$work/bin/whoami"
+out="$(env SLURM_JOB_PREFIX=brisk-owl "$scancel_bin" --dry-run 2>&1)"
+rc=$?
+check whoami-empty-exits-nonzero "1" "$rc"
+check whoami-empty-is-not-no-jobs "" "$(print -r -- "$out" | grep -c 'no jobs with name prefix' | sed 's/^0$//')"
+
+cat >"$work/bin/whoami" <<'EOF'
+#!/bin/sh
+echo djrhails
+EOF
+chmod +x "$work/bin/whoami"
+
+# --- a REFUSAL must name the reason it refused ------------------------------------------
+# Routing both consumers through slurm-job-prefix makes it a hard dependency. Reported as the
+# generic "nothing identifies this submitter" it tells the operator to export
+# SLURM_JOB_PREFIX, which they have usually already done — a refusal whose stated remedy is
+# already satisfied reads as "this tool is broken", the same nudge toward `scancel -u $USER`
+# that a bogus "no jobs" gives. Invoke a copy with the helper neither adjacent nor on $PATH.
+mkdir -p "$work/lonely"
+cp "$scancel_bin" "$work/lonely/scancel-mine"
+out="$(env PATH="$work/bin:/usr/bin:/bin" SLURM_JOB_PREFIX=brisk-owl \
+  "$work/lonely/scancel-mine" --dry-run 2>&1)"
+rc=$?
+check missing-helper-exits-nonzero "2" "$rc"
+check missing-helper-says-so "1" "$(print -r -- "$out" | grep -c 'cannot run slurm-job-prefix')"
+check missing-helper-is-not-no-prefix "" \
+  "$(print -r -- "$out" | grep -c 'nothing identifies this submitter' | sed 's/^0$//')"
+
+# A prefix that slugifies away was NAMED — it just dissolved. The two need opposite
+# responses (supply a prefix vs supply a DIFFERENT one), so they must not share a message.
+out="$(env -u SLURM_JOB_PREFIX -u GANTRY_THREAD_KEY "$scancel_bin" --dry-run --prefix '___' 2>&1)"
+rc=$?
+check empty-slug-exits-nonzero "2" "$rc"
+check empty-slug-says-so "1" "$(print -r -- "$out" | grep -c 'slugifies to nothing')"
+
+# And it must NOT fall through to the thread key: silently cancelling a DIFFERENT scope than
+# the one named is worse than refusing, so an explicit prefix always wins or refuses.
+out="$(env -u SLURM_JOB_PREFIX GANTRY_THREAD_KEY=thrd_brisk-owl \
+  "$scancel_bin" --dry-run --prefix '___' 2>&1)"
+check empty-slug-never-falls-back-to-thread-key "" \
+  "$(print -r -- "$out" | grep -c 'brisk-owl' | sed 's/^0$//')"
 
 ((fails == 0)) || exit 1
 print "ok"

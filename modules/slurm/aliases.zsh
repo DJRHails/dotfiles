@@ -26,6 +26,15 @@ sqmine() {
   # Always via slurm-job-prefix, never $SLURM_JOB_PREFIX raw: that script prefers the env
   # var but slugifies it as clusterkit does when naming the job, so a mixed-case or
   # underscored value still matches instead of silently listing nothing.
+  #
+  # That makes it a hard dependency, so say when it is missing rather than blaming an unset
+  # SLURM_JOB_PREFIX — setting that cannot help once the raw value is no longer read.
+  if (( ! $+commands[slurm-job-prefix] )); then
+    print -u2 "sqmine: slurm-job-prefix is not on \$PATH — it owns clusterkit's slug rules,"
+    print -u2 "  so setting SLURM_JOB_PREFIX cannot help; fix \$PATH, or use sqme to list"
+    print -u2 "  every job under this (shared) uid"
+    return 1
+  fi
   # Declare separately so the assignment's exit status is testable: `local x="$(cmd)"`
   # masks cmd's failure. Don't fall through to an empty prefix either — awk's
   # index(s, "") is 1 for every row, so the filter would silently become "list
