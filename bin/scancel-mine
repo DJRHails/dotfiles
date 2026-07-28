@@ -28,6 +28,7 @@ Usage:
   --prefix <p>       override $SLURM_JOB_PREFIX
   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
                      required when squeue is not on PATH, e.g. --via ant-cluster
+  -h, --help         print this help
 EOF
 }
 
@@ -107,10 +108,15 @@ if [[ -z "$via" ]] && ! command -v squeue >/dev/null 2>&1; then
   exit 2
 fi
 
-# Capture before filtering, and check the status: `mapfile < <(...)` would discard it
-# (pipefail does not reach into a process substitution), turning a controller outage or
-# an ssh failure into a cheerful "no jobs" and exit 0.
-if ! whoami_out="$(slurm whoami)"; then
+# Capture the QUERY with `$(...)` and check its status before filtering. Reading it
+# straight into `mapfile < <(squeue ...)` would discard that status (pipefail does not
+# reach into a process substitution), turning a controller outage or an ssh failure into a
+# cheerful "no jobs" and exit 0. The `mapfile` further down is over the local `awk` filter,
+# whose input is already in hand — a failure there yields an empty list, which the
+# zero-jobs branch reports without cancelling anything.
+# Emptiness matters as much as the exit status: an ssh that connects but prints nothing
+# would leave this empty and hand `squeue -u ""` a filter of unverified breadth.
+if ! whoami_out="$(slurm whoami)" || [[ -z "$whoami_out" ]]; then
   echo "scancel-mine: could not resolve the cluster user${via:+ on $via}." \
     "Nothing cancelled." >&2
   exit 1
