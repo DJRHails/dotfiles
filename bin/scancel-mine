@@ -2,40 +2,59 @@
 set -euo pipefail
 # scancel-mine — cancel only the Slurm jobs belonging to THIS worker.
 #
-# Every gantry worker reaches the clusters as the same unix identity (djrhails, uid
-# 2116), so `scancel -u $USER` is a FLEET-WIDE cancel: on 2026-07-28 one such sweep
-# killed a peer's tp=8 vLLM serve after 6.7h queued, four array tasks, and a second
-# serve. The job NAME is the only per-worker discriminator Slurm carries, so this
-# resolves a name prefix to explicit job ids and cancels those — never a user filter.
+# Every worker reaches the clusters as the same unix account, so `scancel -u $USER` is a
+# FLEET-WIDE cancel: one such sweep destroyed a peer's long-queued multi-GPU serve and
+# several array tasks. (Details in the runpod-ant-cluster skill, which is encrypted at
+# rest — keep them out of this file, which is public.) The job NAME is the discriminator
+# we standardise on, so this resolves a name prefix to explicit job ids and cancels
+# those — never a user filter.
 #
-# The prefix comes from $SLURM_JOB_PREFIX (see slurm-job-prefix), and there is no
+# The prefix comes from $SLURM_JOB_PREFIX (see slurm-job-prefix) and there is no
 # fallback: without one, "my jobs" is unknowable and the safe answer is to refuse.
+# Unlike `sqmine`, which falls back to slurm-job-prefix for LISTING, a cancel never
+# guesses.
 #
-# Usage:
-#   scancel-mine [--dry-run] [--prefix <p>] [--via <ssh-host>]
-#
-#   --dry-run          list what would be cancelled, cancel nothing
-#   --prefix <p>       override $SLURM_JOB_PREFIX
-#   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
-#                      required when squeue is not on PATH, e.g. --via ant-cluster
+# --help prints the usage block below; it is the single source of that text, so editing
+# it can't desync from the docs the way a line-numbered `sed` range would.
 
 usage() {
-  sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+scancel-mine — cancel only the Slurm jobs belonging to THIS worker.
+
+Usage:
+  scancel-mine [--dry-run] [--prefix <p>] [--via <ssh-host>]
+
+  --dry-run          list what would be cancelled, cancel nothing
+  --prefix <p>       override $SLURM_JOB_PREFIX
+  --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
+                     required when squeue is not on PATH, e.g. --via ant-cluster
+EOF
 }
 
 dry_run=0
 prefix="${SLURM_JOB_PREFIX:-}"
 via=""
 
+# Reject a flag-shaped value: `--prefix --dry-run` would otherwise set prefix to
+# "--dry-run" and silently leave dry_run off, i.e. a live cancel matching nothing.
+require_value() {
+  local option="$1" value="${2-}"
+  if [[ -z "$value" || "$value" == -* ]]; then
+    echo "scancel-mine: $option needs a value (got '${value:-}')" >&2
+    exit 2
+  fi
+  printf '%s' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --dry-run | -n) dry_run=1 ;;
+  --dry-run) dry_run=1 ;;
   --prefix)
-    prefix="${2:?--prefix needs a value}"
+    prefix="$(require_value --prefix "${2-}")"
     shift
     ;;
   --via)
-    via="${2:?--via needs a value}"
+    via="$(require_value --via "${2-}")"
     shift
     ;;
   -h | --help)
@@ -58,25 +77,49 @@ scancel-mine: no job-name prefix.
   Set one for this worker (derived from $GANTRY_THREAD_KEY):
     export SLURM_JOB_PREFIX="$(slurm-job-prefix)"
 
-  Refusing to guess: under the shared djrhails uid, a cancel without a name prefix
+  Refusing to guess: under the shared cluster account, a cancel without a name prefix
   would reap every PEER worker's queued compute. To cancel a specific job instead:
     scancel <jobid>
 EOF
   exit 2
 fi
 
+# Same sanitisation slurm-job-prefix applies, so a --prefix override can't smuggle
+# whitespace past the `%j` field assumption the awk match below depends on.
+prefix="${prefix//[^A-Za-z0-9_-]/-}"
+
 # Run a Slurm command locally, or on the login node when this box has no Slurm.
+# ssh joins its argv with spaces and hands ONE string to the remote shell, which
+# re-splits it — so quote each word for that shell, or `-o '%i %j'` arrives as `-o %i`
+# plus a stray `%j` and the job-name column comes back empty.
+# shellcheck disable=SC2029  # client-side quoting is the point
 slurm() {
   if [[ -n "$via" ]]; then
-    ssh "$via" "$@"
+    ssh "$via" "$(printf '%q ' "$@")"
   else
     "$@"
   fi
 }
 
 if [[ -z "$via" ]] && ! command -v squeue >/dev/null 2>&1; then
-  echo "scancel-mine: no squeue on PATH — pass --via <ssh-host> (e.g. ant-cluster, eur-cluster)" >&2
+  echo "scancel-mine: no squeue on PATH — pass --via <ssh-host>" \
+    "(e.g. ant-cluster, eur-cluster)" >&2
   exit 2
+fi
+
+# Capture before filtering, and check the status: `mapfile < <(...)` would discard it
+# (pipefail does not reach into a process substitution), turning a controller outage or
+# an ssh failure into a cheerful "no jobs" and exit 0.
+if ! whoami_out="$(slurm whoami)"; then
+  echo "scancel-mine: could not resolve the cluster user${via:+ on $via}." \
+    "Nothing cancelled." >&2
+  exit 1
+fi
+
+if ! squeue_out="$(slurm squeue -h -u "$whoami_out" -o '%i %j')"; then
+  echo "scancel-mine: squeue failed${via:+ on $via} — cannot determine your jobs." \
+    "Nothing cancelled." >&2
+  exit 1
 fi
 
 # Match the prefix as a LITERAL (index(...)==1), so a prefix containing regex
@@ -85,14 +128,21 @@ fi
 # Strip an optional leading "ck-" first: clusterkit names every job it submits
 # ck-<prefix>-<slug>, so a name-starts-with-prefix test would match none of them.
 # Then require the prefix to end at a component boundary, so prefix "brisk-owl"
-# cannot claim a peer's "brisk-owlet-..." jobs.
+# cannot claim a peer's "brisk-owlet-..." jobs. Note the limit: a peer prefix that
+# extends ours with a HYPHEN ("run-alpha" vs "run-alpha-2") is not separable by name
+# at all, so we rely on gantry slugs being fixed three-word forms, which cannot extend
+# one another. A hand-passed --prefix can; pass the longest prefix you mean.
+# The `prefix != ""` term is belt-and-braces: awk's index(s, "") is 1 for EVERY row, so
+# a regression in the empty-prefix guard above would otherwise cancel the whole account.
 mapfile -t job_ids < <(
-  slurm squeue -h -u "$(slurm whoami)" -o '%i %j' |
-    awk -v prefix="$prefix" '{
+  awk -v prefix="$prefix" '
+    prefix == "" { next }
+    {
       name = $2
       sub(/^ck-/, "", name)
       if (name == prefix || index(name, prefix "-") == 1) print $1
-    }'
+    }
+  ' <<<"$squeue_out"
 )
 
 if [[ ${#job_ids[@]} -eq 0 ]]; then

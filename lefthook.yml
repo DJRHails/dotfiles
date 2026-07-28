@@ -9,3 +9,8 @@ pre-commit:
       run: scripts/check-crypt-patterns.sh
     glassine-check:
       run: glassine check
+    # The scancel guard is a safety control: a bypass in it costs peer workers' queued
+    # compute, and every bypass found so far was a one-line addition to these suites.
+    # Run them here, since the repo has no CI to run them anywhere else.
+    scancel-guard-tests:
+      run: python3 tests/block_unscoped_scancel_test.py && zsh -f tests/scancel-mine.test.zsh
