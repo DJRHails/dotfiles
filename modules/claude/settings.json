@@ -81,6 +81,10 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/block-inline-scripts.sh"
+          },
+          {
+            "type": "command",
+            "command": "python3 ~/.files/modules/claude/hooks/block_unscoped_scancel.py"
           }
         ]
       }
