@@ -116,5 +116,35 @@ check dry-run-cancels-nothing "" "$(grep -c 'REAL SCANCEL CALLED' "$work/err" | 
 env SLURM_JOB_PREFIX=brisk-owl "$scancel_bin" >/dev/null 2>"$work/err2"
 check cancels-explicit-ids "REAL SCANCEL CALLED: 101 102" "$(grep -o 'REAL SCANCEL CALLED: .*' "$work/err2")"
 
+# --- the two derivations must agree END-TO-END, not just in slurm-job-prefix ------------
+# The slug checks above pin the producer in isolation; these drive a NON-SLUG prefix all the
+# way through scancel-mine's matcher. clusterkit names the job with slugify(<raw prefix>),
+# so a consumer matching the raw value selects nothing — and reports it as "no jobs", the
+# reading that sends an operator back to `scancel -u $USER`.
+cat >"$work/bin/squeue" <<'EOF'
+#!/bin/sh
+echo "201 ck-thrd-odd-key-vllm-serve"
+EOF
+chmod +x "$work/bin/squeue"
+ids="$(env SLURM_JOB_PREFIX=thrd_Odd_Key "$scancel_bin" --dry-run 2>&1 | grep -oE '\b201\b' | sort -u)"
+check env-prefix-slugified-before-matching "201" "$ids"
+ids="$(env -u SLURM_JOB_PREFIX "$scancel_bin" --dry-run --prefix "thrd_Odd_Key" 2>&1 | grep -oE '\b201\b' | sort -u)"
+check cli-prefix-slugified-before-matching "201" "$ids"
+
+# --- a queue it could not READ must never look like an empty queue ----------------------
+# mapfile does not observe a process substitution's exit status, so a failing squeue (or a
+# timed-out --via ssh hop) once yielded zero ids and printed "no jobs" with exit 0.
+cat >"$work/bin/squeue" <<'EOF'
+#!/bin/sh
+echo "squeue: error: Unable to contact slurm controller (connect failure)" >&2
+exit 1
+EOF
+chmod +x "$work/bin/squeue"
+out="$(env SLURM_JOB_PREFIX=brisk-owl "$scancel_bin" --dry-run 2>&1)"
+rc=$?
+check squeue-failure-exits-nonzero "1" "$rc"
+check squeue-failure-is-not-no-jobs "" "$(print -r -- "$out" | grep -c 'no jobs with name prefix' | sed 's/^0$//')"
+check squeue-failure-says-so "1" "$(print -r -- "$out" | grep -c 'squeue failed')"
+
 ((fails == 0)) || exit 1
 print "ok"

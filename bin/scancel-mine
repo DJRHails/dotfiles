@@ -9,10 +9,11 @@ set -euo pipefail
 # we standardise on, so this resolves a name prefix to explicit job ids and cancels
 # those — never a user filter.
 #
-# The prefix comes from $SLURM_JOB_PREFIX (see slurm-job-prefix) and there is no
-# fallback: without one, "my jobs" is unknowable and the safe answer is to refuse.
-# Unlike `sqmine`, which falls back to slurm-job-prefix for LISTING, a cancel never
-# guesses.
+# The prefix always resolves through slurm-job-prefix, the ONE place the slug rules
+# live, so a hand-passed --prefix is normalised the same way clusterkit normalises the
+# name it embeds. With nothing to identify a submitter it prints nothing and this
+# refuses: "my jobs" is then unknowable and the safe answer is not to sweep. Unlike
+# `sqmine`, which falls back for LISTING, a cancel never guesses.
 #
 # --help prints the usage block below; it is the single source of that text, so editing
 # it can't desync from the docs the way a line-numbered `sed` range would.
@@ -25,7 +26,7 @@ Usage:
   scancel-mine [--dry-run] [--prefix <p>] [--via <ssh-host>]
 
   --dry-run          list what would be cancelled, cancel nothing
-  --prefix <p>       override $SLURM_JOB_PREFIX
+  --prefix <p>       override $SLURM_JOB_PREFIX (normalised via slurm-job-prefix)
   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
                      required when squeue is not on PATH, e.g. --via ant-cluster
   -h, --help         print this help
@@ -33,7 +34,7 @@ EOF
 }
 
 dry_run=0
-prefix="${SLURM_JOB_PREFIX:-}"
+prefix_override=""
 via=""
 
 # Reject a flag-shaped value: `--prefix --dry-run` would otherwise set prefix to
@@ -51,7 +52,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
   --dry-run) dry_run=1 ;;
   --prefix)
-    prefix="$(require_value --prefix "${2-}")"
+    prefix_override="$(require_value --prefix "${2-}")"
     shift
     ;;
   --via)
@@ -71,12 +72,23 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
+# Resolve the prefix through slurm-job-prefix, the ONE place the slug rules live. Matching
+# on a raw value would reopen the mismatch this path exists to close: clusterkit embeds
+# slugify(<raw prefix>) in the job name, so a pasted mixed-case or underscored --prefix
+# would select nothing and report it as "no jobs". Going through that script also picks up
+# the $GANTRY_THREAD_KEY fallback, so a worker container needs no manual export.
+prefix_bin="${BASH_SOURCE[0]%/*}/slurm-job-prefix"
+[[ -x "$prefix_bin" ]] || prefix_bin="slurm-job-prefix"
+prefix="$(
+  SLURM_JOB_PREFIX="${prefix_override:-${SLURM_JOB_PREFIX:-}}" "$prefix_bin" 2>/dev/null || true
+)"
+
 if [[ -z "$prefix" ]]; then
   cat >&2 <<'EOF'
-scancel-mine: no job-name prefix.
+scancel-mine: no job-name prefix — nothing identifies this submitter.
 
-  Set one for this worker (derived from $GANTRY_THREAD_KEY):
-    export SLURM_JOB_PREFIX="$(slurm-job-prefix)"
+  A worker gets one from $GANTRY_THREAD_KEY automatically. Otherwise name it:
+    scancel-mine --prefix <prefix>     # or: export SLURM_JOB_PREFIX=<prefix>
 
   Refusing to guess: under the shared cluster account, a cancel without a name prefix
   would reap every PEER worker's queued compute. To cancel a specific job instead:
