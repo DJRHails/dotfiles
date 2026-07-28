@@ -142,6 +142,7 @@
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "xhigh",
+  "fastMode": true,
   "skipDangerousModePermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "theme": "dark",
