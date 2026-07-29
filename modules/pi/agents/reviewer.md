@@ -1,4 +1,4 @@
 ---
 name: reviewer
-model: claude-opus-5[fast]
+model: claude-fable-5
 ---
