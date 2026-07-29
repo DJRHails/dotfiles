@@ -36,12 +36,14 @@ The script (mirrors `DJRHails/kb` `bin/r2_upload.py`):
    repo-relative path** (the CDN key is a content hash, so the alt is the only provenance the
    embed keeps); the human description goes in a bold caption line below the image, not in the alt.
 3. Update an existing PR body with the REST API: `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md`.
-   Prefer this over `gh pr edit`, which fails closed under the gantry-injected token: that
-   `GITHUB_TOKEN` is a classic PAT scoped `repo`+`workflow` only, and `gh pr edit` first *reads* the
-   PR through a query carrying a `Team` requested-reviewer fragment (`organization{login}`, `name`,
-   `slug`) that needs `read:org` — so it exits 1 and writes nothing even for a body-only edit on a
-   personal repo. The failure surfaces as GraphQL `INSUFFICIENT_SCOPES` inside an HTTP 200, not a
-   4xx. The REST PATCH needs no extra scope.
+   Prefer this over `gh pr edit`, which fails closed on any host whose token lacks `read:org`: a
+   `GITHUB_TOKEN` scoped `repo`+`workflow` only cannot run the query `gh pr edit` *reads* the PR
+   with, which carries a `Team` requested-reviewer fragment (`organization{login}`, `name`, `slug`)
+   — so it exits 1 and writes nothing even for a body-only edit on a personal repo. The failure
+   surfaces as GraphQL `INSUFFICIENT_SCOPES` inside an HTTP 200, not a 4xx. `read:org` is being
+   added to the injected PAT fleet-wide (see the PR-workflow bullet in `modules/agents/AGENTS.md`);
+   check with `gh auth status`. The REST PATCH stays the better call regardless — one request, no
+   GraphQL preflight, no scope dependency.
 
 When repairing an old/merged PR whose embed is broken (relative path, dead branch blob link),
 upload the bytes the PR actually referenced — `git fetch origin pull/<n>/head` and
