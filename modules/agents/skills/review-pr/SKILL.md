@@ -46,8 +46,9 @@ guard, not attribution polish: workers post through the maintainer's
 token, so the sign-off is the only mark portcullis's echo guard
 (`gantry-signed-feedback-drop`) can key on to drop your own posts
 when they come back as webhooks. An unsigned inline comment or reply
-re-triggers your own run as fake human feedback (the PR #2290 echo
-loop: 11 unsigned thread replies each requested a fresh re-review).
+re-triggers your own run as fake human feedback (the touchstone#2290
+echo loop: 11 unsigned thread replies each requested a fresh
+re-review).
 Skip the sign-off only when `$GANTRY_URL` is empty (interactive use).
 
 ## 0. Right-size the review (do this first)
