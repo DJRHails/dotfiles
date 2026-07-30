@@ -227,3 +227,12 @@ linking to the PR. Include:
 - What was implemented (1-3 bullet points)
 - Key design decisions
 - Link to the PR
+
+**Gantry sign-off:** when running as a gantry worker (`$GANTRY_URL`
+is set), end every body you post — the PR description (§9) and the
+issue comment (§10) — with `_[via gantry](<GANTRY_URL>)_` as the
+last line. It is the mark portcullis's echo guard
+(`gantry-signed-feedback-drop`) keys on; an unsigned comment echoes
+back as a webhook and re-triggers your own run as fake human
+feedback (the touchstone#2290 echo loop). Skip it only when
+`$GANTRY_URL` is empty (interactive use).

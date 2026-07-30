@@ -90,6 +90,14 @@ gh api "repos/$REPO/pulls/$PR_NUM/comments/$COMMENT_ID/replies" \
 gh pr comment "$PR_NUM" --body "$REPLY_TEXT"
 ```
 
+**Gantry sign-off:** when running as a gantry worker (`$GANTRY_URL`
+is set), end every reply body with `_[via gantry](<GANTRY_URL>)_` as
+the last line. It is the mark portcullis's echo guard
+(`gantry-signed-feedback-drop`) keys on — an unsigned reply echoes
+back as a review-comment webhook and re-triggers your own run as fake
+human feedback (the touchstone#2290 echo loop). Skip it only when
+`$GANTRY_URL` is empty (interactive use).
+
 ### Resolve threads (after fixes are pushed)
 
 Only offer to resolve after the user has pushed. Use GraphQL:
