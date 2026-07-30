@@ -37,6 +37,19 @@ are about to send, and wait for explicit user confirmation.
 Execute every step below sequentially without pausing for
 confirmation, except where the shared-repo guard requires it.
 
+**Gantry sign-off — every posted body, not just the summary:** when
+running as a gantry worker (`$GANTRY_URL` is set), end **every** body
+you post to the PR — the review body, each inline finding comment
+(§1), each thread reply (§4), and the summary comment (§5) — with
+`_[via gantry](<GANTRY_URL>)_` as the last line. This is a loop
+guard, not attribution polish: workers post through the maintainer's
+token, so the sign-off is the only mark portcullis's echo guard
+(`gantry-signed-feedback-drop`) can key on to drop your own posts
+when they come back as webhooks. An unsigned inline comment or reply
+re-triggers your own run as fake human feedback (the PR #2290 echo
+loop: 11 unsigned thread replies each requested a fresh re-review).
+Skip the sign-off only when `$GANTRY_URL` is empty (interactive use).
+
 ## 0. Right-size the review (do this first)
 
 Not every PR earns the full agent battery. The fan-out in §1 (five
@@ -177,6 +190,10 @@ Rules:
   about to push to.
 - Keep the `finding:F<n>` token in every body; the resolve step
   depends on it.
+- When the gantry sign-off applies, append it after the
+  `finding:F<n>` token in **each** comment body, and at the end of
+  the review `body` — the sign-off must be the last line (the echo
+  guard anchors on the end of the body).
 
 ## 2. Fix findings
 
@@ -353,6 +370,12 @@ comment and look up that finding's disposition:
   the thread **open** for the author to adjudicate. Only fixes
   auto-resolve.
 
+End every reply body with the gantry sign-off when it applies (e.g.
+`-f body='Fixed in <commit-sha>.
+
+_[via gantry](<GANTRY_URL>)_'`) — unsigned replies echo back as
+review-comment webhooks and re-trigger your own run.
+
 Leave threads with no `finding:` token untouched — they are not ours.
 
 ## 5. PR comment
@@ -385,3 +408,6 @@ Format the comment body as:
 
 [commit SHA and subject line]
 ```
+
+End the summary comment with the gantry sign-off when it applies,
+after any trailing `Verdict:` line your agent contract requires.
