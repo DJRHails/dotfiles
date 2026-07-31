@@ -19,3 +19,18 @@ repos:
         entry: glassine check
         language: system
         pass_filenames: false
+      # The scancel guard is a safety control: a bypass in it costs peer workers' queued
+      # compute, and every bypass found so far was a one-line addition to these suites.
+      # Mirrored from lefthook.yml — this is the path a clone without the ~/.git-hooks
+      # shim takes, and the repo has no CI to run them anywhere else. Kept as two hooks so
+      # a failure in one still reports the other.
+      - id: scancel-hook-tests
+        name: scancel guard hook suite
+        entry: python3 tests/block_unscoped_scancel_test.py
+        language: system
+        pass_filenames: false
+      - id: scancel-mine-tests
+        name: scancel-mine behaviour suite
+        entry: zsh -f tests/scancel-mine.test.zsh
+        language: system
+        pass_filenames: false

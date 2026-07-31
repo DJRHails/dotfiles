@@ -2,9 +2,10 @@
 set -euo pipefail
 # slurm-job-prefix — print THIS worker's Slurm job-name prefix.
 #
-# Under the shared djrhails uid, the job NAME is the only thing that distinguishes one
-# gantry worker's jobs from a peer's, so every job a worker submits should be named
-# "<prefix>-<what>" and every cancel scoped to that prefix (see scancel-mine).
+# Under the shared cluster account, the job NAME is what distinguishes one worker's jobs
+# from a peer's (Slurm also carries --wckey and --comment; name is what squeue and sacct
+# show by default, so it is the one we standardise on). Every job a worker submits should
+# be named "<prefix>-<what>" and every cancel scoped to that prefix (see scancel-mine).
 #
 # The prefix is the gantry thread slug ($GANTRY_THREAD_KEY without its thrd_ tag),
 # which is stable for the life of a run, unique across the fleet, and traceable back to
