@@ -23,7 +23,25 @@ work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 stub="$work/bin"
 mkdir -p "$stub"
-path=("$stub" /usr/bin /bin)
+
+# scancel-mine is `#!/usr/bin/env bash` and uses `mapfile`, a bash 4 builtin. Pinning the
+# path to /usr/bin:/bin alone finds macOS's bash 3.2, where every run exits 127 and the
+# whole suite fails for a reason that has nothing to do with the code under test. Locate a
+# bash that actually has mapfile and put its directory on the pinned path. The pin itself
+# stays — the stubs must shadow real squeue/scancel — so this adds exactly one directory.
+bash_dir=""
+for candidate in $(whence -ap bash) /opt/homebrew/bin/bash /usr/local/bin/bash; do
+  if [[ -x $candidate ]] && "$candidate" -c 'mapfile -t _ < <(:)' 2>/dev/null; then
+    bash_dir="${candidate:A:h}"
+    break
+  fi
+done
+if [[ -z $bash_dir ]]; then
+  print -u2 "scancel-mine tests: no bash with mapfile (bash 4+) found; install one (brew install bash)"
+  exit 2
+fi
+
+path=("$stub" "$bash_dir" /usr/bin /bin)
 unset SLURM_JOB_PREFIX
 
 fails=0
