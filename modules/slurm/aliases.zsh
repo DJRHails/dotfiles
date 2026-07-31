@@ -23,12 +23,24 @@ alias sqdel='scancel'
 # Same name matching as bin/scancel-mine: strip clusterkit's ck- tag, then require the
 # prefix to end at a component boundary (so "brisk-owl" doesn't claim "brisk-owlet-...").
 sqmine() {
+  # Always via slurm-job-prefix, never $SLURM_JOB_PREFIX raw: that script prefers the env
+  # var but slugifies it as clusterkit does when naming the job, so a mixed-case or
+  # underscored value still matches instead of silently listing nothing.
+  #
+  # That makes it a hard dependency, so say when it is missing rather than blaming an unset
+  # SLURM_JOB_PREFIX — setting that cannot help once the raw value is no longer read.
+  if (( ! $+commands[slurm-job-prefix] )); then
+    print -u2 "sqmine: slurm-job-prefix is not on \$PATH — it owns clusterkit's slug rules,"
+    print -u2 "  so setting SLURM_JOB_PREFIX cannot help; fix \$PATH, or use sqme to list"
+    print -u2 "  every job under this (shared) uid"
+    return 1
+  fi
   # Declare separately so the assignment's exit status is testable: `local x="$(cmd)"`
   # masks cmd's failure. Don't fall through to an empty prefix either — awk's
   # index(s, "") is 1 for every row, so the filter would silently become "list
   # everything" (or, one refactor away in scancel-mine, "cancel everything").
   local prefix
-  if ! prefix="${SLURM_JOB_PREFIX:-$(slurm-job-prefix)}" || [[ -z $prefix ]]; then
+  if ! prefix="$(slurm-job-prefix 2>/dev/null)" || [[ -z $prefix ]]; then
     print -u2 "sqmine: nothing identifies this submitter — set SLURM_JOB_PREFIX, or use sqme to list every job under this (shared) uid"
     return 1
   fi
