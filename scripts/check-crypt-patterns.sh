@@ -24,7 +24,14 @@ cd "$repo_root"
 
 # Collect all .gitattributes files (excluding .git internals and all of .data/
 # — worktrees live at .data/worktrees/ and carry their own .gitattributes copy)
-mapfile -t attr_files < <(
+# A read loop, not `mapfile`: that is a bash 4+ builtin, and `#!/usr/bin/env bash` resolves to
+# macOS's bash 3.2 whenever /usr/bin precedes a newer bash on PATH. The hook then died with
+# "mapfile: command not found" (exit 127), which lefthook reports as a FAILED pre-commit — blocking
+# every commit on that machine while looking like the crypt check itself had tripped.
+attr_files=()
+while IFS= read -r attr_file; do
+  attr_files+=("$attr_file")
+done < <(
   find . -name .gitattributes -type f \
     -not -path "./.git/*" \
     -not -path "./.data/*" \
