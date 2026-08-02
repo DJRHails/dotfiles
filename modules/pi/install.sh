@@ -51,4 +51,12 @@ if platform::command_exists "pi"; then
   log::execute \
     "pi install npm:@narumitw/pi-goal" \
     "pi-goal"
+
+  log::execute \
+    "pi install npm:pi-web-access" \
+    "pi-web-access"
+
+  log::execute \
+    "pi install npm:@tintinweb/pi-tasks" \
+    "pi-tasks"
 fi
