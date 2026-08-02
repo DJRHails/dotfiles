@@ -6,11 +6,12 @@
     "git:github.com/DJRHails/pi-cc-patch",
     "npm:@ff-labs/pi-fff",
     "npm:pi-web-access",
-    "npm:@narumitw/pi-goal"
+    "npm:@narumitw/pi-goal",
+    "npm:@tintinweb/pi-tasks"
   ],
-  "lastChangelogVersion": "0.82.0",
+  "lastChangelogVersion": "0.83.0",
   "defaultProvider": "anthropic-api",
-  "defaultModel": "claude-opus-5[fast]",
+  "defaultModel": "claude-fable-5",
   "defaultThinkingLevel": "xhigh",
   "theme": "dark"
 }
