@@ -80,8 +80,8 @@ connected count climb), then `--retitle`. Stubborn stragglers: reconnect by hand
   zellij status bar (`Zellij (cmux-<host>-<id>)`) via `cmux read-screen` — needed for nested
   surfaces AND locally-resumed ones, whose tab title goes stale at the deleted wrapper's name.
 - **Idle leftover surfaces.** A racy pass can leave empty `cmux-trifle-*` surfaces. Don't blind-close
-  them — the user's live local sessions (e.g. a running Claude tab) are also `cmux-trifle-*`. Confirm
-  via `cmux read-screen` (a connected one shows `Zellij (cmux-<host>-...)`) before closing any.
+  them — the user's live local sessions (e.g. a running Claude tab) are also `cmux-trifle-*`. Use
+  `scripts/clean-empty-surfaces.py` (below) rather than eyeballing `cmux read-screen`.
 - **TMPDIR and zellij.** All local `zellij` invocations (list-sessions, dump-layout, delete-session,
   attach) must run with `TMPDIR=/tmp` or they silently see zero sessions / delete nothing. The
   script forces this; auto-attach.zsh's hop husk-delete was silently failing for exactly this
@@ -89,6 +89,105 @@ connected count climb), then `--retitle`. Stubborn stragglers: reconnect by hand
 - **`cmux rpc` is gone.** Old tooling (`~/.config/cmux/snapshots/sort_bonbon.py`) used it and a
   `wrap-<session>` nesting convention; this script uses the current CLI (`workspace create`,
   `new-surface`, `send`, `rename-tab`, `read-screen`) instead.
+
+## Cleaning empty surfaces after a rebuild
+A rebuild leaves behind roughly as many junk surfaces as real ones (one pass here went 58 → 26).
+`scripts/clean-empty-surfaces.py` finds and closes them:
+
+```bash
+python3 scripts/clean-empty-surfaces.py                      # report only (default)
+python3 scripts/clean-empty-surfaces.py --close              # close everything classified empty
+python3 scripts/clean-empty-surfaces.py --close --keep a,b   # …but spare these zellij sessions
+```
+
+Three kinds of junk, which look *opposite* on screen but are equally empty:
+
+- **dead husk** — the pre-restart surface whose terminal exited; `cmux read-screen` is blank. Its
+  resume binding still names the session it used to hold, and that session is normally live again
+  on the NEW surface the rebuild made, so the husk is a pure duplicate.
+- **bare wrapper** — a LIVE local auto-attach wrapper (`Zellij (cmux-<local>-…)`) sitting at a bare
+  shell. The screen looks *busy* (zellij status bar, starship, direnv noise) but the pane tree runs
+  nothing.
+- **fresh agent** — a `pi`/`claude` that started but was never used. It defeats both other tests:
+  the process tree sees a live agent (meaningful) and the screen is far from blank.
+
+**Judge by process tree, never by screen text** — for the first two. Screen text calls a bare
+wrapper "live" and a detached-but-working session "empty"; the pane process tree (reusing
+`rebuild-durable.py`'s `local_meaningful()`, the `zellij::sweep-husks` rule) gets both right.
+
+**The fresh-agent case needs the usage line, and only the usage line.** `0% │ ↑0 ↓0 │ $0` means no
+tokens have ever been exchanged; a real session reads `31% │ ↑374 ↓134k`. Two tempting signals are
+both WRONG: the startup banner still renders *above* a restored conversation, and a fresh session
+*does* mint a session UUID — a rule keyed on "banner and no UUID" fires on the wrong sessions in
+both directions. This check runs BEFORE the remote/local split, because a remote agent is invisible
+to the local process-tree test and would otherwise get an unconditional keep. It doubles as the
+context-% readout in the report.
+
+Surfaces holding a remote mosh session, or a local session running real work, are otherwise kept.
+
+### Gotchas
+- **`--keep` the sessions you just resurrected.** A resurrected EXITED skeleton comes back as
+  layout + cwd + scrollback with FRESH shells — no work running yet — so it is indistinguishable
+  from a bare wrapper by the process-tree test. Without `--keep` the cleanup silently undoes the
+  resurrection you just performed.
+- **Close by UUID, not short ref.** Closing renumbers `surface:N` refs mid-loop; the script resolves
+  every UUID up front from one `cmux tree --all --id-format both` snapshot.
+- **Never close the caller.** The script always skips `$CMUX_SURFACE_ID` — closing it kills the
+  agent session doing the cleaning.
+- **A refused close looks like a successful one.** cmux reports close failures on **stderr with a
+  non-zero exit while stdout stays EMPTY**, so a stdout-only helper prints `closed <surface>` for a
+  close that errored. Use `cmux_checked()`, which folds in stderr and checks the return code.
+- **cmux won't close a workspace's last surface** — `Error: invalid_state: Cannot close the last
+  surface`. The script escalates automatically: on *that specific* message it closes the workspace
+  instead, since a workspace whose only surface is empty holds nothing but its own name. It
+  re-counts surfaces first (a concurrent rebuild pass can add one), and only that message
+  escalates — any other error stays a reported failure rather than becoming a workspace deletion.
+  Consequence: an empty workspace's NAME is not preserved. If a name is worth keeping, keep a real
+  surface in it.
+
+## Recovering what a dead skeleton was working on
+Resurrecting an EXITED skeleton restores layout + cwd + a FRESH shell and **nothing else** — no
+processes, and `pane_content` in the serialized metadata is only geometry, not scrollback. So a
+resurrected skeleton reads as "dead" even though the attach succeeded. Do not chase skeletons when
+what you actually want is the work.
+
+What *is* serialized is each **pane title**, and `pi` sets it to `π - <task> - <repo>`. That turns
+an anonymous pile of dead sessions into an index of lost work. zellij cannot `dump-layout` an
+EXITED session, so read the file directly:
+
+```bash
+CACHE=~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info
+rg -o '^\s+title "(.*)"' "$CACHE/<session>/session-metadata.kdl"
+```
+
+Then map title → resumable session id in pi's own store
+(`~/.pi/agent/sessions/<project-cwd-with-slashes-as-dashes>/<ts>_<uuid>.jsonl`) and resume with
+`pi --session <uuid>`. Two traps: **pi RENAMES a session as the task evolves**, so scan every
+`"name":` record rather than stopping at the first `session_info`; and most `[subagent] …` titles
+are ephemeral pi workers, not sessions worth restoring (36 touchstone skeletons collapsed to 6 real
+sessions). `resurrect` (`~/.local/bin/resurrect`) is claude-transcript-based and will not see pi
+work at all.
+
+## Moving a pi session to another host
+pi keys a session to a project by the DIRECTORY it lives in, so migrating means placing the file in
+the target's project dir and rewriting the `cwd` in its first `{"type":"session"}` line. Leave
+historical paths inside tool output alone — they are a record, not live state. The copies then
+diverge: new work on the target does not appear on the source.
+
+- **Check the format loads on the target FIRST.** Hosts drift (trifle 0.82.0 vs taffy 0.80.6 for
+  `version 3` sessions). `pi --export <session-file>` loads and exits — a compatibility test that
+  needs no TTY. Note `--export` takes the session file as INPUT, not an output path.
+- **`zellij action write-chars` is silently dropped** against a session with no attached client, so
+  you cannot pre-create a detached session and type a command into it — it reports success and does
+  nothing. Declare the command in a **layout** instead, so the agent is the session's own process:
+  `layout { pane command="pi" cwd="<repo>" { args "--session" "<uuid>" } }`, started with
+  `zellij --session <name> --new-session-with-layout <path>`.
+- **Use the remote's ABSOLUTE paths in anything sent through mosh.** `$HOME` in a `cmux send` is
+  expanded by the LOCAL shell before mosh runs, so the remote receives `/Users/dh/…` and zellij
+  exits instantly.
+- **Sessions created that way are invisible to connected-detection** unless it matches
+  `zellij --session` as well as `zellij attach` (fixed in `REMOTE_CONN`). Otherwise the next rebuild
+  pass judges them disconnected and mints duplicate surfaces.
 
 ## Restart survival — resume bindings
 What "a restart" does to sessions:
