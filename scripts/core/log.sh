@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
 log::error() {
-    log::red "   [✖] $1 $2\n"
+    # $2 is an optional continuation line; default it so a one-argument call
+    # doesn't abort a caller running under `set -u`.
+    log::red "   [✖] $1 ${2:-}\n"
 }
 
 log::spinner() {
