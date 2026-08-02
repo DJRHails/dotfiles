@@ -13,7 +13,10 @@ Host *.trycloudflare.com
 	HostName %h
 	User root
 	Port 22
-	ProxyCommand /usr/local/bin/cloudflared access ssh --hostname %h
+	# Resolved from PATH, which ssh passes through to the ProxyCommand shell:
+	# an absolute path matches neither brew on Apple Silicon (/opt/homebrew/bin)
+	# nor apt (/usr/bin).
+	ProxyCommand cloudflared access ssh --hostname %h
 
 # GPU VMs via bonbon relay (on-demand RunPod pods)
 Host gpu
