@@ -157,6 +157,20 @@ check real-git-before-python "0" "$(before git python)"
 check real-python-before-zellij "0" "$(before python zellij)"
 check real-go-before-claude "0" "$(before go claude)"
 check real-node-before-pi "0" "$(before node pi)"
+# git appends a `Host github.com` block to ~/.ssh/config; linking the ssh
+# module afterwards backs that file aside and loses the block.
+check real-ssh-before-git "0" "$(before ssh git)"
+check real-ssh-before-gpu-vm "0" "$(before ssh gpu-vm)"
+check real-node-before-claude "0" "$(before node claude)"
+check real-python-before-claude "0" "$(before python claude)"
+check real-python-before-agents "0" "$(before python agents)"
+
+# Selecting claude alone drags in its whole transitive closure.
+claude_closure="$(DOTFILES="$repo_root" resolve claude)"
+for required in go node python git rust ssh; do
+  check "claude-closure-has-$required" "0" \
+    "$([[ " $claude_closure " == *" $required "* ]] && echo 0 || echo 1)"
+done
 
 # The --cli set gains exactly the modules its dependencies require.
 cli_order="$(DOTFILES="$repo_root" resolve zsh ssh git python node piknik tailscale \

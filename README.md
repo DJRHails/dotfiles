@@ -85,8 +85,28 @@ module that doesn't exist, or a cycle:
    [✖]   unresolvable modules: claude go
 ```
 
-Current edges: `claude → go`, `pi → node`, `python → git`, `git → rust`,
-`zellij → python`, `execblock → python`, `explaincron → python`.
+Current edges:
+
+| Module       | Needs           | Why
+| ------------ | --------------- | ---
+| `agents`     | `python`        | `skills/` ships `uv run` and `python3` entrypoints.
+| `claude`     | `go`            | `install.sh` installs `ant` with `install::go_tool`.
+| `claude`     | `node`          | `mcp.json` launches playwriter and context7 with `npx`.
+| `claude`     | `python`        | `settings.json` registers four `python3 .../hooks/*.py` hooks.
+| `execblock`  | `python`        | `bin/execblock` runs `uv run`.
+| `explaincron`| `python`        | `bin/explaincron` builds its venv with `python3 -m venv`.
+| `git`        | `rust`          | `setup.sh` seeds `~/.git-template` with `prek`, a cargo tool.
+| `git`        | `ssh`           | `setup.github.sh` appends to `~/.ssh/config`, a symlink the ssh module owns.
+| `gpu-vm`     | `ssh`           | The `Host gpu*` stanzas live in `modules/ssh/config.tmpl`.
+| `pi`         | `node`          | `install.sh` uses `npm install -g`.
+| `python`     | `git`           | `install.sh` writes `init.templateDir` into `~/.gitconfig.local`.
+| `zellij`     | `python`        | `install.*.sh` installs `humane` with `uv tool install`.
+
+Shipping a `*.zsh` fragment is deliberately **not** an edge: `zshrc` globs
+`$DOTFILES/modules/*/*.zsh` over the repo tree at shell startup, so nothing is
+resolved at install time and 13 identical `→ zsh` edges would make `zsh` a
+mandatory graph root that buries the real ordering constraints.
+
 Run `bash tests/module-deps.test.sh` to check the graph still resolves.
 
 ## :zap: Inspired by
