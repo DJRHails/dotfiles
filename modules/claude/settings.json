@@ -14,7 +14,6 @@
     "deny": [
       "Bash(rm -rf *)",
       "Bash(rm -fr *)",
-      "Bash(sudo *)",
       "Bash(mkfs *)",
       "Bash(dd *)",
       "Bash(curl *|bash*)",
