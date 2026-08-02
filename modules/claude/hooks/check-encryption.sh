@@ -54,13 +54,24 @@ content_signature() {
     fi
 }
 
-# Build content signatures of encrypted files
-declare -A ENCRYPTED_SIGNATURES
+# Build content signatures of encrypted files, as tab-delimited "<sig>\t<file>" lines rather than
+# an associative array: `declare -A` is bash 4+, and the shebang is /bin/bash, which on macOS is
+# always 3.2. It failed with "declare: -A: invalid option", and because this runs as a PreToolUse
+# hook that non-zero exit blocked every `git commit`/`git add` the agent attempted.
+ENCRYPTED_SIGNATURES=""
 while IFS= read -r file; do
     [[ -z "$file" || ! -f "$file" ]] && continue
     sig=$(content_signature "$file")
-    ENCRYPTED_SIGNATURES["$sig"]="$file"
+    ENCRYPTED_SIGNATURES="${ENCRYPTED_SIGNATURES}${sig}	${file}
+"
 done <<< "$ENCRYPTED_FILES"
+
+# Signatures are md5 hex, so the first tab always ends the key; take the rest of the line verbatim
+# so filenames containing tabs survive.
+signature_owner() {
+    printf '%s' "$ENCRYPTED_SIGNATURES" \
+        | awk -v want="$1" 'index($0, want "\t") == 1 { print substr($0, length(want) + 2); exit }'
+}
 
 # Function to check if path matches any crypt pattern
 matches_crypt_pattern() {
@@ -93,8 +104,8 @@ while IFS= read -r file; do
     # Check if this file's content matches any encrypted file
     sig=$(content_signature "$file")
 
-    if [[ -n "${ENCRYPTED_SIGNATURES[$sig]:-}" ]]; then
-        original="${ENCRYPTED_SIGNATURES[$sig]}"
+    original=$(signature_owner "$sig")
+    if [[ -n "$original" ]]; then
         # A file matching itself is inside the boundary by definition
         # (ENCRYPTED_FILES only lists files the glassine attribute covers)
         [[ "$original" == "$file" ]] && continue
