@@ -96,7 +96,7 @@ create_links() {
   # shellcheck disable=SC2034
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
-  if [ -f $symlink_file ]; then
+  if [ -f "$symlink_file" ]; then
     log::subheader "Creating symbolic links for '${module_dir##*/}'"
     link::extract_and_link "$symlink_file"
   fi
@@ -107,6 +107,7 @@ main() {
   . "scripts/core/main.sh"
   . "scripts/scan.sh"
   . "scripts/link.sh"
+  . "scripts/deps.sh"
 
   # Check if we need help
   doc::maybe_help "$@"
@@ -159,6 +160,13 @@ main() {
 
   # Grab modules
   scan::find_valid_modules
+
+  # Order by declared dependencies (modules/*/deps.conf), pulling in modules
+  # that are required but weren't selected. Must run after the Bash 4 check —
+  # the resolver needs associative arrays. An unresolvable graph aborts rather
+  # than installing in an arbitrary order.
+  log::header "Resolving module dependencies"
+  deps::resolve_order || exit 1
 
   log::header "Installing $(log::bold "${#scanned_valid_modules[@]} modules")"
 

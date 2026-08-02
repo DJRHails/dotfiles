@@ -59,6 +59,36 @@ cd ~/.files
 | `zellij`                | Zellij terminal multiplexer with durable remote sessions.
 | :sparkle: `zsh`         | zsh, aliases, completion, and the glue that loads every module's `*.zsh`.
 
+### Dependencies
+
+A module declares what it needs in its own `deps.conf` — one module name per
+line, `#` comments and blank lines ignored:
+
+```bash
+# modules/claude/deps.conf
+# install.sh installs `ant` with install::go_tool, which needs the go toolchain.
+go
+```
+
+`bootstrap.sh` resolves those declarations before installing anything:
+dependencies are pulled in even when you didn't select them (`./bootstrap.sh
+claude` also installs `go`), and the install order is topologically sorted so a
+module always runs after everything it depends on. Modules with no dependency
+relationship keep the order you asked for.
+
+Resolution failures abort the run rather than degrade — a dependency naming a
+module that doesn't exist, or a cycle:
+
+```
+   [✖] module dependencies cannot be resolved (cycle detected)
+   [✖]   claude -> go -> claude
+   [✖]   unresolvable modules: claude go
+```
+
+Current edges: `claude → go`, `pi → node`, `python → git`, `git → rust`,
+`zellij → python`, `execblock → python`, `explaincron → python`.
+Run `bash tests/module-deps.test.sh` to check the graph still resolves.
+
 ## :zap: Inspired by
 - [@holman](https://github.com/holman/dotfiles)
 - [@alrra](https://github.com/alrra/dotfiles)
