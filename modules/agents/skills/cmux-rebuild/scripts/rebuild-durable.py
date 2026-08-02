@@ -59,7 +59,8 @@ REMOTE_CONN = (
     r"""for(i=1;i<=NF;i++)if($i ~ /:[0-9]+$/){n=split($i,a,":");p=a[n]} """
     r"""if(match($0,/pid=[0-9]+/))pid=substr($0,RSTART+4,RLENGTH-4); if(p!="")print p,pid}' """
     r"""| while read -r pp pid; do case "$lp" in *" $pp "*) pgrep -af mosh-server """
-    r"""| sed -nE "s/^$pid .*zellij attach (-c )?(cmux-[A-Za-z0-9_-]+).*/\2/p";; esac; done"""
+    r"""| sed -nE "s/^$pid .*zellij (attach (-c )?|--session )(cmux-[A-Za-z0-9_-]+).*/\3/p";; """
+    r"""esac; done"""
 )
 
 # Pane processes that do NOT make a session meaningful (zellij::sweep-husks' filter): zellij
