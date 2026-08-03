@@ -2,14 +2,14 @@
 #
 # Naming:
 #   ssh::self      — the name this host advertises to a UI host's SSH
-#   ssh::ui_host   — the first UI-capable host (cursor/vscode)
+#   ssh::ui_host   — the first UI-capable host (runs VS Code)
 #   ssh::open_url  — `open <url>` on a remote macOS host
 #   path::abs      — resolve an absolute path on the local FS
 #
 # Configuration (set in ~/.zshrc.local to override defaults):
 #   CODE_UI_HOSTS   — array of UI-capable hosts, first wins. Default: (trifle)
 #   CODE_LOCAL_HOST — override $(hostname -s) for ssh-remote+ identity
-#   CODE_URL_SCHEME — cursor | vscode. Default: cursor
+#   CODE_URL_SCHEME — editor URL scheme for remote-open. Default: vscode
 
 typeset -ga CODE_UI_HOSTS
 [[ ${#CODE_UI_HOSTS[@]} -eq 0 ]] && CODE_UI_HOSTS=(trifle)
