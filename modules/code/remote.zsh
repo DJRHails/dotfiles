@@ -1,8 +1,8 @@
-# Host-aware `code`: opens Cursor/VS Code on a UI-capable host, with
+# Host-aware `code`: opens VS Code on a UI-capable host, with
 # Remote-SSH pointed back at the current host's filesystem.
 #
 # On the UI host itself, falls through to the real `code` binary
-# (on macOS that's typically Cursor's wrapper at /usr/local/bin/code).
+# (on macOS that's VS Code's CLI at /usr/local/bin/code).
 #
 # Depends on helpers from modules/ssh/lib.zsh: ssh::self, ssh::ui_host,
 # ssh::open_url, path::abs.
@@ -23,7 +23,7 @@ code() {
     return $?
   fi
 
-  scheme="${CODE_URL_SCHEME:-cursor}"
+  scheme="${CODE_URL_SCHEME:-vscode}"
   if [[ -n "$root" && -f "$abs" && "$abs" != "$root" ]]; then
     ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${root}"
     ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${abs}"
