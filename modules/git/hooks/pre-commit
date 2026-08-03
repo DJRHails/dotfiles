@@ -1,0 +1,47 @@
+#!/bin/sh
+# Global pre-commit hook: runs every hook manager the repo actually configures.
+#
+# Installed by modules/git/symlinks.conf as a SYMLINK at ~/.git-hooks/pre-commit, which
+# gitconfig.local points core.hooksPath at. The symlink is deliberate: an installer that
+# overwrites the hook writes through it and dirties this tracked file, so `git status` in
+# the dotfiles repo surfaces the damage instead of it going unnoticed for weeks.
+#
+# Both managers run when both are configured, and the worst status wins. An earlier
+# dispatcher `exec`ed the first match, which silently starved lefthook in any repo carrying
+# both .pre-commit-config.yaml and lefthook.yml — this repo does. Structure mirrors the
+# sibling pre-push hook; there is no stdin to replay, since git gives pre-commit none.
+#
+# Why this is tracked at all: `lefthook install` regenerates the hook with a lefthook-only
+# version that drops the prek delegation, and because core.hooksPath is global, running it
+# in ONE repo disables prek's pre-commit hooks in EVERY repo — secret scanning included.
+# That happened on 2026-08-03 and went unnoticed because commits still succeeded, silently.
+# If pre-commit hooks stop running everywhere, check this file first.
+
+status=0
+
+dir="$(git rev-parse --show-toplevel 2>/dev/null)"
+
+# prek (Rust, drop-in pre-commit replacement) or pre-commit (Python)
+if [ -f "$dir/.pre-commit-config.yaml" ]; then
+  if command -v prek >/dev/null 2>&1; then
+    prek run --hook-stage pre-commit || status=$?
+  elif command -v pre-commit >/dev/null 2>&1; then
+    pre-commit run --hook-stage pre-commit || status=$?
+  else
+    printf >&2 "\033[33m⚠ .pre-commit-config.yaml found but no runner installed. Run: uv tool install prek\033[0m\n"
+  fi
+fi
+
+# lefthook (Go). Checked against every config name lefthook itself looks for.
+for name in lefthook.yml lefthook.yaml .lefthook.yml .lefthook.yaml .config/lefthook.yml .config/lefthook.yaml; do
+  if [ -f "$dir/$name" ]; then
+    if command -v lefthook >/dev/null 2>&1; then
+      lefthook run pre-commit || status=$?
+    else
+      printf >&2 "\033[33m⚠ %s found but 'lefthook' not installed. Run: brew install lefthook\033[0m\n" "$name"
+    fi
+    break
+  fi
+done
+
+exit $status
