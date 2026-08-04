@@ -48,9 +48,6 @@ if [[ -z $bash_dir ]]; then
 fi
 
 path=("$stub" "$bash_dir" /usr/bin /bin)
-# slurm-job-prefix falls back to $GANTRY_THREAD_KEY, so on a gantry worker the
-# "no prefix anywhere" case resolves a prefix unless that is cleared too.
-unset SLURM_JOB_PREFIX GANTRY_THREAD_KEY
 
 fails=0
 check() {
