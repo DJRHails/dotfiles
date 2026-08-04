@@ -48,7 +48,6 @@ if [[ -z $bash_dir ]]; then
 fi
 
 path=("$stub" "$bash_dir" /usr/bin /bin)
-unset SLURM_JOB_PREFIX
 
 fails=0
 check() {
