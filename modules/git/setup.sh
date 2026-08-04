@@ -77,6 +77,18 @@ else
 fi
 github::install_cli
 
+# gh-stack: GitHub's official stacked-PR extension (needs gh >= 2.90 and an
+# authenticated gh — extension installs clone through the API).
+if ! platform::command_exists gh; then
+  log::warning "gh not on PATH; skipping gh-stack extension"
+elif gh extension list 2> /dev/null | grep -q 'github/gh-stack'; then
+  log::success "gh-stack extension"
+elif gh auth status > /dev/null 2>&1; then
+  log::execute "gh extension install github/gh-stack" "gh-stack extension"
+else
+  log::warning "gh not authenticated; skipping gh-stack extension (gh extension install github/gh-stack)"
+fi
+
 # Hook enforcement: point init.templateDir at ~/.git-template and populate it
 # with prek's pre-commit shim, so every future clone/init gets hooks — the
 # shim no-ops in repos without a pre-commit config. Then install hooks for
