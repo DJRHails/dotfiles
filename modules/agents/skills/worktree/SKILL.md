@@ -1,6 +1,6 @@
 ---
 name: worktree
-description: Manage git worktrees — setup, cleanup, and recovery. Use when the user asks to clean up, prune, create, or sync worktrees, create worktrees for open PRs, or create a worktree — and whenever a git command inside a worktree fails with "fatal: not a git repository ... .git/worktrees/<name>" (dangling worktree; recover in place, do not delete it). Also load proactively when the session starts inside a worktree (working directory contains .data/worktrees/).
+description: 'Manage git worktrees — setup, cleanup, and recovery. Use when the user asks to clean up, prune, create, or sync worktrees, create worktrees for open PRs, or create a worktree — and whenever a git command inside a worktree fails with "fatal: not a git repository ... .git/worktrees/<name>" (dangling worktree; recover in place, do not delete it). Also load proactively when the session starts inside a worktree (working directory contains .data/worktrees/).'
 ---
 
 # Worktree Management

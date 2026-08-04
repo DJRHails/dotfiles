@@ -12,12 +12,16 @@ Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) 
 - **Replace, don't deprecate** - When a new implementation replaces an old one, remove the old one entirely. No backward-compatible shims, dual config formats, or migration paths. Proactively flag dead code.
 - **Verify at every level** - Set up automated guardrails (linters, type checkers, pre-commit hooks, tests) as the first step, not an afterthought. Prefer structure-aware tools (ast-grep, LSPs, compilers) over text pattern matching.
 - **Bias toward action** - Decide and move for anything easily reversed; state your assumption so the reasoning is visible. Ask before committing to interfaces, data models, architecture, or destructive operations. When given a bug report, just fix it — don't ask for hand-holding. Point at logs, errors, failing tests, then resolve them. Zero context switching required from the user.
-- **Confirm before contacting other humans** - Any action that delivers a message to someone other than me — sending email, posting Slack into a channel/DM with anyone else in it, creating or updating a calendar event with attendees (or `--send-updates` anything other than `none`), opening/commenting/merging GitHub PRs and issues, posting to Linear/Notion/Jira where teammates are notified, or any webhook/API call that reaches a person — requires you to first post a short summary (recipients, subject/title, body, timing) and then wait for my explicit "yes" / "send it" / "go ahead". My initial request ("send the invite to X", "reply to this email", "message Alice") is the trigger, not the authorization. Drafts and local-only artifacts that don't notify anyone are exempt. **Exempt: GitHub PRs and issues on my own personal repos (`github.com/DJRHails/*`) — open, comment, and merge them freely without a confirmation step, since they're solo repos that notify no one else.** The confirmation step still applies to repos in shared orgs (e.g. `safety-research`) or any repo with other collaborators. **Also exempt: the `hails-talk` Slack workspace (`hails-talk.slack.com`, team `Hails`) is solo — only me and my own bots (e.g. `sage_saint`) — so post / reply / edit / react there freely without confirmation, including with `--yes`. This is the slack skill in bot mode via `$SLACK_BOT_TOKEN` (sourced from the touchstone `.env`; that token is scoped to this one workspace).** Any OTHER Slack workspace (Anthropic / fellows Enterprise Grid, etc.) still requires the summary + explicit confirmation.
+- **Confirm before contacting other humans** - Any action that delivers a message to someone other than me — sending email, posting Slack into a channel/DM with anyone else in it, creating or updating a calendar event with attendees (or `--send-updates` anything other than `none`), opening/commenting/merging GitHub PRs and issues, posting to Linear/Notion/Jira where teammates are notified, or any webhook/API call that reaches a person — requires you to first post a short summary (recipients, subject/title, body, timing) and then wait for my explicit "yes" / "send it" / "go ahead". My initial request ("send the invite to X", "reply to this email", "message Alice") is the trigger, not the authorization. Drafts and local-only artifacts that don't notify anyone are exempt. **Exempt: GitHub PRs and issues on my own personal repos (**`github.com/DJRHails/`***) — open, comment, and merge them freely without a confirmation step, since they're solo repos that notify no one else.** The confirmation step still applies to repos in shared orgs (e.g. `safety-research`) or any repo with other collaborators. **Also exempt: the** `hails-talk` **Slack workspace (**`hails-talk.slack.com`**, team** `Hails`**) is solo — only me and my own bots (e.g.** `sage_saint`**) — so post / reply / edit / react there freely without confirmation, including with** `--yes`**. This is the slack skill in bot mode via** `$SLACK_BOT_TOKEN` **(sourced from the touchstone** `.env`**; that token is scoped to this one workspace).** Any OTHER Slack workspace (Anthropic / fellows Enterprise Grid, etc.) still requires the summary + explicit confirmation.
 - **Finish the job** - Handle the edge cases you can see. Clean up what you touched. If something is broken adjacent to your change, flag it. But don't invent new scope.
 - **Falsify, first** - When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
 - **Prove it works** - Never mark a task complete without demonstrating correctness. Run tests, check logs, diff behavior. Ask: "Would a staff engineer approve this?"
 
+
+
 ## Code Quality
+
+
 
 ### Hard limits
 
@@ -26,6 +30,8 @@ Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) 
 3. 100-char line length
 4. Absolute imports only — no relative (`..`) paths
 5. Google-style docstrings on non-trivial public APIs
+
+
 
 ### Regex convention
 
@@ -55,6 +61,8 @@ def normalize(x: Float[np.ndarray, "batch features"]) -> Float[np.ndarray, "batc
     ...
 ```
 
+
+
 ### Zero warnings policy
 
 Fix every warning from every tool — linters, type checkers, compilers, tests. If a warning truly can't be fixed, add an inline ignore with a justification comment. Never leave warnings unaddressed.
@@ -69,6 +77,8 @@ Code should be self-documenting. No commented-out code—delete it. If you need 
 - Never swallow exceptions silently
 - Include context (what operation, what input, suggested fix)
 
+
+
 ### Testing
 
 - **Test behavior, not implementation.** If a refactor breaks your tests but not your code, the tests were wrong.
@@ -76,23 +86,27 @@ Code should be self-documenting. No commented-out code—delete it. If you need 
 - **Mock boundaries, not logic.** Only mock things that are slow, non-deterministic, or external services you don't control.
 - **Verify tests catch failures.** Break the code, confirm the test fails, then fix.
 
+
+
 ## Development
 
 When adding dependencies, CI actions, or tool versions, always look up the current stable version — never assume from memory.
 
 ### CLI tools
 
-| tool           | replaces   | usage                                                                     |
-| -------------- | ---------- | ------------------------------------------------------------------------- |
-| `rg` (ripgrep) | grep       | `rg "pattern"` - fast regex search                                        |
-| `fd`           | find       | `fd "*.py"` - fast file finder                                            |
-| `ast-grep`     | -          | `ast-grep --pattern '$FUNC($$$)' --lang py` - AST-based code search       |
-| `shellcheck`   | -          | `shellcheck script.sh` - shell script linter                              |
-| `shfmt`        | -          | `shfmt -i 2 -w script.sh` - shell formatter                               |
-| `actionlint`   | -          | `actionlint .github/workflows/` - GitHub Actions linter                   |
-| `zizmor`       | -          | `zizmor .github/workflows/` - Actions security audit                      |
-| `prek`         | pre-commit | `prek run` - fast git hooks (Rust, no Python)                             |
-| `trash`        | rm         | `trash file` - moves to the OS trash (recoverable). **Never use `rm -rf`** |
+
+| tool           | replaces   | usage                                                                      |
+| -------------- | ---------- | -------------------------------------------------------------------------- |
+| `rg` (ripgrep) | grep       | `rg "pattern"` - fast regex search                                         |
+| `fd`           | find       | `fd "*.py"` - fast file finder                                             |
+| `ast-grep`     | -          | `ast-grep --pattern '$FUNC($$$)' --lang py` - AST-based code search        |
+| `shellcheck`   | -          | `shellcheck script.sh` - shell script linter                               |
+| `shfmt`        | -          | `shfmt -i 2 -w script.sh` - shell formatter                                |
+| `actionlint`   | -          | `actionlint .github/workflows/` - GitHub Actions linter                    |
+| `zizmor`       | -          | `zizmor .github/workflows/` - Actions security audit                       |
+| `prek`         | pre-commit | `prek run` - fast git hooks (Rust, no Python)                              |
+| `trash`        | rm         | `trash file` - moves to the OS trash (recoverable). **Never use** `rm -rf` |
+
 
 Prefer `ast-grep` over ripgrep when searching for code structure (function calls, class definitions, imports). Use ripgrep for literal strings and log messages.
 
@@ -100,12 +114,14 @@ Prefer `ast-grep` over ripgrep when searching for code structure (function calls
 
 **Runtime:** 3.13 with `uv venv`
 
+
 | purpose       | tool                         |
 | ------------- | ---------------------------- |
 | deps & venv   | `uv`                         |
 | lint & format | `ruff check` / `ruff format` |
 | static types  | `ty check`                   |
 | tests         | `pytest -q`                  |
+
 
 **Always use uv, ruff, and ty** over pip/poetry, black/pylint/flake8, and mypy/pyright. Supply chain: `pip-audit` before deploying, pin exact versions (`==` not `>=`) with `uv pip install --require-hashes`.
 
@@ -115,6 +131,7 @@ Prefer `ast-grep` over ripgrep when searching for code structure (function calls
 
 **Runtime:** Node 22 LTS, ESM only (`"type": "module"`)
 
+
 | purpose | tool           |
 | ------- | -------------- |
 | lint    | `oxlint`       |
@@ -122,11 +139,13 @@ Prefer `ast-grep` over ripgrep when searching for code structure (function calls
 | test    | `vitest`       |
 | types   | `tsc --noEmit` |
 
+
 Supply chain: `pnpm audit --audit-level=moderate` before installing, pin exact versions (no `^` or `~`).
 
 ### Rust
 
 **Runtime:** Latest stable via `rustup`
+
 
 | purpose      | tool                                                       |
 | ------------ | ---------------------------------------------------------- |
@@ -136,6 +155,7 @@ Supply chain: `pnpm audit --audit-level=moderate` before installing, pin exact v
 | test         | `cargo test`                                               |
 | supply chain | `cargo deny check`                                         |
 | safety check | `cargo careful test`                                       |
+
 
 **Style:** Prefer `for` loops with mutable accumulators over iterator chains. Use `let...else` for early returns. No wildcard matches.
 
@@ -154,7 +174,11 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 - Always check existing `.env` files before asking the user for env vars
 - Running containers don't pick up `.env` changes — recreate containers (`docker compose up -d`), don't just restart them
 
+
+
 ## Workflow
+
+
 
 ### Subagent strategy
 
@@ -163,47 +187,62 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 - One tack per subagent for focused execution
 - For complex problems, throw more compute at it via subagents
 - **On stall, always cancel and restart — proactively, don't wait for the user.** The harness
-  pings the parent when an autonomous subagent stalls; treat that ping as an action item, not a
-  notification. Immediately: (1) check whether it committed/pushed anything salvageable (branch,
-  worktree, PR) so you don't lose or duplicate work; (2) cancel/kill it; (3) re-spawn with the
-  same task (fresh spawn if it left no trace, else resume its session). A stalled agent never
-  self-recovers — every minute you wait for it is wasted. Never leave a stalled subagent sitting.
+pings the parent when an autonomous subagent stalls; treat that ping as an action item, not a
+notification. Immediately: (1) check whether it committed/pushed anything salvageable (branch,
+worktree, PR) so you don't lose or duplicate work; (2) cancel/kill it; (3) re-spawn with the
+same task (fresh spawn if it left no trace, else resume its session). A stalled agent never
+self-recovers — every minute you wait for it is wasted. Never leave a stalled subagent sitting.
+
+
 
 ### Pi-specific configuration
 
-- **Spawn subagents on the `anthropic-api` provider (the configured default); pick the model to
-  fit the task — no Opus pin.** `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_*` keys
-  and works wherever they resolve. **Any registered `anthropic-api` model works, including non-Opus
-  (`claude-fable-5`, `claude-haiku-4-5`, `claude-sonnet-5`)** — use a cheap/small model for recon,
-  reviews, and parallel fan-out; reserve `claude-opus-5[fast]` for work that needs the frontier.
-  The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for two real bugs in
-  `DJRHails/pi-interactive-subagents`, **both fixed and on `main` since 2026-07-24**: a
-  bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in `anthropic`
-  provider and the subagent "stalled and exited with no output" on hosts like `taffy` — fixed by
-  reading the parent provider from `ctx.model` (not the nonexistent `ctx.getModel()`) so bare ids
-  route to the parent's provider (patch #9) — plus recovering the zellij `new-pane` id by pane-diff
-  so parallel/crowded-tab spawns don't orphan panes (patch #12). **This is about the agent-harness
-  *subagent spawn* only — it does NOT relax any project's monitor/eval sweep rule (frontier
-  monitors, Sonnet-and-above with an Opus arm), which lives in that project's CLAUDE.md.**
-
+- **Spawn subagents on the** `anthropic-api` **provider (the configured default); pick the model to
+fit the task — no Opus pin.** `anthropic-api` uses the load-balanced `ANTHROPIC_API_KEY_`* keys
+and works wherever they resolve. **Any registered** `anthropic-api` **model works, including non-Opus
+(**`claude-fable-5`**,** `claude-haiku-4-5`**,** `claude-sonnet-5`**)** — use a cheap/small model for recon,
+reviews, and parallel fan-out; reserve `claude-opus-5[fast]` for work that needs the frontier.
+The old "always pin to `claude-opus-4-8[fast]`" rule was a *workaround* for two real bugs in
+`DJRHails/pi-interactive-subagents`, **both fixed and on** `main` **since 2026-07-24**: a
+bare/ambiguous model id (e.g. `claude-fable-5`) fell through to pi's keyless built-in `anthropic`
+provider and the subagent "stalled and exited with no output" on hosts like `taffy` — fixed by
+reading the parent provider from `ctx.model` (not the nonexistent `ctx.getModel()`) so bare ids
+route to the parent's provider (patch #9) — plus recovering the zellij `new-pane` id by pane-diff
+so parallel/crowded-tab spawns don't orphan panes (patch #12). **This is about the agent-harness
+*subagent spawn* only — it does NOT relax any project's monitor/eval sweep rule (frontier
+monitors, Sonnet-and-above with an Opus arm), which lives in that project's CLAUDE.md.**
 - **A stalled/no-output subagent is almost always a STALE INSTALLED PACKAGE, not a model or
-  provider fault. Check the installed code's commit before theorising.** `pi` installs git packages
-  as plain clones under `~/.pi/agent/git/<host>/<owner>/<repo>` — a *separate* clone from any
-  `$PROJECTS` checkout, and nothing re-pulls it after the initial install. On 2026-07-25 that clone
-  sat 10 days stale at an old commit while the fix had long since shipped, and the whole failure
-  looked like a provider/model bug. Diagnose with `git -C ~/.pi/agent/git/github.com/<owner>/<repo>
-  log --oneline -1`; fix with `pi update <source>` (fetches + resets to `origin/HEAD`), then
-  **restart pi** — a running process has the old extension in memory. The daily dotfiles autoupdate
-  now refreshes these automatically (`modules/dotfiles-autoupdate/update.sh`).
-
+provider fault. Check the installed code's commit before theorising.** `pi` installs git packages
+as plain clones under `~/.pi/agent/git/<host>/<owner>/<repo>` — a *separate* clone from any
+`$PROJECTS` checkout, and nothing re-pulls it after the initial install. On 2026-07-25 that clone
+sat 10 days stale at an old commit while the fix had long since shipped, and the whole failure
+looked like a provider/model bug. Diagnose with `git -C ~/.pi/agent/git/github.com/<owner>/<repo> log --oneline -1`; fix with `pi update <source>` (fetches + resets to `origin/HEAD`), then
+**restart pi** — a running process has the old extension in memory. The daily dotfiles autoupdate
+now refreshes these automatically (`modules/dotfiles-autoupdate/update.sh`).
 - **In a patch-stack fork, an OPEN patch PR does not mean unintegrated — never use PR state as the
-  signal.** Repos managed by `DJRHails/patch-stack-action` (commits prefixed `patch-stack:`) keep
-  every `patch/*` PR open against `base` permanently; integration happens by force-rebuilding
-  `main` from `base` + all patches. So `gh pr list --state open` listing a fix means nothing. Check
-  `git log origin/main` (after `git fetch`, since `main` is force-pushed) for the actual state, and
-  **never `gh pr merge` a `patch/*` branch** — the next rebuild discards it. Also note `gh` resolves
-  to the *upstream* parent repo by default on a fork, silently answering about the wrong repo; pass
-  `--repo <owner>/<repo>` explicitly.
+signal.** Repos managed by `DJRHails/patch-stack-action` (commits prefixed `patch-stack:`) keep
+every `patch/*` PR open against `base` permanently; integration happens by force-rebuilding
+`main` from `base` + all patches. So `gh pr list --state open` listing a fix means nothing. Check
+`git log origin/main` (after `git fetch`, since `main` is force-pushed) for the actual state, and
+**never** `gh pr merge` **a** `patch/`* **branch** — the next rebuild discards it. Also note `gh` resolves
+to the *upstream* parent repo by default on a fork, silently answering about the wrong repo; pass
+`--repo <owner>/<repo>` explicitly.
+- **The mirror of that trap: a PUSHED** `patch/`* **branch is not integrated either.** Both directions
+bite, and `git log origin/main` is the only signal for either. Having pushed a cmux fix to
+`patch/cmux-stale-surface` (2026-07-29), I told the user a pi restart would pick it up — it could
+not, because `main` had never been rebuilt and the runtime reads `main`. Cost them a pointless
+restart. **Getting a patch into a running tool is three steps, and skipping any one of them looks
+identical to the fix not working:**
+  1. **Rebuild the stack** so `main` carries the patch:
+    `gh workflow run patch-stack-sync.yml --repo <owner>/<repo>` (it also runs nightly at 04:00
+     UTC). Verify with `git grep <new-symbol> origin/main -- <path>` after a fetch.
+  2. **Update the installed clone** — `pi` installs git packages to
+    `~/.pi/agent/git/<host>/<owner>/<repo>`, a *separate* clone from any `$PROJECTS` checkout or
+     worktree, and nothing re-pulls it: `pi update git:github.com/<owner>/<repo>`. Note the
+     `git:` **prefix is required**; the bare form fails with `No matching package found` plus a
+     hint. Confirm the clone actually moved with `git -C <clone> log --oneline -1`.
+  3. **Restart pi** — the extension is already loaded in memory, so a correct on-disk fix changes
+    nothing until the process restarts.
 
 **Before committing:**
 
@@ -225,16 +264,22 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   - `$PROJECTS/github.com/TypeCellOS/BlockNote`
   - `$PROJECTS/registry.tiptap.dev/@tiptap-pro/extension-ai`
 
+
+
 ### Worktrees
 
 - Put git worktrees under `.data/worktrees/` inside the repo root, not as sibling directories or in ad hoc temp locations.
 - Audit worktrees regularly: list them, verify they still map to active branches/PRs, and check for stale or abandoned work.
 - Clean worktrees regularly: remove merged or unused worktrees promptly so local state stays understandable and disk usage stays bounded.
 
+
+
 ### PR workflow
 
-- **Before pushing any fix to a branch, check `gh pr view <n> --json state,mergedAt`.** If the PR is already merged, push to a new branch off `main` and open a fresh PR instead.
-- **Edit PR descriptions with `gh api`, not `gh pr edit`.** In gantry/CI containers the injected `GITHUB_TOKEN` is a classic PAT whose scopes you should read off `gh auth status` rather than assume — historically `repo`+`workflow` only, i.e. no `read:org`. `gh pr edit` fetches the PR through a GraphQL query whose `reviewRequests` selection carries a `Team` fragment (`organization{login}`, `name`, `slug`) requiring `read:org`, so it **fails closed** — exit 1, nothing written, because the scope is needed by the *read* that precedes the write, not by the write. That bites even a body-only edit on a solo repo (`gh auth status` self-reports "Missing required token scopes: 'read:org'"). The same `read:org`-gated team/org fields break `gh pr create --reviewer <org>/<team>`; `--reviewer <user>` resolves via `assignableUsers` and needs no extra scope. The error arrives as GraphQL `INSUFFICIENT_SCOPES` inside an HTTP **200**, so grep exit codes, not status codes. Use `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md` — scope-free and verified. Read commands (`gh pr view`, `gh pr status`) are unaffected. `gh auth refresh` can't add the scope in-container (the env token is immutable), so the scope has to go on the PAT itself — and **the operator call (2026-07-28) is to add it fleet-wide**: `read:org` is read-only org/team metadata, the `gh pr edit` UX is worth having everywhere, and a classic PAT's scopes are editable in place, so it needs no rotation and no turnstile `proxy.env` change. Until `gh auth status` shows `read:org`, use the REST PATCH — and keep preferring it for `-F body=@file` writes regardless: one call, no GraphQL preflight, immune to scope drift.
+- **Before pushing any fix to a branch, check** `gh pr view <n> --json state,mergedAt`**.** If the PR is already merged, push to a new branch off `main` and open a fresh PR instead.
+- **Edit PR descriptions with** `gh api`**, not** `gh pr edit`**.** In gantry/CI containers the injected `GITHUB_TOKEN` is a classic PAT whose scopes you should read off `gh auth status` rather than assume — historically `repo`+`workflow` only, i.e. no `read:org`. `gh pr edit` fetches the PR through a GraphQL query whose `reviewRequests` selection carries a `Team` fragment (`organization{login}`, `name`, `slug`) requiring `read:org`, so it **fails closed** — exit 1, nothing written, because the scope is needed by the *read* that precedes the write, not by the write. That bites even a body-only edit on a solo repo (`gh auth status` self-reports "Missing required token scopes: 'read:org'"). The same `read:org`-gated team/org fields break `gh pr create --reviewer <org>/<team>`; `--reviewer <user>` resolves via `assignableUsers` and needs no extra scope. The error arrives as GraphQL `INSUFFICIENT_SCOPES` inside an HTTP **200**, so grep exit codes, not status codes. Use `gh api --method PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md` — scope-free and verified. Read commands (`gh pr view`, `gh pr status`) are unaffected. `gh auth refresh` can't add the scope in-container (the env token is immutable), so the scope has to go on the PAT itself — and **the operator call (2026-07-28) is to add it fleet-wide**: `read:org` is read-only org/team metadata, the `gh pr edit` UX is worth having everywhere, and a classic PAT's scopes are editable in place, so it needs no rotation and no turnstile `proxy.env` change. Until `gh auth status` shows `read:org`, use the REST PATCH — and keep preferring it for `-F body=@file` writes regardless: one call, no GraphQL preflight, immune to scope drift.
+
+
 
 ## Pixel-precise user input — build a picker, don't iterate through prose
 
@@ -243,9 +288,12 @@ When the answer is a single point or value on an image (crop coordinate, boundin
 **Why:** prose feedback on visual positions loses ~100 px per round trip. Reading compressed chat thumbnails back and applying an inverse offset compounds the error. On one crop task I averaged ~150 px absolute error across 7 images after 4+ rounds of prose corrections; the user's first pass through a click tool was pixel-perfect.
 
 **How to apply:**
+
 - Heuristic: if you find yourself asking "is that enough? a bit more?" about a spatial quantity, stop and build the tool.
 - Minimum viable picker: one static HTML page, `python3 -m http.server` in `/tmp/<tool>/`, click handler that writes the chosen value to `window.__RESULT__`. Playwriter reads it back, or the user pastes a generated bash command.
 - Persist the originals somewhere stable (`/tmp/<tool>-backup/`) so you can re-crop non-destructively after the user adjusts.
+
+
 
 ## Hand me one command, never a procedure
 
@@ -263,22 +311,27 @@ figures, wrote a self-contained runner, and added the missing `channels create` 
 skill — leaving me a single `bash …/post_touchstone.sh`.)
 
 **How to apply:**
+
 - **Stage, don't enumerate.** scp assets to the host that has the session, write a self-contained
-  runner script there, and add any missing CLI subcommand to the relevant skill — so the
-  human-facing surface is one command.
+runner script there, and add any missing CLI subcommand to the relevant skill — so the
+human-facing surface is one command.
 - **Don't bypass the boundary.** Never dump Keychain/cookies or otherwise work around the auth wall
-  (it gets blocked anyway and isn't yours to cross) — run the sanctioned tool where the session
-  already lives, via the one command.
+(it gets blocked anyway and isn't yours to cross) — run the sanctioned tool where the session
+already lives, via the one command.
 - **Make the command robust:** idempotent / safe to re-run, an obvious env override
-  (`BROWSER=chrome …`), parse whatever it needs from intermediate output, and degrade gracefully
-  (skip-and-continue on a soft failure, never half-finish).
+(`BROWSER=chrome …`), parse whatever it needs from intermediate output, and degrade gracefully
+(skip-and-continue on a soft failure, never half-finish).
 - **State the one boundary in one line** (why it can't be fully headless), then give the command,
-  and offer to show me the staged script if I want to eyeball it first.
+and offer to show me the staged script if I want to eyeball it first.
+
+
 
 ## Session Insights & Memory
 
 - After completing significant work, or the session required a user intervention / rejected tool usage, offer to review and save insights to AGENTS.md
 - After ANY correction from the user: capture the pattern and write a rule that prevents the same mistake. Ruthlessly iterate on these rules until mistake rate drops.
+
+
 
 ## Session Artifacts — long output goes in files, not the chat
 
@@ -302,8 +355,8 @@ token budget.
 
 ### Capture full output to `.data/` — don't truncate with `tail`/`head`
 
-When a command's output matters for debugging, **`tee` or redirect the
-full output to a file under `.data/` (gitignored), then inspect the file**
+When a command's output matters for debugging, `tee` **or redirect the
+full output to a file under** `.data/` **(gitignored), then inspect the file**
 — do not pipe straight through `| tail -25` / `| head`. Truncation throws
 away exactly the lines you'll need two steps later (the first error, the
 stack frame above the one you saw, the warning before the failure), and
@@ -313,33 +366,41 @@ grepping the file is ~100× faster to debug than re-running with different
 truncation each time.
 
 - **Do:** `cmd 2>&1 | tee .data/run-<name>.log` then
-  `rg -n "error|warn|traceback" .data/run-<name>.log` (or read the file,
-  with offset/limit for big ones). The full log stays on disk for the
-  whole session.
+`rg -n "error|warn|traceback" .data/run-<name>.log` (or read the file,
+with offset/limit for big ones). The full log stays on disk for the
+whole session.
 - **For long-running jobs:** redirect and background —
-  `cmd >.data/<name>.log 2>&1 &` — then `tail -f`/`rg` the file as needed
-  instead of blocking on a truncated pipe.
-- **`tail`/`head` are fine** for a genuine one-glance sanity check on
-  output you will never need again (e.g. `ls | head`), or to preview the
-  *tail of a file you already captured* (`tail -50 .data/<name>.log`).
-  The anti-pattern is discarding un-captured output through a truncating
-  pipe.
+`cmd >.data/<name>.log 2>&1 &` — then `tail -f`/`rg` the file as needed
+instead of blocking on a truncated pipe.
+- `tail`**/**`head` **are fine** for a genuine one-glance sanity check on
+output you will never need again (e.g. `ls | head`), or to preview the
+*tail of a file you already captured* (`tail -50 .data/<name>.log`).
+The anti-pattern is discarding un-captured output through a truncating
+pipe.
 - Put these under `.data/` (already the convention for worktrees), keep
-  it gitignored, and prefer a descriptive `<name>` so parallel runs don't
-  clobber each other.
+it gitignored, and prefer a descriptive `<name>` so parallel runs don't
+clobber each other.
+
+
 
 ## Git Hygiene
 
-- **Always gitignore `.agents/settings.local.json`** (and `.claude/settings.local.json`) - If you see these files in `git status` or `git diff`, add them to `.gitignore` before committing. These files contain local permissions and should never be tracked.
+- **Always gitignore** `.agents/settings.local.json` (and `.claude/settings.local.json`) - If you see these files in `git status` or `git diff`, add them to `.gitignore` before committing. These files contain local permissions and should never be tracked.
 - **Encrypted-at-rest files → keep their contents out of plaintext git metadata.** Some repos encrypt sensitive files at rest (glassine: `filter=glassine` in `.gitattributes`; verify a specific path with `git check-attr filter -- <file>`). The committed blob and the diff are ciphertext, so committing the *change* is safe — but the branch name, commit message, PR title/description, issue text, and review comments are all plaintext (and public if the repo is — assume public unless you've confirmed otherwise). Before writing any of those for a change that touches an encrypted file, check whether it's encrypted, then keep the public-facing text generic: never name the secrets, credentials, internal hostnames, service/workspace names, or architecture details that the encryption exists to hide. Put the real rationale in a comment *inside* the encrypted file, where it's protected. If you've already pushed something leaky, amend + force-push and re-edit the PR/issue text before merging. Branch names are the exception: GitHub keeps the head branch name on a PR forever, even after the branch is deleted — so pick a generic branch name (`topology-refresh`, not `topology-<hostname>`) *before* pushing; there is no after-the-fact fix.
+
+
 
 ## MCP Servers (mcporter)
 
-| server | description |
-| --- | --- |
-| `context7` | Look up live documentation and code examples for any library/framework via Context7 |
+
+| server                      | description                                                                                        |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| `context7`                  | Look up live documentation and code examples for any library/framework via Context7                |
 | `figma-dev-mode-mcp-server` | Figma Dev Mode — inspect designs and pull code/context from Figma frames (remote, `mcp.figma.com`) |
-| `playwriter` | Control Chrome via Playwright — browser automation, scraping, testing, and recording |
+| `playwriter`                | Control Chrome via Playwright — browser automation, scraping, testing, and recording               |
+
+
+
 
 ## References
 
@@ -348,3 +409,4 @@ truncation each time.
 - [trailofbits/skills-curated](https://github.com/trailofbits/skills-curated) - Curated skill collection
 - [obra/superpowers](https://github.com/obra/superpowers) - Workflow discipline skills
 - [anthropics/claude-code](https://github.com/anthropics/claude-code) - Official plugins (frontend-design, pr-review-toolkit)
+
