@@ -8,6 +8,13 @@
 # Linux. Logs to $XDG_STATE_HOME/dotfiles/autoupdate.log.
 set -euo pipefail
 
+# launchd/systemd/cron hand us a minimal PATH that omits ~/.local/bin and
+# Homebrew, so tools git itself needs are missing: without `glassine` on PATH
+# the repo's clean filter fails with 127, `git merge --ff-only` aborts, and the
+# daily pull silently reported "diverged" for a week (2026-07-28..08-04).
+PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PATH
+
 # Resolve the repo root from this script's own location (robust to env-less
 # launchd/systemd invocation), overridable via $DOTFILES.
 DOTFILES="${DOTFILES:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
@@ -58,6 +65,8 @@ update_dotfiles() {
   # WIP); run `git submodule update` by hand to follow a bumped pin.
   if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
     log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
+  elif git merge-base --is-ancestor @ '@{u}'; then
+    log "ERROR: $branch is behind upstream but the fast-forward FAILED (see errors above)"
   else
     log "skip: $branch diverged from upstream — needs a manual pull"
   fi
@@ -121,7 +130,7 @@ ensure_github_ssh_rewrite() {
       '[url "git@github.com:"]' \
       '	insteadOf = https://github.com/')
     if [ ! -f "$rewrite" ] || [ "$(cat "$rewrite")" != "$desired" ]; then
-      printf '%s\n' "$desired" > "$rewrite"
+      printf '%s\n' "$desired" >"$rewrite"
       log "wrote $rewrite (host has a GitHub SSH key)"
     fi
   fi
