@@ -11,7 +11,7 @@
   ],
   "lastChangelogVersion": "0.83.0",
   "defaultProvider": "anthropic-api",
-  "defaultModel": "claude-fable-5",
+  "defaultModel": "claude-opus-5[fast]",
   "defaultThinkingLevel": "xhigh",
   "theme": "dark"
 }
