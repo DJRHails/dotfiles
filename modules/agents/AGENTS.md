@@ -9,13 +9,15 @@ Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) 
 - **Clarity over cleverness** - Prefer explicit, readable code over dense one-liners
 - **Name things for what they are** - Give every coined identifier a short descriptive name, never an opaque label or sequence number: `direct-review` not `lane A`, "the premise-check phase" not "Phase 1", "the seam gate" not `G3`. This covers code (enum variants, functions, flags), plan phases, doc sections and headings, review-finding IDs, figures and tables, file names — anywhere a name accretes. Numbers and bare letters rot: inserting or reordering one entry renumbers the rest and silently breaks every cross-reference, and the label carries no meaning, where a descriptive name is self-documenting and a stable anchor. Exceptions: intrinsic ordinals (fixed pipeline stages, list positions, weeks, ladder rungs) and external identifiers quoted verbatim (another paper's `Fig 4a`, a dataset's category code).
 - **Justify new dependencies** - Each dependency is attack surface and maintenance burden
-- **Replace, don't deprecate** - When a new implementation replaces an old one, remove the old one entirely. No backward-compatible shims, dual config formats, or migration paths. Proactively flag dead code.
+- **Replace, don't deprecate** - When a new implementation replaces an old one, remove the old one entirely. No backward-compatible shims, dual config formats, or migration paths. Proactively flag dead code. **A "graceful degradation" path for stale data or an old schema version IS a deprecation shim** — and the specific danger is that it hides *total* failures: a reader (or a UI) that silently omits a section cannot distinguish "this never shipped" from "not applicable here". One night, two separate produce-side bugs (no report ever shipped an export node; 0 of 46 carried a task node) stayed invisible for hours behind a null-on-unknown-schema reader that had four tests pinning the degradation as intended. Prefer: **hard-fail on version drift, naming expected vs found; regenerate the data to the current version; and keep a clearly *explained* absence only where the thing is genuinely inapplicable by construction.** Order matters — regenerate first, then flip to failing, or every stale record 500s.
 - **Verify at every level** - Set up automated guardrails (linters, type checkers, pre-commit hooks, tests) as the first step, not an afterthought. Prefer structure-aware tools (ast-grep, LSPs, compilers) over text pattern matching.
+- **Edit files with the `edit` tool, never a scripted find-and-replace** - Reach for `edit` (exact-match replacement) for every targeted change. Do NOT shell out to `python3 - <<'PY' … p.write_text(t)`, `sed -i`, `perl -pi`, or any other write-the-whole-file script to make an edit. Two reasons, and the second is the dangerous one: (1) a scripted replace is invisible in review — `edit` shows the before/after, a heredoc shows a wall of code; (2) **`str.replace` and `sed` silently no-op when the pattern doesn't match and still write the file**, so a stale or mis-typed pattern produces a confident "patched" with nothing changed, while `edit` fails loudly on a miss or a non-unique match. That failure mode is worst exactly where the stakes are highest — resolving merge conflicts, threading a renamed symbol, fixing an import after a refactor — because the whole risk *is* the pattern not matching what you assumed. Batch multiple changes to one file as several `edits[]` entries in a single call. Narrow exceptions, all of which must be stated out loud: a genuinely mechanical sweep across many files (`sed -i 's/old_import/new_import/g' $(rg -l …)`), and regex over unpredictable generated text (stripping conflict markers). Even then, verify with a type check or test afterwards — never assume the sweep landed. Two concrete ways a blanket `str.replace` bites during a rename, both observed: (1) **it rewrites the text that explains the old name** — a docstring or writeup section documenting "we used to call this X" silently becomes self-contradictory; (2) **it double-substitutes when the new name contains the old one** (`CLEAN_STRATA` → `CASCADE_CLEAN_STRATA` applied twice yields `CASCADE_CASCADE_CLEAN_STRATA`). After any rename sweep, grep for the old name expecting only the deliberate historical mentions, and grep for the doubled form.
 - **Bias toward action** - Decide and move for anything easily reversed; state your assumption so the reasoning is visible. Ask before committing to interfaces, data models, architecture, or destructive operations. When given a bug report, just fix it — don't ask for hand-holding. Point at logs, errors, failing tests, then resolve them. Zero context switching required from the user.
 - **Confirm before contacting other humans** - Any action that delivers a message to someone other than me — sending email, posting Slack into a channel/DM with anyone else in it, creating or updating a calendar event with attendees (or `--send-updates` anything other than `none`), opening/commenting/merging GitHub PRs and issues, posting to Linear/Notion/Jira where teammates are notified, or any webhook/API call that reaches a person — requires you to first post a short summary (recipients, subject/title, body, timing) and then wait for my explicit "yes" / "send it" / "go ahead". My initial request ("send the invite to X", "reply to this email", "message Alice") is the trigger, not the authorization. Drafts and local-only artifacts that don't notify anyone are exempt. **Exempt: GitHub PRs and issues on my own personal repos (**`github.com/DJRHails/`***) — open, comment, and merge them freely without a confirmation step, since they're solo repos that notify no one else.** The confirmation step still applies to repos in shared orgs (e.g. `safety-research`) or any repo with other collaborators. **Also exempt: the** `hails-talk` **Slack workspace (**`hails-talk.slack.com`**, team** `Hails`**) is solo — only me and my own bots (e.g.** `sage_saint`**) — so post / reply / edit / react there freely without confirmation, including with** `--yes`**. This is the slack skill in bot mode via** `$SLACK_BOT_TOKEN` **(sourced from the touchstone** `.env`**; that token is scoped to this one workspace).** Any OTHER Slack workspace (Anthropic / fellows Enterprise Grid, etc.) still requires the summary + explicit confirmation.
 - **Finish the job** - Handle the edge cases you can see. Clean up what you touched. If something is broken adjacent to your change, flag it. But don't invent new scope.
 - **Falsify, first** - When I report a bug, don't start by trying to fix it. Instead, start by writing a test that reproduces the bug. Then, have subagents try to fix the bug and prove it with a passing test.
 - **Prove it works** - Never mark a task complete without demonstrating correctness. Run tests, check logs, diff behavior. Ask: "Would a staff engineer approve this?"
+- **An incidental number is not a measurement — check its N and whether it was the study's object.** A figure produced as a *by-product* of work aimed at something else has had none of the care the headline numbers got: no replication, no seed averaging, often a single draw and a tiny N. Before promoting one to a claim (let alone into a brief that spends hours of compute), ask what it was measuring, how many observations it rests on, and whether anything controlled it. One night I took a three-case, single-seed by-product from a plumbing PR, labelled it "the largest uncontrolled instrument artifact in the family", said it "dwarfs" a decision the team had just spent hours making, and filed it as a priority. Measured properly it was **a quarter** the size of the artifact it supposedly displaced, sign-flipped between models, and sat inside the instrument's own grid step — the original reading was one draw from a distribution spanning 35–60. Corollary for summarising other people's work: when you restate a lane's finding, restate the number it *registered*, not the striking one it mentioned in passing.
 
 
 
@@ -187,13 +189,37 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
 - One tack per subagent for focused execution
 - For complex problems, throw more compute at it via subagents
 - **On stall, always cancel and restart — proactively, don't wait for the user.** The harness
-pings the parent when an autonomous subagent stalls; treat that ping as an action item, not a
-notification. Immediately: (1) check whether it committed/pushed anything salvageable (branch,
-worktree, PR) so you don't lose or duplicate work; (2) cancel/kill it; (3) re-spawn with the
-same task (fresh spawn if it left no trace, else resume its session). A stalled agent never
-self-recovers — every minute you wait for it is wasted. Never leave a stalled subagent sitting.
-
-
+  pings the parent when an autonomous subagent stalls; treat that ping as an action item, not a
+  notification. Immediately: (1) check whether it committed/pushed anything salvageable (branch,
+  worktree, PR) so you don't lose or duplicate work; (2) cancel/kill it; (3) re-spawn with the
+  same task (fresh spawn if it left no trace, else resume its session). A stalled agent never
+  self-recovers — every minute you wait for it is wasted. Never leave a stalled subagent sitting.
+- **Check the installed package commit BEFORE re-spawning a stalled agent, not after.** The rule
+  below says a stall is usually a stale package; act on it first. Three consecutive stalls were
+  burned one night before checking, and the clone was 12 commits behind origin. One `git log -1`
+  costs seconds; three re-spawns cost twenty minutes.
+- **Resume is far less reliable than a fresh spawn — try it once, then stop.** A resumed session
+  that exits instantly (code 143, no output) will do so every time; the failure is in the resume
+  path, not the task. Re-spawn fresh with a **self-contained** brief instead. Corollary: handing
+  follow-up work to a finished lane costs a full re-brief, so put everything a lane needs in its
+  original brief where you can.
+- **Spawn failures and your own turn failures are different queues.** If spawns die instantly on
+  provider overload while your own tool calls flow normally, stop retrying and **do the work
+  in-process**. Four spawn attempts died in a row one night while the main session was healthy;
+  the fix was to stop spawning, not to wait longer.
+- **Before spawning, check the task is not already done.** On a fast-moving repo with parallel
+  sessions, grep the merged PRs (`gh pr list --state merged --search <topic>`, or the docs the
+  work would touch) for the task first. A second-monitor replication was one call from being
+  duplicated after another session had already merged it hours earlier.
+- **No report does NOT mean no work — check the branch before re-spawning.** Two lanes in one
+  session opened PRs, got them **merged**, and then died without ever signalling completion; the
+  only way I found out was auditing `git branch -r` and `gh pr list --head <branch>`. Re-spawning
+  on the assumption of failure would have duplicated finished, merged work. When a lane goes
+  quiet: check its branch, its PR state, and its worktree **first**.
+- **`subagent_interrupt` is not termination.** It sends Escape; the pane, session and watcher stay
+  alive, and the harness will eventually report the lane as failed with exit 143. If you are done
+  with a lane, kill its process group (`kill -TERM -- -<pid>`, found via the
+  `sessions/*/artifacts/*.sh` wrapper) rather than leaving idle panes to accumulate.
 
 ### Pi-specific configuration
 
@@ -269,6 +295,9 @@ identical to the fix not working:**
 ### Worktrees
 
 - Put git worktrees under `.data/worktrees/` inside the repo root, not as sibling directories or in ad hoc temp locations.
+- **Never build a branch in the root checkout — on a repo with parallel sessions it carries other people's unpushed commits.** Committing on the root checkout's `main` silently adopts whatever is sitting there: one night a branch built that way swept in another session's unpushed `docs(todo)` commit, and the subsequent `git reset --hard origin/main` would have destroyed it. Always `git worktree add` first, and **before your first commit run `git log --oneline origin/main..HEAD` and confirm every commit is yours.** If you find a foreign commit, branch it off to rescue it before resetting anything, and tell the user — it is not yours to push or drop.
+- The worktree-create helper's `uv sync` may omit dev extras; run `uv sync --extra dev` in a new worktree before expecting `pytest`/`ruff`/`ty` to exist.
+- **Check whether `.data` is a symlink before running two lanes concurrently.** Worktrees are inconsistent about it — some get a real `.data` dir, some get a **symlink to the root checkout's** — so two lanes running the same script from symlinked worktrees write into **one shared output tree**, last-writer-wins, silently interleaving results produced by *different code versions*. One night this left two `summary.json` writes 4 s apart disagreeing on a published count, and it looked exactly like non-determinism in the algorithm. Verify with `readlink <worktree>/.data`; if shared, give each lane a distinct output subdir or serialise them. Corollary: **an unexplained divergence in generated artifacts is a concurrency suspect before it is a numerical one** — and refusing to publish until it is explained is the right call, not fussiness.
 - Audit worktrees regularly: list them, verify they still map to active branches/PRs, and check for stale or abandoned work.
 - Clean worktrees regularly: remove merged or unused worktrees promptly so local state stays understandable and disk usage stays bounded.
 
@@ -325,6 +354,59 @@ already lives, via the one command.
 and offer to show me the staged script if I want to eyeball it first.
 
 
+
+## Turn the verification discipline inward
+
+Every rule about not trusting a sub-agent's self-report applies to **your own inferences**, and that
+is the direction it gets skipped. A session spent writing falsification requirements into worker
+briefs — which caught real problems — still lost ~10 hours to four self-inflicted stalls, each one an
+inference accepted without the check it demanded of others.
+
+- **Consistency is not confirmation.** Six identical `401`s felt like proof a token had expired; it
+  had not, every call was to the wrong API. Two nodes failing identically felt like a cluster-wide
+  fault; it was one artifact logged twice. When N attempts agree, ask whether they share one
+  assumption — repeating a wrong premise produces consistency, not evidence.
+- **Before declaring a credential dead, read the code that consumes it.** Grep the consumer for its
+  base URL and auth header. The token above authenticated against a Cloudflare Worker proxy whose
+  hostname was printed in the consuming library's own error message.
+- **Source every dotenv, not the one you thought of.** `.env` *and* `.env.shared` (and any
+  `.env.*`). One unsourced file produced a confident, wrong conclusion that a private model was
+  permanently unreachable, and a plan built on top of it.
+- **When the user challenges a factual claim, re-check before defending it.** Two direct questions
+  ("are we rsyncing the whole directory?", "the token shouldn't have expired?") were answered from
+  inference when a five-second check was available. Both answers were wrong.
+
+## Background jobs: never pattern-match on process names
+
+`pgrep -f <pattern>` matches **your own command line**, including the shell that *wrote* the script.
+A supervisor whose wait loop greps for the thing it launches will match the heredoc that created it
+and block forever — this cost ten hours twice in one session, the second time after "fixing" it by
+changing the pattern.
+
+- **Use a PID file or a lock file**, never a name pattern: write `$!` on launch, and test with
+  `kill -0 "$pid"`.
+- **If you must grep, exclude self**: `pgrep -f "$pat" | grep -v $$`, and never let the pattern
+  appear in the launching command line (write the script with a file write, not a heredoc).
+- **A backgrounded job that shows no progress is not necessarily slow — check what is matching**
+  before concluding the work is stuck. `pgrep -af <pattern>` shows the full command lines; if the
+  only hits are your own tooling, the job already finished or never started.
+- **Detach properly**: `setsid` + `</dev/null` + `disown`. A plain `&` is killed with its process
+  group. And do not `kill` a stale shell without checking it is not an ancestor of the command you
+  are currently running — that takes your own work down with it.
+
+## Destructive commands: never under a timeout, never on shared storage without ownership checks
+
+- **`rm -rf` is banned** (use `trash`), and on a remote host without `trash` the substitute is an
+  explicit, verified path — not a recursive delete wrapped in `ssh ... timeout`. A timeout that fires
+  mid-delete leaves a **half-removed tree** and no error, and the absence of the confirmation line is
+  the only signal. That happened: `entries=11` before, 7 after, no "removed" ever printed, and the
+  later `ls` was misread as success.
+- **On shared storage, check ownership before every delete.** `/workspace-vast` held directories
+  literally named `$(whoami)` and `${whoami}` — unexpanded variables written as paths — owned by
+  *other people* and holding 197 GB and 874 GB. They look exactly like the accidental copies you were
+  asked to clean up. `stat -c %U` first, and refuse anything not yours.
+- **Know what you are deleting.** A `.data/worktrees` on a cluster was job-isolation state belonging
+  to the scheduler, not synced junk; the sync had excluded `.data` all along.
 
 ## Session Insights & Memory
 
