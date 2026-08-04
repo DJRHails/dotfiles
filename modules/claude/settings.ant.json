@@ -48,7 +48,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-opus-5",
+  "model": "fable",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
