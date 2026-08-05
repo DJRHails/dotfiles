@@ -18,3 +18,8 @@ pre-commit:
       run: python3 tests/block_unscoped_scancel_test.py
     scancel-mine-tests:
       run: zsh -f tests/scancel-mine.test.zsh
+    # The daily autoupdate now stashes, fast-forwards and reapplies, so a regression
+    # in it rewrites tracked config on every host unattended — an unconditional
+    # `git stash pop` once left conflict markers in a live settings.json.
+    autoupdate-tests:
+      run: bash tests/dotfiles-autoupdate.test.sh

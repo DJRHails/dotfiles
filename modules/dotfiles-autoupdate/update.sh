@@ -33,14 +33,6 @@ update_dotfiles() {
     return 0
   }
 
-  # Never touch a tree with local changes in the superproject — a human owns those.
-  # Submodule state is ignored: it's managed separately (a submodule pinned to a
-  # non-HEAD commit is the normal steady state) and must not block the pull.
-  if [ -n "$(git status --porcelain --ignore-submodules=all)" ]; then
-    log "skip: working tree has local changes"
-    return 0
-  fi
-
   local branch local_rev
   branch="$(git rev-parse --abbrev-ref HEAD)"
   if ! git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
@@ -60,6 +52,23 @@ update_dotfiles() {
     return 0
   fi
 
+  # Local edits ride over the update on a stash. Apps write into tracked config
+  # through their symlinks (Claude Code persists `/model`, pi persists
+  # `defaultModel`), so "dirty" is the steady state here, and the old behaviour —
+  # skip while dirty — parked the pull for 12 days on one host and 5 on another.
+  # Untracked files are left in place: they don't block a fast-forward unless
+  # upstream adds the same path, and that case should fail loudly below.
+  local stashed=false
+  if [ -n "$(git status --porcelain --untracked-files=no --ignore-submodules=all)" ]; then
+    if git stash push --quiet --message "dotfiles-autoupdate $(date '+%Y-%m-%dT%H:%M:%S%z')" 2>>"$LOG"; then
+      stashed=true
+      log "stashed local changes before updating"
+    else
+      log 'skip: local changes present and the stash push failed'
+      return 0
+    fi
+  fi
+
   # Fast-forward only — a diverged branch needs a human, never an auto-merge.
   # Submodules are left untouched (never checked out over possible in-submodule
   # WIP); run `git submodule update` by hand to follow a bumped pin.
@@ -69,6 +78,47 @@ update_dotfiles() {
     log "ERROR: $branch is behind upstream but the fast-forward FAILED (see errors above)"
   else
     log "skip: $branch diverged from upstream — needs a manual pull"
+  fi
+
+  [ "$stashed" = true ] && restore_stash
+}
+
+# Reapply the stash taken above — but only when it applies cleanly.
+#
+# `git stash pop` on a conflict leaves conflict MARKERS in tracked files and
+# drops nothing, which is how a settings.json full of `<<<<<<< Updated upstream`
+# reached a running agent and broke it (2026-08-04). So dry-run the patch first
+# with `git apply --check`, which touches nothing, and only pop when it passes.
+# A stash that would conflict is kept — named in the log — for a human to
+# resolve, and the tree is left clean at the new HEAD.
+restore_stash() {
+  local patch
+  patch="$(mktemp)"
+
+  if ! git stash show --patch --no-color stash@'{0}' > "$patch" 2>>"$LOG"; then
+    rm -f "$patch"
+    log "WARNING: could not read the stash back; local changes kept in stash@{0}"
+    return 0
+  fi
+
+  if ! [ -s "$patch" ]; then
+    rm -f "$patch"
+    git stash drop --quiet 2>>"$LOG"
+    log "stash was empty; dropped"
+    return 0
+  fi
+
+  if ! git apply --check "$patch" 2>>"$LOG"; then
+    rm -f "$patch"
+    log "WARNING: local changes CONFLICT with the update — kept in stash@{0}, reapply with: cd $DOTFILES && git stash pop"
+    return 0
+  fi
+  rm -f "$patch"
+
+  if git stash pop --quiet 2>>"$LOG"; then
+    log "reapplied local changes"
+  else
+    log "WARNING: reapplying local changes failed; they are kept in stash@{0}"
   fi
 }
 

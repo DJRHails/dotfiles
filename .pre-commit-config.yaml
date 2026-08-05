@@ -34,3 +34,11 @@ repos:
         entry: zsh -f tests/scancel-mine.test.zsh
         language: system
         pass_filenames: false
+      # The daily autoupdate now stashes, fast-forwards and reapplies, so a regression
+      # in it rewrites tracked config on every host unattended — an unconditional
+      # `git stash pop` once left conflict markers in a live settings.json.
+      - id: autoupdate-tests
+        name: dotfiles-autoupdate behaviour suite
+        entry: bash tests/dotfiles-autoupdate.test.sh
+        language: system
+        pass_filenames: false
