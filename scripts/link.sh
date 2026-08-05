@@ -84,7 +84,10 @@ link::extract_and_link() {
   local sep=' -> '
   while read -r line || [[ -n "$line" ]]
   do
-    [[ -z "$line" ]] && continue
+    # Blank lines and `#` comments are skipped. Without this, a comment is read
+    # as an entry: it has no ' -> ', so src == dst == the whole comment, and the
+    # linker creates a file named after the comment text inside the module dir.
+    [[ -z "$line" || "$line" == \#* ]] && continue
     local src=${line%%$sep*}
     local dst=${line#*$sep}
     link::file "$(dirname "$1")/$src" "${dst/#\~/$HOME}"
