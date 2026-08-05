@@ -63,6 +63,20 @@ worktree::fast_path_available() {
   command -v cpow >/dev/null 2>&1 || return 1
   git -C "$MAIN" diff --quiet HEAD 2>/dev/null || return 1
   git -C "$MAIN" diff --cached --quiet 2>/dev/null || return 1
+  # This path clonefiles MAIN's *working tree*, so its ref and its files must agree — it
+  # cannot base on the upstream tip the way the standard path does. When the local checkout
+  # has drifted behind that base, decline, so the caller falls through to a checkout that
+  # starts from current code. A "fast" worktree built on a stale base is not a saving: it
+  # cost one lane 28 rebase conflicts across 7 files.
+  #
+  # Measured against $NEW_BRANCH_BASE, the same ref (and the same fetch) the standard path
+  # bases new branches on, so a repo whose default branch is not `main` gets the guard too.
+  # Fails closed: if the count can't be taken, take the correct-but-slower path.
+  if [[ "$NEW_BRANCH_BASE" != HEAD ]]; then
+    local behind
+    behind=$(git -C "$MAIN" rev-list --count "HEAD..$NEW_BRANCH_BASE" 2>/dev/null) || return 1
+    ((behind == 0)) || return 1
+  fi
   return 0
 }
 
@@ -133,6 +147,27 @@ for branch in "${BRANCHES[@]}"; do
 done
 if (( ${#MISSING_REFSPECS[@]} > 0 )); then
   git fetch origin "${MISSING_REFSPECS[@]}" 2>/dev/null || true
+fi
+
+# Base for a *new* branch: the upstream tip, not the local checkout's HEAD.
+# `git worktree add -b X <path>` with no commit-ish uses HEAD, and a long-lived main
+# checkout drifts behind origin constantly (22 commits, on the day this was written) —
+# so every "fresh" worktree silently started from stale code. One agent lane built a
+# whole viewer change against a 22-commit-old base and hit 28 rebase conflicts across
+# 7 files for no reason but this default. Falls back to HEAD when there is no origin,
+# and never touches an existing branch (that arm checks the branch out as asked).
+NEW_BRANCH_BASE=HEAD
+if git rev-parse --verify --quiet origin/HEAD >/dev/null 2>&1; then
+  NEW_BRANCH_BASE=$(git rev-parse --abbrev-ref origin/HEAD)
+elif git rev-parse --verify --quiet origin/main >/dev/null 2>&1; then
+  NEW_BRANCH_BASE=origin/main
+fi
+if [[ "$NEW_BRANCH_BASE" != HEAD ]]; then
+  git fetch --quiet origin 2>/dev/null || true
+  BEHIND=$(git rev-list --count "HEAD..$NEW_BRANCH_BASE" 2>/dev/null || echo 0)
+  if (( BEHIND > 0 )); then
+    worktree::info "new branches will base on $NEW_BRANCH_BASE (local HEAD is $BEHIND behind)"
+  fi
 fi
 
 # Cache local and remote branch lists once
@@ -236,6 +271,7 @@ for branch in "${BRANCHES[@]}"; do
       || { worktree::warn "failed to create worktree for $branch"; continue; }
   else
     git -c "checkout.workers=$CHECKOUT_WORKERS" worktree add -b "$branch" "$wt" \
+      "$NEW_BRANCH_BASE" \
       || { worktree::warn "failed to create worktree for $branch"; continue; }
   fi
 
