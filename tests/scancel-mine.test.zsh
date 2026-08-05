@@ -42,7 +42,11 @@ if [[ -z $bash_dir ]]; then
 fi
 
 path=("$stub" "$bash_dir" /usr/bin /bin)
+# slurm-job-prefix reads both: $SLURM_JOB_PREFIX first, then $GANTRY_THREAD_KEY
+# (set in every gantry worker container, where these tests run as a prek hook) —
+# the no-prefix cases need a genuinely prefix-free environment.
 unset SLURM_JOB_PREFIX
+unset GANTRY_THREAD_KEY
 
 fails=0
 check() {
