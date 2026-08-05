@@ -100,8 +100,27 @@ if platform::command_exists prek; then
     init.templateDir "$HOME/.git-template"
   prek init-template-dir "$HOME/.git-template" > /dev/null 2>&1
   log::result $? "prek template dir (~/.git-template)"
-  (cd "$DOTFILES" && prek install > /dev/null 2>&1)
-  log::result $? "prek install (.files)"
+
+  # prek installs into .git/hooks and refuses to run at all while core.hooksPath
+  # is set ("Cowardly refusing to install hooks with `core.hooksPath` set") —
+  # git would ignore what it wrote. The legacy pre-commit ~/.git-hooks setup left
+  # that key behind on some hosts, silently disabling this repo's secret scanning
+  # there. Clear it wherever it lives before installing.
+  if [ -n "$(git config --file "$HOME/.gitconfig.local" --get-all core.hooksPath)" ]; then
+    git config --file "$HOME/.gitconfig.local" --unset-all core.hooksPath
+    log::success "cleared core.hooksPath from ~/.gitconfig.local (prek needs .git/hooks)"
+  fi
+  if [ -n "$(git -C "$DOTFILES" config --local --get-all core.hooksPath)" ]; then
+    git -C "$DOTFILES" config --local --unset-all core.hooksPath
+    log::success "cleared core.hooksPath from .files/.git/config"
+  fi
+
+  prek_err=$(cd "$DOTFILES" && prek install 2>&1 > /dev/null)
+  if [ -n "$prek_err" ]; then
+    log::error "prek install (.files): $prek_err"
+  else
+    log::success "prek install (.files)"
+  fi
 else
   log::warning "prek not on PATH (rust module installs it); skipping git hook setup"
 fi

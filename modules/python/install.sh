@@ -25,23 +25,10 @@ install::uv_tool "ipython" "ipython"
 install::uv_tool "jupyter" "jupyter" "jupyter-core"
 install::uv_tool "pre-commit" "pre-commit"
 
-if cmd_exists pre-commit; then
-  mkdir -p "$HOME/.git-hooks"
-  pre-commit init-templatedir "$HOME/.git-hooks" >/dev/null
-  # init-templatedir only populates the directory — git must also be pointed at
-  # it via init.templateDir, or new clones silently get no hooks. That setting
-  # is machine-local, so it lives in gitconfig.local (see modules/git/gitconfig),
-  # which the git module generates before this script runs.
-  if [ -f "$HOME/.gitconfig.local" ]; then
-    # Write the EXPANDED absolute path, not a literal '~/.git-hooks'. git expands ~
-    # in init.templateDir, but prek (the pre-commit drop-in our repos run) does NOT
-    # — a literal tilde makes `prek init-templatedir` die `os error 2` seeding the
-    # bogus path. .gitconfig.local is machine-local (regenerated per host here), so
-    # an absolute path is correct and keeps both git and prek happy.
-    git config --file "$HOME/.gitconfig.local" init.templateDir "$HOME/.git-hooks"
-    log::success "pre-commit templatedir initialised at $HOME/.git-hooks"
-  else
-    # shellcheck disable=SC2088 # ~ is display text in a log message, not a path to expand
-    log::warning "~/.gitconfig.local missing — run the git module, then set init.templateDir=~/.git-hooks"
-  fi
-fi
+# Hook enforcement belongs to the git module, which seeds prek's template dir at
+# ~/.git-template. This module used to ALSO run `pre-commit init-templatedir
+# ~/.git-hooks` and point init.templateDir there — it runs after the git module,
+# so it won the last write and every new clone got legacy pre-commit hooks
+# instead of prek's. Worse, the ~/.git-hooks setup came with a global
+# core.hooksPath, which makes `prek install` refuse outright. prek is a drop-in
+# replacement for the `pre-commit` binary, so there is nothing to keep here.
