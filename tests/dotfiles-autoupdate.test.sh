@@ -80,8 +80,11 @@ log="$(run_update)"
 
 check "conflict: still pulls" \
   "upstream-model" "$(cat "$clone/settings.json")"
+# Count with `grep -c` on one file, never `grep -rc`: BSD grep prefixes the
+# filename in recursive mode, so the comparison broke on macOS while the
+# behaviour under test was fine.
 check "conflict: no conflict markers in the tree" \
-  "0" "$(grep -rc '^<<<<<<<' "$clone/settings.json" | tr -d ' ')"
+  "0" "$(grep -c '^<<<<<<<' "$clone/settings.json" | tr -d ' ')"
 check "conflict: tree is clean" \
   "" "$(git -C "$clone" status --porcelain)"
 check "conflict: local work kept in the stash" \
