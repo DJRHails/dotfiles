@@ -42,3 +42,10 @@ repos:
         entry: bash tests/dotfiles-autoupdate.test.sh
         language: system
         pass_filenames: false
+      # link::prune_stale deletes files on every bootstrap of every host, so a
+      # regression in what it considers "undeclared drift" is destructive.
+      - id: link-symlinks-tests
+        name: symlink linker behaviour suite
+        entry: bash tests/link-symlinks.test.sh
+        language: system
+        pass_filenames: false

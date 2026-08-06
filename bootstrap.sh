@@ -91,14 +91,23 @@ run() {
 
 create_links() {
   local module_dir="$1"
-  local symlink_file="$module_dir/symlinks.conf"
   # Read by link::extract_and_link (scripts/link.sh) via dynamic scoping.
   # shellcheck disable=SC2034
   local overwrite_all=false backup_all=$skipQuestions skip_all=false
 
-  if [ -f "$symlink_file" ]; then
+  # `symlinks.conf` holds the cross-platform links; `symlinks.<os>.conf` adds
+  # the ones whose destination only exists on that OS (VS Code, for instance,
+  # reads ~/Library/Application Support on macOS and ~/.config on Linux).
+  # Mirrors the install.<os>.sh / setup.<os>.sh convention below. Both are
+  # passed in one call so pruning sees the union of declared destinations.
+  local confs=()
+  [ -f "$module_dir/symlinks.conf" ] && confs+=("$module_dir/symlinks.conf")
+  [ -f "$module_dir/symlinks.$(platform::os).conf" ] \
+    && confs+=("$module_dir/symlinks.$(platform::os).conf")
+
+  if [ ${#confs[@]} -gt 0 ]; then
     log::subheader "Creating symbolic links for '${module_dir##*/}'"
-    link::extract_and_link "$symlink_file"
+    link::extract_and_link "${confs[@]}"
   fi
 }
 
