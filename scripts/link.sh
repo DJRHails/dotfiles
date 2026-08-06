@@ -80,20 +80,28 @@ link::file () {
   fi
 }
 
+# Accepts one or more conf files (a module's `symlinks.conf` plus any
+# `symlinks.<os>.conf`). They are pruned as a single unit: passing them in
+# separate calls would make each prune pass treat the other's links as
+# undeclared drift and delete them whenever both declare into one directory.
 link::extract_and_link() {
   local sep=' -> '
-  while read -r line || [[ -n "$line" ]]
+  local conf line src dst
+  for conf in "$@"
   do
-    # Blank lines and `#` comments are skipped. Without this, a comment is read
-    # as an entry: it has no ' -> ', so src == dst == the whole comment, and the
-    # linker creates a file named after the comment text inside the module dir.
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    local src=${line%%$sep*}
-    local dst=${line#*$sep}
-    link::file "$(dirname "$1")/$src" "${dst/#\~/$HOME}"
-  done < "$1"
+    while read -r line || [[ -n "$line" ]]
+    do
+      # Blank lines and `#` comments are skipped. Without this, a comment is read
+      # as an entry: it has no ' -> ', so src == dst == the whole comment, and the
+      # linker creates a file named after the comment text inside the module dir.
+      [[ -z "$line" || "$line" == \#* ]] && continue
+      src=${line%%"$sep"*}
+      dst=${line#*"$sep"}
+      link::file "$(dirname "$conf")/$src" "${dst/#\~/$HOME}"
+    done < "$conf"
+  done
 
-  link::prune_stale "$1"
+  link::prune_stale "$@"
 }
 
 # Remove symlinks left behind by earlier revisions of a symlinks.conf: a link
@@ -103,25 +111,28 @@ link::extract_and_link() {
 # modules or created by hand point elsewhere and are never touched, and the
 # linker's own *.backup copies are spared.
 link::prune_stale() {
-  local conf=$1
   # Match on the same literal prefix link::file writes (dirname of the conf),
   # with the physical path as a fallback for links made from a resolved cwd.
+  # Every conf passed here belongs to one module, so one dirname covers them all.
   local module_dir module_dir_phys
-  module_dir="$(dirname "$conf")"
+  module_dir="$(dirname "$1")"
   module_dir_phys="$(cd "$module_dir" && pwd -P)"
 
   local -A declared=()
   local -A parents=()
   local sep=' -> '
-  local line dst
-  while read -r line || [[ -n "$line" ]]
+  local conf line dst
+  for conf in "$@"
   do
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    dst=${line#*$sep}
-    dst=${dst/#\~/$HOME}
-    declared["$dst"]=1
-    parents["$(dirname "$dst")"]=1
-  done < "$conf"
+    while read -r line || [[ -n "$line" ]]
+    do
+      [[ -z "$line" || "$line" == \#* ]] && continue
+      dst=${line#*"$sep"}
+      dst=${dst/#\~/$HOME}
+      declared["$dst"]=1
+      parents["$(dirname "$dst")"]=1
+    done < "$conf"
+  done
 
   local dir entry target
   for dir in "${!parents[@]}"

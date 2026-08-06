@@ -23,3 +23,7 @@ pre-commit:
     # `git stash pop` once left conflict markers in a live settings.json.
     autoupdate-tests:
       run: bash tests/dotfiles-autoupdate.test.sh
+    # link::prune_stale deletes files on every bootstrap of every host, so a
+    # regression in what it considers "undeclared drift" is destructive.
+    link-symlinks-tests:
+      run: bash tests/link-symlinks.test.sh

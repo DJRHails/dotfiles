@@ -1,58 +1,89 @@
 {
-    "editor.fontFamily": "'Fira Code', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'",
-    "editor.fontLigatures": true,
-    "editor.wordWrap": "on",
-    "editor.tabSize": 2,
-    "editor.codeActionsOnSave": {
-        "source.fixAll": true
+    "editor.inlineSuggest.enabled": true,
+    "github.copilot.enable": {
+        "*": false,
+        "plaintext": false,
+        "markdown": true,
+        "scminput": false,
+        "yaml": true,
+        "properties": false,
+        "shellscript": true,
+        "dotenv": false,
+        "env": false
     },
-    
+    "files.associations": {
+        "\"*.env*\"": "env"
+    },
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "svelte.enable-ts-plugin": true,
+    "redhat.telemetry.enabled": false,
     "git.autofetch": true,
-    
-    "typescript.updateImportsOnFileMove.enabled": "always",
-    "[typescript]": {
-        "editor.defaultFormatter": "vscode.typescript-language-features"
-    },
-    "eslint.lintTask.enable": true,
-    "eslint.format.enable": true,
-    "eslint.packageManager": "yarn",
-    "eslint.alwaysShowStatus": true,
-    "eslint.validate": [
-        "html",
-        "javascript",
-        "typescript",
-        "javascriptreact",
-        "typescriptreact"
-    ],
-    "vetur.useWorkspaceDependencies": true,
-    "javascript.updateImportsOnFileMove.enabled": "always",
-    "editor.suggestSelection": "first",
-    "vsintellicode.modify.editor.suggestSelection": "automaticallyOverrodeDefaultValue",
-    "[dart]": {
-        "editor.formatOnSave": true,
-        "editor.formatOnType": true,
-        "editor.rulers": [
-            80
-        ],
-        "editor.selectionHighlight": false,
-        "editor.suggest.snippetsPreventQuickSuggestions": false,
-        "editor.suggestSelection": "first",
-        "editor.tabCompletion": "onlySnippets",
-        "editor.wordBasedSuggestions": false
-    },
-    "java.semanticHighlighting.enabled": true,
-    "java.configuration.checkProjectSettingsExclusions": false,
-    "dart.debugExternalLibraries": false,
-    "dart.debugSdkLibraries": false,
-    "git.confirmSync": false,
-    "python.languageServer": "Microsoft",
+    "git.suggestSmartCommit": false,
+    "editor.fontFamily": "'FiraCode Nerd Font Mono', 'Fira Code', monospace",
+    "editor.fontLigatures": true,
+    "jupyter.askForKernelRestart": false,
+    "tabnine.experimentalAutoImports": true,
     "spellright.language": [
-        "en_GB",
-        "en_US"
+    "en_US"
     ],
-    "spellright.documentTypes": [
-        "markdown",
-        "latex",
-        "plaintext"
-    ]
+    "terminal.integrated.enableMultiLinePasteWarning": false,
+    "terminal.integrated.fontFamily": "'FiraCode Nerd Font Mono', 'Fira Code'",
+    // Nerd Font glyph coverage overflows xterm.js's WebGL texture atlas, which
+    // renders cells blank or with the wrong glyph until they are re-drawn by a
+    // selection. The DOM renderer has no atlas and no such failure mode.
+    "terminal.integrated.gpuAcceleration": "off",
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.formatting.provider": "black",
+    "diffEditor.ignoreTrimWhitespace": false,
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "explorer.confirmDragAndDrop": false,
+    "editor.inlineSuggest.enabled": true,
+    "[markdown]": {
+        "editor.defaultFormatter": "DavidAnson.vscode-markdownlint"
+    },
+    "svelte.plugin.svelte.note-new-transformation": false,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "python.analysis.indexing": true,
+    "[python]": {
+        "editor.formatOnType": true,
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "files.exclude": {
+        "**/.git": false,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true
+    },
+    "terminal.integrated.defaultProfile.linux": "zsh",
+    "[shellscript]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+    "cSpell.userWords": [
+        "targetting"
+    ],
+    "flake8.args": [
+        "--max-line-length=150",
+        "--ignore=E402,F841,F401,E302,E305"
+    ],
+    "window.zoomLevel": -1,
+    "editor.renderWhitespace": "boundary",
+    "supermaven.logFilePath": "/tmp/supermaven.log",
+    "gitlens.ai.experimental.provider": "openai",
+    "gitlens.ai.experimental.openai.model": "gpt-4-turbo-preview",
+    "supermaven.enable": {
+        "dotenv": false,
+        "*": true
+    },
+    "git.confirmSync": false,
+    "terminal.integrated.scrollback": 10000,
+    "python.languageServer": "Pylance"
 }
