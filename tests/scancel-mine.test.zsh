@@ -16,6 +16,12 @@
 set -u
 set -o pipefail
 
+# The suite must not inherit a submitter identity from the machine running it:
+# slurm-job-prefix falls back to $GANTRY_THREAD_KEY, which every gantry worker
+# container exports, so without this the "no prefix anywhere" case derives a
+# real prefix, matches no stub jobs, and exits 0 instead of refusing with 2.
+unset SLURM_JOB_PREFIX GANTRY_THREAD_KEY
+
 script_dir="${0:A:h}"
 mine="$script_dir/../bin/scancel-mine"
 
@@ -42,7 +48,6 @@ if [[ -z $bash_dir ]]; then
 fi
 
 path=("$stub" "$bash_dir" /usr/bin /bin)
-unset SLURM_JOB_PREFIX
 
 fails=0
 check() {
