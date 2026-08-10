@@ -21,7 +21,10 @@ Read `docs/paper-watch/` in the repo:
 
 Also check this loop's open PRs (`gh pr list --author @me`): one whose review has
 landed gets resumed — address the feedback and judge the merge (see Merge gate) —
-before any new sweep. That can be the whole iteration.
+before any new sweep. That can be the whole iteration. An open paper-watch PR that
+hasn't been reviewed yet still holds the freshest ledger: sweep against its
+branch's `ledger.jsonl` and stack the new writeup onto that same branch — never
+sweep against the stale copy on `main`.
 
 ## First run (no queries.md)
 
@@ -68,8 +71,10 @@ Don't edit `references.bib` — flag citable papers in the writeup instead.
 A curated paper can cross a second, higher bar: its method is implementable
 inside this repo's own harness **and** landing it would move something the
 repo's docs already care about — a benchmark the plan calls for, a baseline or
-ablation to compare against, an eval or training technique to adopt. For at
-most **one** such paper per iteration:
+ablation to compare against, an eval or training technique to adopt. Candidates
+are this run's curated papers plus recent `curated` ledger entries (the sweep's
+dedup hides those — re-read the last few writeups when picking). For at most
+**one** such paper per iteration:
 
 - Check it isn't already in flight: no open PR mentioning the paper
   (`gh pr list --search <id-or-keyword>`), no `implementing` ledger entry.
@@ -84,7 +89,7 @@ most **one** such paper per iteration:
   name the spawned run in the writeup entry and the Slack message.
 
 When in doubt, don't spawn — a wasted implementation run costs more than a
-missed paper, and next week's window can still escalate it.
+missed paper, and a later run can still escalate it from the ledger.
 
 ## Report to Slack
 
