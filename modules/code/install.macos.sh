@@ -4,3 +4,5 @@
 install::cask "Visual Studio Code" "visual-studio-code"
 
 # Install code command using command palette > "Shell Command"
+
+. "$DOTFILES/modules/code/llm-save-merge.sh"
