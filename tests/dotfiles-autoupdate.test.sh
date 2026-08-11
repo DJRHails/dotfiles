@@ -35,7 +35,7 @@ fake_home="$work/home"
 
 # A bare origin plus a clone, so the script's fetch/merge run for real.
 setup_repo() {
-  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home"
+  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home" "$work/glassine.calls"
   mkdir -p "$fake_home"
   printf '[user]\n\tname = t\n\temail = t@t\n' > "$fake_home/.gitconfig"
   git init --quiet --bare "$work/origin"
@@ -68,6 +68,37 @@ run_update() {
   printf '%s\n' "$?" > "$work/status"
   cat "$work/state/dotfiles/autoupdate.log"
 }
+
+# A stand-in for glassine on PATH, faithful to the two parts of its contract the
+# updater leans on: `init` rewrites still-encrypted worktree files in place, and
+# reports how many on stdout. Real decryption needs sops, an age identity and a
+# .sops.yaml — none of which belong in a behaviour test of the updater.
+stub_glassine() {
+  local mode=${1:-repair}
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/glassine" << STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$work/glassine.calls"
+if [ "$mode" = fail ]; then
+  echo 'glassine: no decryption identity found' >&2
+  exit 1
+fi
+count=0
+while IFS= read -r f; do
+  grep -qF 'ENC[AES256_GCM' "$clone/\$f" 2> /dev/null || continue
+  printf 'decrypted-plaintext\n' > "$clone/\$f"
+  count=\$((count + 1))
+done < <(git -C "$clone" ls-files)
+[ "\$count" -eq 0 ] ||
+  printf 'glassine: decrypted %d file(s) into the working tree\n' "\$count"
+exit 0
+STUB
+  chmod +x "$fake_home/.local/bin/glassine"
+}
+
+# Mark the clone as a glassine repo without installing real filters: the updater
+# gates on this config alone, and a real clean filter would need sops.
+enable_glassine_filter() { git -C "$clone" config filter.glassine.clean 'glassine clean %f'; }
 
 # --- a local edit that does not collide is carried over the update ----------
 setup_repo
@@ -133,6 +164,56 @@ log="$(run_update)"
 
 check "diverged: HEAD untouched" "$local_head" "$(git -C "$clone" rev-parse HEAD)"
 check "diverged: logged" "1" "$(grep -c 'diverged from upstream' <<< "$log")"
+
+# --- ciphertext stranded in the worktree is detected and repaired -----------
+# A hand-resolved conflict (or a checkout with glassine off PATH) writes the raw
+# sops envelope into the working tree while git still calls the tree clean, so
+# nothing flags it. Two skills sat unreadable that way for a week.
+setup_repo
+stub_glassine
+enable_glassine_filter
+printf 'ENC[AES256_GCM,data:xx]\n' > "$clone/secret.md"
+git_quiet add -A
+git_quiet commit -m "encrypted-at-rest file"
+git_quiet push origin HEAD:main
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "glassine repair: worktree is plaintext again" \
+  "decrypted-plaintext" "$(cat "$clone/secret.md")"
+check "glassine repair: names the repair in the log" \
+  "1" "$(grep -c 'repaired unsmudged files: decrypted 1 file' <<< "$log")"
+check "glassine repair: went through init" \
+  "init" "$(cat "$work/glassine.calls")"
+
+# --- a repo that has not opted into glassine is never touched ---------------
+# Running `glassine init` against an unmanaged repo would bootstrap .sops.yaml
+# and filters into it, so the config gate has to hold.
+setup_repo
+stub_glassine
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "no glassine filter: glassine is not invoked" \
+  "never-called" "$(cat "$work/glassine.calls" 2> /dev/null || echo never-called)"
+check "no glassine filter: still pulls" \
+  "upstream-changed" "$(cat "$clone/other.txt")"
+
+# --- a glassine that cannot decrypt is logged, never fatal ------------------
+# No identity on this host is a warning: the update itself must still land, and
+# the rest of the daily run must still happen.
+setup_repo
+stub_glassine fail
+enable_glassine_filter
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "glassine failure: warned" \
+  "1" "$(grep -c 'WARNING: glassine init failed' <<< "$log")"
+check "glassine failure: the update still landed" \
+  "upstream-changed" "$(cat "$clone/other.txt")"
+check "glassine failure: no repair claimed" \
+  "0" "$(grep -c 'repaired unsmudged files' <<< "$log")"
 
 # --- a clean-tree update still runs the steps after the pull ----------------
 # `update_dotfiles` ends on the stash branch, so an `&&` one-liner there made it
