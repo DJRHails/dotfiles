@@ -8,11 +8,12 @@
 # popped into the working tree as conflict markers.
 set -u
 
-# The suite drives git in throwaway repos under $work, so ambient repo
-# pointers must not leak in: pre-commit/prek export GIT_DIR (and friends)
-# when the commit runs from a linked worktree, which silently redirects every
-# `git -C "$clone"` at the worktree's own repo and fails half the checks.
-unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY
+# The suite builds its own repos under /tmp. When it runs from a git hook —
+# prek at commit time, especially from a linked worktree — git exports
+# GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE pointing at the committing repo, which
+# hijacks every nested git call here (21 checks fail with "GIT_WORK_TREE not
+# allowed without specifying GIT_DIR"). Drop all inherited git env.
+unset "${!GIT_@}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
@@ -245,6 +246,23 @@ check "glassine failure: the update still landed" \
   "upstream-changed" "$(cat "$clone/other.txt")"
 check "glassine failure: no repair claimed" \
   "0" "$(grep -c 'repaired unsmudged files' <<< "$log")"
+# enable_glassine_filter sets no local config, so this case is also the
+# compound failure: config missing AND init failed. init dies before writing
+# any filter config, so the plaintext-staging window stays open — the log
+# must name that, not just the ciphertext direction.
+check "glassine failure: names the still-open plaintext window" \
+  "1" "$(grep -c 'filter config is still missing' <<< "$log")"
+
+# With the config intact, a failed init carries no plaintext risk — no scare.
+setup_repo
+stub_glassine fail
+enable_glassine_filter
+git -C "$clone" config filter.glassine.clean 'glassine clean %f'
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "intact config + failed init: no plaintext warning" \
+  "0" "$(grep -c 'filter config is still missing' <<< "$log")"
 
 # --- a lost filter config is restored, and said out loud --------------------
 # filter.glassine.* lives in .git/config, so it is never cloned and easily lost.
