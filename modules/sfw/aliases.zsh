@@ -35,13 +35,13 @@ if (( $+commands[sfw] )); then
     esac
   }
   yarn() {
-    # A bare (or flags-only) `yarn` is an install; `global` covers global add.
-    local sub="$(_sfw_subcmd "$@")"
-    if [[ -z "$sub" || "$sub" == (install|add|up|upgrade|upgrade-interactive|dlx|create|global) ]]; then
-      sfw yarn "$@"
-    else
-      command yarn "$@"
-    fi
+    # The empty pattern: a bare (or flags-only) `yarn` is an install. `global`
+    # covers global add.
+    case "$(_sfw_subcmd "$@")" in
+      "" | install | add | up | upgrade | upgrade-interactive | dlx | create | global)
+        sfw yarn "$@" ;;
+      *) command yarn "$@" ;;
+    esac
   }
   pip() {
     case "$(_sfw_subcmd "$@")" in
