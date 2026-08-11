@@ -263,8 +263,13 @@ ensure_sfw_fresh() {
       ;;
   esac
   # Same-directory temp file so the mv below is an atomic rename — a
-  # concurrent sfw invocation must never exec a half-written binary.
-  tmp="$(mktemp "${bin}.XXXXXX")"
+  # concurrent sfw invocation must never exec a half-written binary. Guarded:
+  # unlike /tmp, this directory can be unwritable (or the disk full), and a
+  # bare failing assignment under set -e would kill the whole update run.
+  tmp="$(mktemp "${bin}.XXXXXX")" || {
+    log "sfw: FAILED to create temp file beside $bin, not refreshing"
+    return 0
+  }
   if curl -fsSL --max-time 300 -o "$tmp" \
     "https://github.com/SocketDev/sfw-free/releases/download/${tag}/sfw-free-${os}-${arch}"; then
     # Prove the download runs before it replaces the live firewall: a 200

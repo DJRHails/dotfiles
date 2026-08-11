@@ -398,6 +398,27 @@ check "sfw garbage: old binary intact" \
 check "sfw garbage: no temp file left beside the binary" \
   "0" "$(find "$fake_home/.local/bin" -name 'sfw.*' | wc -l | tr -d ' ')"
 
+# --- sfw refresh: an unwritable bin dir skips the refresh, never the run ------
+# The same-directory mktemp is the one refresh step that can fail outside the
+# curl/verify guards; under set -e an unguarded failure would kill the whole
+# update script, not just the refresh.
+setup_repo
+stub_sfw "1.0.0"
+stub_curl ok
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+chmod 555 "$fake_home/.local/bin"
+log="$(run_update)"
+chmod 755 "$fake_home/.local/bin"
+
+check "sfw unwritable dir: skip logged" \
+  "1" "$(grep -c 'sfw: FAILED to create temp file beside .*sfw, not refreshing' <<< "$log")"
+check "sfw unwritable dir: exits 0" "0" "$(cat "$work/status")"
+check "sfw unwritable dir: old binary intact" \
+  "1" "$(grep -c 'version 1.0.0' "$fake_home/.local/bin/sfw")"
+check "sfw unwritable dir: later steps still ran" \
+  "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
 # --- sfw refresh: a current binary is left untouched --------------------------
 setup_repo
 stub_sfw "9.9.9"
