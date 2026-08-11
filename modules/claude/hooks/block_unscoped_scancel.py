@@ -32,9 +32,14 @@ Run the tests: python3 tests/block_unscoped_scancel_test.py
 from __future__ import annotations
 
 import json
-import shlex
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
+
+# Claude Code runs this as `python3 <abs path>`, which puts the hooks dir on sys.path — but the
+# test harness loads it through importlib from a path, which does not. Anchoring on __file__ makes
+# `lib.shell_walk` importable either way; without it the refactor passed in production and failed
+# under test, which is the worst possible split for a guard.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # Superset of the scancel options that consume the NEXT token as their value, so
 # `-u djrhails` is read as a user filter rather than a job-id target. A spurious entry
@@ -68,82 +73,21 @@ NAME_OPTS = frozenset({"-n", "--name", "--jobname"})
 # `` IDS=`squeue …` `` kept `squeue` glued inside `IDS=`squeue` and waved the sweep through.
 QUERY_COMMANDS = frozenset({"squeue", "sacct", "scontrol"})
 
-# Wrappers to peel off before deciding whether `scancel` is the real command. Not
-# exhaustive, and it does not need to be: an unrecognised head falls through to the
-# fail-closed scan in `_unscoped_in_segment`. `xargs` takes value-options, so it is
-# handled separately below.
-PLAIN_WRAPPERS = frozenset(
-    {
-        "sudo", "doas", "time", "nohup", "command", "exec", "builtin", "env",
-        "timeout", "nice", "ionice", "stdbuf", "setsid", "flock", "watch",
-    }
-)  # fmt: skip
-
-# Wrappers whose first bare operand is a VALUE, not the wrapped command: `timeout 60 …`,
-# `flock /tmp/lock …`. Peeling only the wrapper name left `60` as the head, which matched
-# nothing and put the real command out of the parser's reach.
-OPERAND_WRAPPERS = frozenset({"timeout", "flock"})
-
-# Shell keywords that can head a segment once it is split on `;`, so the real command
-# follows them: `if …; then scancel --me; fi`.
-SHELL_KEYWORDS = frozenset({"then", "do", "else", "elif", "{", "}", "!", "--"})
-
-# Commands whose arguments are DATA, not commands — they can only ever *mention* a
-# cancel. Listing them keeps `rg 'scancel -u' docs/` out of the fail-closed scan below;
-# a missing entry over-blocks, which is the direction we want to err in.
-MENTION_ONLY_COMMANDS = frozenset(
-    {
-        "rg", "grep", "egrep", "fgrep", "ag", "ack", "echo", "printf", "cat", "sed",
-        "awk", "head", "tail", "less", "more", "diff", "man", "comm", "sort", "uniq",
-    }
-)  # fmt: skip
-
-# Commands that ask WHERE a command lives rather than running it. Without these, the
-# fail-closed scan below blocked `which scancel` — which is what an agent reaches for while
-# working out why it just got blocked, so the guard obstructed its own diagnosis.
-LOOKUP_COMMANDS = frozenset({"which", "type", "whereis", "hash"})
-
-# Commands that execute a command string handed to them, so a quoted `scancel` inside
-# their arguments is a real cancel — `ssh ant-cluster "scancel -u djrhails"` is how a
-# worker reaches the cluster in the first place.
-COMMAND_RUNNERS = frozenset({"ssh", "bash", "sh", "zsh", "dash", "eval"})
-
-# Wrapper options that consume the next token, so the wrapper's own flags are not
-# mistaken for the wrapped command.
-WRAPPER_VALUE_OPTS = {
-    "xargs": frozenset({"-a", "-d", "-E", "-I", "-i", "-L", "-l", "-n", "-P", "-s", "--replace"}),
-    # ssh's value-taking flags; the first bare token after them is the host.
-    "ssh": frozenset({"-b", "-c", "-D", "-E", "-e", "-F", "-I", "-i", "-J", "-L", "-l",
-                      "-m", "-O", "-o", "-p", "-Q", "-R", "-S", "-W", "-w"}),
-}  # fmt: skip
-
-# Operators that redirect rather than separate. They still end a command, but the token
-# before them may be a file-descriptor number (`2>/dev/null`), which must not be read as
-# a job id — that alone turned a blocked sweep into an allowed one.
-REDIRECT_OPERATORS = frozenset({"<", ">", ">>", "<<", "<<<", ">&", "<&", "&>", ">|"})
-
-# `shlex` has already discarded adjacency by the time we segment, so `1937678 >` and `2>`
-# look identical. Only a single digit that could really BE a descriptor is dropped —
-# treating every trailing digit run as one ate real job ids and false-blocked the entirely
-# routine `scancel <jobid> >/tmp/log`.
-FD_DIGITS = frozenset({"0", "1", "2"})
-
-# Shell operators that separate one command from the next. `shlex` with
-# punctuation_chars emits these as standalone tokens; `\n` is inserted by `_tokenize`,
-# which lexes line by line (shlex treats a newline as ordinary whitespace).
-OPERATORS = (
-    frozenset({"|", "||", "&", "&&", ";", ";;", "|&", "(", ")", "\n"})
-    | REDIRECT_OPERATORS
+# The generic shell walking lives in lib/shell_walk.py so this guard and
+# block_self_matching_pkill share ONE tokeniser. Aliased to the private names this module already
+# used, so nothing below changes: two parsers drifting apart is how one guard grows a hole the
+# other does not have.
+from lib.shell_walk import (  # noqa: E402
+    COMMAND_RUNNERS,
+    LOOKUP_COMMANDS,
+    MENTION_ONLY_COMMANDS,
+    WRAPPER_VALUE_OPTS,
+    split_operator_run as _split_operator_run,
+    split_segments as _split_segments,
+    strip_wrapper_args as _strip_wrapper_args,
+    strip_wrappers as _strip_wrappers,
+    tokenize as _tokenize,
 )
-
-# The characters `shlex` treats as punctuation. It merges ADJACENT punctuation into one
-# token, so `);` arrives as a single `");"` that matches no operator — which stopped
-# `_split_segments` splitting there and glued a whole trailing `scancel --me` onto the
-# segment inside a `$(…)`. `_split_operator_run` takes such a run apart again.
-PUNCTUATION_CHARS = frozenset("();<>|&")
-
-# Longest operator first, so `&&` is not read as two `&` and `<<<` not as `<<` plus `<`.
-_MAX_OPERATOR_LENGTH = 3
 
 BLOCK_REASON = (
     "Unscoped `scancel` blocked: every worker shares the one cluster unix account, so "
@@ -169,119 +113,6 @@ BLOCK_REASON = (
     '      (length($2) == length(p) || substr($2, length(p) + 1, 1) == "-") {print $1}\'\n'
     "Eyeball the ids it prints before cancelling them."
 )
-
-
-def _tokenize(command: str) -> list[str]:
-    """Split a shell command into tokens, keeping operators as their own tokens.
-
-    Lexes line by line and emits an explicit ``\\n`` separator, because ``shlex`` with
-    ``whitespace_split`` swallows newlines as ordinary whitespace — which would fold a
-    whole multi-line script into one command and hide every ``scancel`` after line one.
-    """
-    tokens: list[str] = []
-    for line in command.splitlines():
-        lexer = shlex.shlex(line, posix=True, punctuation_chars=True)
-        lexer.whitespace_split = True
-        try:
-            lexed = list(lexer)
-        except ValueError:
-            # Unbalanced quotes — the shell would reject this anyway. Fall back to a
-            # whitespace split so a malformed `scancel -u $USER` still can't sneak past.
-            lexed = line.split()
-        for token in lexed:
-            tokens.extend(_split_operator_run(token))
-        tokens.append("\n")
-    return tokens
-
-
-def _split_operator_run(token: str) -> list[str]:
-    """Take a merged run of punctuation apart into the operators it spells.
-
-    ``shlex`` hands back ``");"`` as one token, which is in no operator set and so
-    separates nothing. Returns ``[token]`` unchanged for anything that is not purely
-    punctuation, or that does not decompose cleanly into known operators.
-    """
-    if not token or not all(char in PUNCTUATION_CHARS for char in token):
-        return [token]
-    parts: list[str] = []
-    index = 0
-    while index < len(token):
-        for length in range(_MAX_OPERATOR_LENGTH, 0, -1):
-            candidate = token[index : index + length]
-            if candidate in OPERATORS:
-                parts.append(candidate)
-                index += length
-                break
-        else:
-            return [token]  # an unknown punctuation run: leave it for the caller to see
-    return parts
-
-
-def _split_segments(tokens: list[str]) -> list[list[str]]:
-    """Group tokens into individual commands, split on shell operators."""
-    segments: list[list[str]] = [[]]
-    for token in tokens:
-        if token not in OPERATORS:
-            segments[-1].append(token)
-            continue
-        if (
-            token in REDIRECT_OPERATORS
-            and segments[-1]
-            and segments[-1][-1] in FD_DIGITS
-        ):
-            segments[-1].pop()  # a file descriptor (`2>`), not a job id
-        segments.append([])
-    return [segment for segment in segments if segment]
-
-
-def _strip_wrappers(segment: list[str]) -> list[str]:
-    """Peel leading env assignments, shell keywords and command wrappers off a segment.
-
-    Returns the tokens of the command actually being run, so `xargs -r scancel` and
-    `ssh ant-cluster scancel …` both reduce to a `scancel …` head.
-    """
-    tokens = list(segment)
-    while tokens:
-        head = tokens[0]
-        if (
-            "=" in head
-            and not head.startswith("-")
-            and head.split("=", 1)[0].isidentifier()
-        ):
-            tokens.pop(0)  # VAR=value prefix
-            continue
-        if head in PLAIN_WRAPPERS or head in SHELL_KEYWORDS:
-            if head in OPERAND_WRAPPERS:
-                # drop the wrapper, then its own flags, then its value operand
-                tokens = _strip_wrapper_args(tokens, frozenset(), drop_host=True)
-            else:
-                tokens.pop(0)
-            continue
-        if head == "xargs":
-            tokens = _strip_wrapper_args(
-                tokens, WRAPPER_VALUE_OPTS["xargs"], drop_host=False
-            )
-            continue
-        break
-    return tokens
-
-
-def _strip_wrapper_args(
-    tokens: list[str], value_opts: frozenset[str], *, drop_host: bool
-) -> list[str]:
-    """Drop a wrapper (tokens[0]), its options, and — for ssh — its host argument."""
-    rest = tokens[1:]
-    index = 0
-    while index < len(rest):
-        token = rest[index]
-        if not token.startswith("-"):
-            break
-        index += 1
-        if token in value_opts:
-            index += 1  # this option's value
-    if drop_host and index < len(rest):
-        index += 1  # the ssh destination
-    return rest[index:]
 
 
 def _is_job_id(token: str, *, variables_are_targets: bool) -> bool:
