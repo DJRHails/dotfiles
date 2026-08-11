@@ -111,6 +111,7 @@ These patterns signal machine-generated text. Never use them.
 | `groundbreaking` | Let the reader judge significance |
 | `complex`, `rich` (as praise) | Vacuous; describe what makes it so |
 | `spine` (metaphorical) | "the spine of the argument" — AI structural metaphor |
+| `the gap`, `the disconnect`, `the tension`, `the delta` (as a punchline) | Abstract noun standing in for the point you failed to make. "The number worth carrying is the gap" says nothing the numbers did not already say. Fine in its literal sense ("identify the gap in prior work"); banned as the predicate of a summarising sentence |
 
 ### Banned Atmospheric Words
 
@@ -128,6 +129,7 @@ These patterns signal machine-generated text. Never use them.
 - **Sensory abstractions** — attaching physical senses to abstract concepts
 - **Synonym cycling** — calling the same thing "the protagonist", "the main character", "the central figure", "the hero" across consecutive sentences. Pick one name and stick with it.
 - **False ranges** — "from X to Y, from A to B" where X/Y aren't on a meaningful scale. "From the Big Bang to dark matter" is not a range.
+- **Takeaway announcements** — "The number worth carrying is X", "The thing to remember is Y", "What matters here is Z", "The interesting part is...", "The real story is...", "The key insight is...", "This is the number that...". A label pasted on a fact, telling the reader which bit to be impressed by before they have seen it. If the fact is striking, it lands unannounced; if it needs the label, it is not striking. Cut the frame and state the fact. Watch for it clustering: the tic repeats across a document once it appears, and every instance reads as the same voice-over.
 
 ### Content Inflation Patterns
 
