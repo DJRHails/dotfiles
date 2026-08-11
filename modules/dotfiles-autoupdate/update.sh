@@ -80,7 +80,13 @@ update_dotfiles() {
     log "skip: $branch diverged from upstream — needs a manual pull"
   fi
 
-  [ "$stashed" = true ] && restore_stash
+  # An `&&` one-liner here would make the function return 1 whenever no stash
+  # was taken, and `set -e` then kills the script before the steps below it: on
+  # 2026-08-05 two clean-tree fast-forwards (13:13, 13:27) silently skipped the
+  # pi package refresh entirely. Every early return above is a deliberate 0.
+  if [ "$stashed" = true ]; then
+    restore_stash
+  fi
 }
 
 # Reapply the stash taken above — but only when it applies cleanly.
@@ -120,6 +126,44 @@ restore_stash() {
   else
     log "WARNING: reapplying local changes failed; they are kept in stash@{0}"
   fi
+}
+
+# Re-decrypt any glassine-managed file left as ciphertext in the working tree.
+#
+# Encrypted-at-rest files (see .gitattributes) are plaintext in the worktree and
+# ciphertext in git, and the smudge filter is what keeps that true. Several
+# ordinary operations write the raw blob instead: resolving a merge or stash
+# conflict by hand, `git checkout --ours/--theirs`, or any checkout that ran
+# while glassine was off PATH. The result is a file whose content is a sops
+# envelope while git still considers the tree clean — so nothing flags it and
+# nothing repairs it, and the damage outlives the operation that caused it.
+#
+# That is not hypothetical: a stash-conflict cleanup on 2026-08-04 left two
+# skills as ciphertext, and they stayed unreadable for a week. The only symptom
+# was agents reporting "description is required", which names neither the file
+# nor the cause. `restore_stash` above now prevents that particular conflict,
+# but every other path to a raw-blob write is still open, so detect and repair
+# the state rather than chase each cause.
+#
+# `glassine init` is idempotent (it writes .sops.yaml only when absent) and its
+# refresh loop re-smudges exactly these files, so run it daily and log only a
+# real repair.
+repair_glassine_worktree() {
+  command -v glassine >/dev/null 2>&1 || return 0
+  cd "$DOTFILES" 2>/dev/null || return 0
+  # Only repos that already opted into the filter — never bootstrap glassine
+  # into a repo that has not.
+  git config --get filter.glassine.clean >/dev/null 2>&1 || return 0
+
+  local out repaired
+  if ! out="$(glassine init 2>&1)"; then
+    log "WARNING: glassine init failed; managed files may still be ciphertext in the worktree"
+    return 0
+  fi
+
+  repaired="$(printf '%s\n' "$out" | grep 'decrypted .* file' || true)"
+  [ -n "$repaired" ] || return 0
+  log "repaired unsmudged files: ${repaired#glassine: }"
 }
 
 # Refresh pi's installed extension packages.
@@ -187,5 +231,6 @@ ensure_github_ssh_rewrite() {
 }
 
 update_dotfiles
+repair_glassine_worktree
 ensure_github_ssh_rewrite
 refresh_pi_packages
