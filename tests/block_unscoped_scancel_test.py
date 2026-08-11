@@ -115,6 +115,9 @@ UNSCOPED = [
     "apptainer exec img.sif bash -c 'scancel --me'",
     "docker run --rm img bash -c 'scancel --me'",
     "/usr/bin/env bash -c 'scancel --me'",
+    # tmux's -d takes NO value: the token after it is the command tmux runs, so a free-text
+    # exemption that trusted `-d` on any head would drop the whole payload as prose
+    "tmux new-session -d 'scancel --me'",
     # a wrapper whose first operand is a VALUE left that value as the head
     "timeout 60 bash -c 'scancel --me'",
     "flock /tmp/lock bash -c 'scancel --me'",
@@ -171,6 +174,8 @@ SCOPED = [
     "rg -n 'scancel --me' modules/",
     "echo 'never run scancel -u $USER'",
     "grep -r 'scancel -u djrhails' .",
+    # --grep takes a search pattern — free text on git, formerly a KNOWN_OVERBLOCK
+    "git log --grep scancel",
     # the sanctioned helper is its own command, not a scancel
     "scancel-mine",
     "scancel-mine --dry-run",
@@ -204,7 +209,6 @@ KNOWN_OVERBLOCK = [
     'scancel "${job_ids[@]}"',  # the idiom bin/scancel-mine itself uses internally
     "squeue -j $JOBID; scancel $JOBID",  # check-then-cancel: the query taints the $VAR
     "scontrol show job $JOBID; scancel $JOBID",  # scontrol enumerates ids too
-    "git log --grep scancel",  # a bare `scancel` token in ANY unrecognised command
     "rg scancel docs/ | bash",  # a stdin interpreter plus the word anywhere
 ]
 

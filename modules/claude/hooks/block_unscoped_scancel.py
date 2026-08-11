@@ -79,12 +79,13 @@ QUERY_COMMANDS = frozenset({"squeue", "sacct", "scontrol"})
 # other does not have.
 from lib.shell_walk import (  # noqa: E402
     COMMAND_RUNNERS,
+    FREE_TEXT_COMMANDS,
     LOOKUP_COMMANDS,
     MENTION_ONLY_COMMANDS,
-    WRAPPER_VALUE_OPTS,
     drop_free_text_values,
     split_operator_run as _split_operator_run,
     split_segments as _split_segments,
+    strip_runner_args as _strip_runner_args,
     strip_wrapper_args as _strip_wrapper_args,
     strip_wrappers as _strip_wrappers,
     tokenize as _tokenize,
@@ -208,13 +209,13 @@ def _unscoped_in_segment(
         return _unscoped_in_runner(
             head, args, variables_are_targets=variables_are_targets
         )
-    # Values claimed by a free-text flag are prose, not commands, so they are dropped before the
-    # fail-closed scan. Without this the guard blocked its own paperwork — a `git commit -m` or
-    # `gh pr create --title` that so much as discusses a cancel was refused, which teaches people
-    # to route around the guard rather than heed it.
-    return _unscoped_in_payload(
-        drop_free_text_values(args[1:]), variables_are_targets=variables_are_targets
-    )
+    # On a FREE_TEXT_COMMANDS head ONLY, values claimed by a free-text flag are dropped first — a
+    # `git commit -m` that so much as discusses a cancel was refused, which teaches people to
+    # route around the guard rather than heed it (FREE_TEXT_COMMANDS says why an arbitrary head
+    # cannot be trusted with the same flags). The head itself is scanned too: after a wrapper peel
+    # a quoted payload can be the whole segment (`watch 'scancel --me'` reduces to one token).
+    rest = drop_free_text_values(args[1:]) if head in FREE_TEXT_COMMANDS else args[1:]
+    return _unscoped_in_payload([args[0], *rest], variables_are_targets=variables_are_targets)
 
 
 def _unscoped_in_payload(
@@ -237,11 +238,11 @@ def _unscoped_in_payload(
         )
     for token in tokens:
         if token != "scancel" and "scancel" in token:
+            payload = token[token.index("scancel") :]
+            if payload == token and not any(char.isspace() for char in token):
+                continue  # `scancel_test.py` is a name, not a payload — re-lexing cannot progress
             offenders.extend(
-                _unscoped_in_command(
-                    token[token.index("scancel") :],
-                    variables_are_targets=variables_are_targets,
-                )
+                _unscoped_in_command(payload, variables_are_targets=variables_are_targets)
             )
     return offenders
 
@@ -250,14 +251,10 @@ def _unscoped_in_runner(
     head: str, args: list[str], *, variables_are_targets: bool
 ) -> list[list[str]]:
     """Unscoped cancels inside a command that runs a command handed to it."""
-    if head == "ssh":
-        # `ssh ant-cluster scancel -u djrhails` — the remote command is the tail tokens.
-        rest = _strip_wrapper_args(args, WRAPPER_VALUE_OPTS["ssh"], drop_host=True)
-    else:
-        # Drop the runner's own flags up to the first operand, but do NOT filter flags out
-        # of the middle: that detached `-u` from its value in `bash -c scancel -u $USER`
-        # and promoted the username to a job-id target.
-        rest = _strip_wrapper_args(args, frozenset(), drop_host=False)
+    # Drops the runner's own flags up to the first operand (and ssh's host), but does NOT filter
+    # flags out of the middle: that detached `-u` from its value in `bash -c scancel -u $USER`
+    # and promoted the username to a job-id target.
+    rest = _strip_runner_args(head, args)
     if not rest:
         # An interpreter with no operand reads its script from stdin, so the cancel is in
         # some other segment (`echo 'scancel --me' | bash`). Nothing here to judge.

@@ -49,6 +49,16 @@ SELF_KILLING = [
     # buried after a separator
     "echo starting; pkill -f mytrainer",
     "cd /tmp && pkill -f mytrainer",
+    # getopt_long accepts unambiguous abbreviations of --full
+    "pkill --ful mytrainer",
+    # quoted payloads handed to an unrecognised head really run — tmux/watch/parallel/sbatch
+    # all execute their argument, and each of these slipped the bare-token scan
+    "tmux new-session -d 'pkill -f mytrainer'",
+    "watch 'pkill -f mytrainer'",
+    "parallel 'pkill -f mytrainer' ::: 1",
+    "sbatch --wrap 'pkill -f mytrainer'",
+    # a loop keyword at segment head must not hide the runner behind it
+    'while ssh bonbon "pkill -f mytrainer"; do :; done',
 ]
 
 # Safe: matches a process NAME, not the caller's argv — or does not match at all.
@@ -69,14 +79,21 @@ ALLOWED = [
     "grep -rn 'pkill -f mytrainer' docs/",
     "echo 'never use pkill -f'",
     "which pkill",
-    # Prose handed to a free-text flag is data, not a command. Every one of these was refused
-    # before the FREE_TEXT_OPTS exemption, so the guard blocked its own paperwork — including the
-    # PR that introduced it.
+    # Prose handed to a free-text flag on a paperwork command is data, not a command. Now that
+    # the fail-closed scan re-lexes quoted payloads, every one of these would block without the
+    # FREE_TEXT_OPTS exemption — a guard that refuses its own paperwork gets routed around.
     'git commit -m "stop using pkill -f, it kills the caller"',
     'git commit -F .git/msg.txt',
     'gh pr create --title "guard: block pkill -f" --body-file /tmp/body.md',
     'gh pr create --title="block pkill -f"',
     'gh issue comment 12 --body "we hit pkill -f again"',
+    'git log --grep "pkill -f"',
+    # a loop keyword out of command position is data, so a one-shot pgrep stays a one-shot
+    "pgrep -af mytrainer && echo waiting for logs",
+    'for f in *.log; do grep for "$f"; done && pgrep -af mytrainer',
+    'pgrep -f "for"',
+    # everything after `--` is an operand, so this is a name kill, not a full match
+    "pkill -x -- -foo",
 ]
 
 # A pgrep predicate inside a loop matches the shell evaluating it, so the loop never ends.
@@ -84,6 +101,12 @@ HANGING_LOOPS = [
     'while pgrep -f mytrainer > /dev/null; do sleep 5; done',
     'until ! pgrep -f mytrainer; do sleep 2; done',
     'while pgrep -af "train.py" >/dev/null 2>&1; do sleep 10; done',
+    # the remote shell's argv carries the pattern too, so a remoted predicate hangs the same way
+    'while ssh bonbon "pgrep -f mytrainer"; do sleep 5; done',
+    # the most idiomatic wait-loop spelling: the predicate hides in a command substitution
+    'while [ -n "$(pgrep -f mytrainer)" ]; do sleep 5; done',
+    # the predicate is in the loop BODY, quoted, behind a runner
+    'while :; do ssh host "pgrep -f myjob" || break; sleep 5; done',
 ]
 
 # The same loops, with the caller filtered out.
@@ -193,10 +216,15 @@ def test_wants_full_match_reads_bundles_and_long_forms() -> None:
     assert hook.wants_full_match(["-f", "x"])
     assert hook.wants_full_match(["-af"])
     assert hook.wants_full_match(["--full"])
+    # getopt_long accepts unambiguous abbreviations, so these all turn -f on for real
+    assert hook.wants_full_match(["--ful"])
+    assert hook.wants_full_match(["--f"])
     assert not hook.wants_full_match(["-x", "name"])
     assert not hook.wants_full_match(["-9"])
     # a long option that merely contains an f must not read as -f
     assert not hook.wants_full_match(["--signal", "TERM"])
+    # after `--` everything is an operand, however flag-shaped it looks
+    assert not hook.wants_full_match(["-x", "--", "-foo"])
 
 
 if __name__ == "__main__":

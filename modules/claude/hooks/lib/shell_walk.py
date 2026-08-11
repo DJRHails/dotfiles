@@ -4,10 +4,10 @@ A guard hook has to answer "does this Bash command *run* X?" — and the honest 
 lexer, not a regex. ``rg "scancel" docs/`` and ``ssh host "pkill -f foo"`` differ only in
 whether the quoted text is data or a command, which is exactly what a regex cannot see.
 
-Extracted verbatim from ``block_unscoped_scancel.py``, which grew this parser first and whose
-test suite pins its behaviour. It lives here so the second guard (``block_self_matching_pkill``)
-reuses one tokeniser instead of carrying a divergent copy — two parsers disagreeing about what
-counts as a command is how one guard ends up with a hole the other does not.
+Extracted from ``block_unscoped_scancel.py``, which grew this parser first. It lives here so the
+second guard (``block_self_matching_pkill``) reuses one tokeniser instead of carrying a divergent
+copy — two parsers disagreeing about what counts as a command is how one guard ends up with a hole
+the other does not. Both guards' behaviour suites pin what is here, so run BOTH after a change.
 
 The shared contract for callers: peel wrappers with :func:`strip_wrappers`, then treat an
 unrecognised head as *possibly* running its arguments and fail CLOSED. Only
@@ -18,24 +18,35 @@ from __future__ import annotations
 
 import shlex
 
-# Wrappers to peel off before deciding what the real command is. Not exhaustive, and it does not
-# need to be: an unrecognised head falls through to the caller's fail-closed scan. `xargs` takes
-# value-options, so it is handled separately below.
-PLAIN_WRAPPERS = frozenset(
-    {
-        "sudo", "doas", "time", "nohup", "command", "exec", "builtin", "env",
-        "timeout", "nice", "ionice", "stdbuf", "setsid", "flock", "watch",
-    }
-)  # fmt: skip
-
 # Wrappers whose first bare operand is a VALUE, not the wrapped command: `timeout 60 …`,
 # `flock /tmp/lock …`. Peeling only the wrapper name left `60` as the head, which matched
 # nothing and put the real command out of the parser's reach.
 OPERAND_WRAPPERS = frozenset({"timeout", "flock"})
 
+# Wrappers to peel off before deciding what the real command is. Not exhaustive, and it does not
+# need to be: an unrecognised head falls through to the caller's fail-closed scan. `xargs` takes
+# value-options, so it is handled separately below. OPERAND_WRAPPERS is unioned in rather than
+# listed again, because strip_wrappers only consults it inside this set's branch: an operand
+# wrapper missing from here would silently never peel, and the guard would fail open invisibly.
+PLAIN_WRAPPERS = OPERAND_WRAPPERS | frozenset(
+    {
+        "sudo", "doas", "time", "nohup", "command", "exec", "builtin", "env",
+        "nice", "ionice", "stdbuf", "setsid", "watch",
+    }
+)  # fmt: skip
+
 # Shell keywords that can head a segment once it is split on `;`, so the real command follows
-# them: `if …; then pkill -f foo; fi`.
-SHELL_KEYWORDS = frozenset({"then", "do", "else", "elif", "{", "}", "!", "--"})
+# them: `if …; then pkill -f foo; fi`. The loop and conditional openers/closers are here too:
+# leaving `while` unpeelable hid everything behind it (`while ssh host "pkill -f x"` — the
+# `ssh` was never recognised as a runner, so the quoted payload fell to a bare-token scan).
+# `block_self_matching_pkill` also reads this set to tell command position from data, so dropping
+# a keyword here quietly widens what its loop detection reads as prose.
+SHELL_KEYWORDS = frozenset(
+    {
+        "then", "do", "else", "elif", "{", "}", "!", "--",
+        "if", "fi", "while", "until", "for", "done",
+    }
+)  # fmt: skip
 
 # Commands whose arguments are DATA, not commands — they can only ever *mention* a command.
 # Listing them keeps `rg 'pkill -f' docs/` out of the fail-closed scan; a missing entry
@@ -48,16 +59,23 @@ MENTION_ONLY_COMMANDS = frozenset(
 )  # fmt: skip
 
 # Flags whose value is free TEXT by the flag's own contract — a commit message, a PR title, a
-# body file. Text handed to one of these cannot execute, so a guard must not read a command name
-# inside it as an invocation. Without this the guards block their own paperwork: `git commit -m
-# "stop using pkill -f"` and `gh pr create --title "block pkill -f"` were both refused, which is
-# how a guard teaches people to route around it.
+# search pattern. Text handed to one of these cannot execute, so a guard must not read a command
+# name inside it as an invocation. Without the exemption the guards block their own paperwork —
+# a `git commit -m` whose message merely discusses a cancel was refused, which is how a guard
+# teaches people to route around it. (Heredoc-fed messages are still blocked: the lexer reads
+# heredoc lines as commands. `git commit -F <file>` is the shape that always works.)
 FREE_TEXT_OPTS = frozenset(
     {
         "-m", "--message", "-F", "--file", "--body", "--body-file", "-t", "--title",
-        "-d", "--description", "--notes", "--subject",
+        "-d", "--description", "--notes", "--subject", "--grep",
     }
 )  # fmt: skip
+
+# The only command heads these flags are trusted on. On an arbitrary unrecognised head the
+# "value" after one of these short flags can BE the command — tmux's `-d` takes no value, so
+# `tmux new-session -d 'pkill -f x'` would have its whole payload dropped as prose. git and gh
+# are paperwork: their -m/-F/--title values are messages by contract, never executed.
+FREE_TEXT_COMMANDS = frozenset({"git", "gh"})
 
 # Commands that ask WHERE a command lives rather than running it. Without these, the fail-closed
 # scan blocks `which pkill` — which is what an agent reaches for while working out why it just
@@ -192,6 +210,10 @@ def drop_free_text_values(tokens: list[str]) -> list[str]:
     ``--title "block pkill -f"`` leaves ``--title`` in place and drops the string after it. Also
     handles the ``--flag=value`` spelling, whose value never was a separate token.
 
+    Callers must apply this only when the command head is in :data:`FREE_TEXT_COMMANDS`: the
+    flags are trusted by the *head's* contract, not their own spelling — on an unknown head,
+    ``-d``'s "value" can be the command itself (``tmux new-session -d 'pkill -f x'``).
+
     Only the *immediately following* token is dropped. A flag that takes free text takes exactly
     one operand, so consuming more would hide a real command: ``git commit -m "msg" && pkill -f x``
     must still be caught, and it is, because the walker has already split on ``&&``.
@@ -213,10 +235,25 @@ def drop_free_text_values(tokens: list[str]) -> list[str]:
     return kept
 
 
+def strip_runner_args(head: str, tokens: list[str]) -> list[str]:
+    """Drop a command runner, its own flags, and — for ssh — the destination host.
+
+    Both guards descend into runners through here, so they cannot drift on which runners take
+    value options or on which of them puts a destination ahead of the command it runs.
+    """
+    return strip_wrapper_args(
+        tokens, WRAPPER_VALUE_OPTS.get(head, frozenset()), drop_host=head == "ssh"
+    )
+
+
 def strip_wrapper_args(
     tokens: list[str], value_opts: frozenset[str], *, drop_host: bool
 ) -> list[str]:
-    """Drop a wrapper (tokens[0]), its options, and — for ssh — its host argument."""
+    """Drop a wrapper (tokens[0]), its options, and optionally its first bare operand.
+
+    ``drop_host`` drops that operand too, for the wrappers whose first operand is a value rather
+    than the start of the wrapped command: ssh's destination, timeout's duration, flock's path.
+    """
     rest = tokens[1:]
     index = 0
     while index < len(rest):
