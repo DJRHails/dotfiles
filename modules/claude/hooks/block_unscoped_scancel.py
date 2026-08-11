@@ -82,6 +82,7 @@ from lib.shell_walk import (  # noqa: E402
     LOOKUP_COMMANDS,
     MENTION_ONLY_COMMANDS,
     WRAPPER_VALUE_OPTS,
+    drop_free_text_values,
     split_operator_run as _split_operator_run,
     split_segments as _split_segments,
     strip_wrapper_args as _strip_wrapper_args,
@@ -207,7 +208,13 @@ def _unscoped_in_segment(
         return _unscoped_in_runner(
             head, args, variables_are_targets=variables_are_targets
         )
-    return _unscoped_in_payload(args[1:], variables_are_targets=variables_are_targets)
+    # Values claimed by a free-text flag are prose, not commands, so they are dropped before the
+    # fail-closed scan. Without this the guard blocked its own paperwork — a `git commit -m` or
+    # `gh pr create --title` that so much as discusses a cancel was refused, which teaches people
+    # to route around the guard rather than heed it.
+    return _unscoped_in_payload(
+        drop_free_text_values(args[1:]), variables_are_targets=variables_are_targets
+    )
 
 
 def _unscoped_in_payload(

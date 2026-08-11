@@ -44,6 +44,7 @@ from lib.shell_walk import (  # noqa: E402
     LOOKUP_COMMANDS,
     MENTION_ONLY_COMMANDS,
     WRAPPER_VALUE_OPTS,
+    drop_free_text_values,
     split_segments,
     strip_wrapper_args,
     strip_wrappers,
@@ -134,8 +135,12 @@ def _offenders_in_segment(segment: list[str], *, in_loop: bool, self_excluded: b
         return _offenders_in_runner(tokens, in_loop=in_loop, self_excluded=self_excluded)
     if head in MATCHERS:
         return _verdict(head, tokens[1:], in_loop=in_loop, self_excluded=self_excluded)
-    # Fail closed: an unrecognised head may still run a matcher handed to it as an argument.
-    return _scan_for_matchers(tokens[1:], in_loop=in_loop, self_excluded=self_excluded)
+    # Fail closed: an unrecognised head may still run a matcher handed to it as an argument. Values
+    # claimed by a free-text flag are dropped first — `gh pr create --title "block pkill -f"` is
+    # prose, and blocking it taught nothing except how to route around the guard.
+    return _scan_for_matchers(
+        drop_free_text_values(tokens[1:]), in_loop=in_loop, self_excluded=self_excluded
+    )
 
 
 def _verdict(head: str, args: list[str], *, in_loop: bool, self_excluded: bool) -> list[str]:

@@ -69,6 +69,14 @@ ALLOWED = [
     "grep -rn 'pkill -f mytrainer' docs/",
     "echo 'never use pkill -f'",
     "which pkill",
+    # Prose handed to a free-text flag is data, not a command. Every one of these was refused
+    # before the FREE_TEXT_OPTS exemption, so the guard blocked its own paperwork — including the
+    # PR that introduced it.
+    'git commit -m "stop using pkill -f, it kills the caller"',
+    'git commit -F .git/msg.txt',
+    'gh pr create --title "guard: block pkill -f" --body-file /tmp/body.md',
+    'gh pr create --title="block pkill -f"',
+    'gh issue comment 12 --body "we hit pkill -f again"',
 ]
 
 # A pgrep predicate inside a loop matches the shell evaluating it, so the loop never ends.
@@ -169,6 +177,16 @@ def test_main_fails_closed_on_an_unreadable_pkill() -> None:
 
 def test_unbalanced_quotes_still_block() -> None:
     assert _blocked("pkill -f 'mytrainer")
+
+
+def test_a_real_command_after_a_free_text_flag_is_still_caught() -> None:
+    """The exemption drops ONE operand, so a chained command after it must still block.
+
+    This is the hole a broader exemption would open: `git commit -m "msg" && pkill -f x` has to
+    stay blocked, and it does because the walker splits on `&&` before any of this runs.
+    """
+    assert _blocked('git commit -m "done" && pkill -f mytrainer')
+    assert _blocked('gh pr create --title "t"; pkill -f mytrainer')
 
 
 def test_wants_full_match_reads_bundles_and_long_forms() -> None:

@@ -47,6 +47,18 @@ MENTION_ONLY_COMMANDS = frozenset(
     }
 )  # fmt: skip
 
+# Flags whose value is free TEXT by the flag's own contract — a commit message, a PR title, a
+# body file. Text handed to one of these cannot execute, so a guard must not read a command name
+# inside it as an invocation. Without this the guards block their own paperwork: `git commit -m
+# "stop using pkill -f"` and `gh pr create --title "block pkill -f"` were both refused, which is
+# how a guard teaches people to route around it.
+FREE_TEXT_OPTS = frozenset(
+    {
+        "-m", "--message", "-F", "--file", "--body", "--body-file", "-t", "--title",
+        "-d", "--description", "--notes", "--subject",
+    }
+)  # fmt: skip
+
 # Commands that ask WHERE a command lives rather than running it. Without these, the fail-closed
 # scan blocks `which pkill` — which is what an agent reaches for while working out why it just
 # got blocked, so the guard would obstruct its own diagnosis.
@@ -172,6 +184,33 @@ def strip_wrappers(segment: list[str]) -> list[str]:
             continue
         break
     return tokens
+
+
+def drop_free_text_values(tokens: list[str]) -> list[str]:
+    """Remove values that a :data:`FREE_TEXT_OPTS` flag claims, so prose is not read as commands.
+
+    ``--title "block pkill -f"`` leaves ``--title`` in place and drops the string after it. Also
+    handles the ``--flag=value`` spelling, whose value never was a separate token.
+
+    Only the *immediately following* token is dropped. A flag that takes free text takes exactly
+    one operand, so consuming more would hide a real command: ``git commit -m "msg" && pkill -f x``
+    must still be caught, and it is, because the walker has already split on ``&&``.
+    """
+    kept: list[str] = []
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token in FREE_TEXT_OPTS:
+            kept.append(token)
+            skip_next = True
+            continue
+        if token.startswith("--") and "=" in token and token.split("=", 1)[0] in FREE_TEXT_OPTS:
+            kept.append(token.split("=", 1)[0])
+            continue
+        kept.append(token)
+    return kept
 
 
 def strip_wrapper_args(
