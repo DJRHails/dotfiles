@@ -64,13 +64,25 @@ flags "real story" takeaway-announcement \
   "The real story is in the tail."
 flags "this is the number that" takeaway-announcement \
   "This is the number that matters."
+flags "key takeaway" takeaway-announcement \
+  "The key takeaway is that caching wins."
+flags "important part" takeaway-announcement \
+  "The important part is the cache."
+flags "this is the thing that" takeaway-announcement \
+  "This is the thing that broke the build."
 
 # --- abstract nouns as a punchline are caught -------------------------------
+# Every noun and copula in the alternation gets a positive: covered only by a
+# negative, an entry can be dropped from the list without failing anything.
 
 flags "is the gap" punchline-abstraction \
   "The number worth carrying is the gap between the two runs."
 flags "remains the tension" punchline-abstraction \
   "What is left over remains the tension in the design."
+flags "was the delta" punchline-abstraction \
+  "The finding was the delta between the two runs."
+flags "becomes the disconnect" punchline-abstraction \
+  "What is left over becomes the disconnect in the design."
 
 # --- the literal sense stays legal ------------------------------------------
 # Each of these appears in the repo's own prose; a false positive here trains
@@ -86,6 +98,12 @@ ignores "delta as a diff" punchline-abstraction \
   "Review only the new delta against the previously-reviewed head."
 ignores "plain statement of a number" takeaway-announcement \
   "Throughput rose from 900 to 1,340 requests per second."
+# The takeaway pattern carries a carve-out of its own, anchored on the literal
+# `the`: an abstract's contribution sentence is the one register where the
+# construction earns its place. Dropping the anchor keeps every other check
+# green, so this is the only line that pins it.
+ignores "abstract contribution sentence" takeaway-announcement \
+  "Our key insight is that caching wins."
 
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
