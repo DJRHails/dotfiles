@@ -32,3 +32,7 @@ pre-commit:
     # A word-list "simplification" reads as tidier and quietly kills the carve-out.
     prose-lint-tests:
       run: bash tests/prose-lint.test.sh
+    # The sfw wrappers are a security control: a silently broken case pattern
+    # means installs bypass the firewall while it still looks installed.
+    sfw-aliases-tests:
+      run: zsh -f tests/sfw-aliases.test.zsh

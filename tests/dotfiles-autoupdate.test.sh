@@ -335,7 +335,17 @@ while [ \$# -gt 0 ]; do
 done
 case "\$url" in
   *api.github.com*) printf '{"tag_name": "v9.9.9"}\n' ;;
-  *releases/download*) printf 'new-sfw-binary %s\n' "\${url##*/}" > "\$out" ;;
+  *releases/download*)
+    [ "$mode" = download-fail ] && exit 22
+    if [ "$mode" = download-garbage ]; then
+      printf '<html>captive portal</html>\n' > "\$out"
+    else
+      # A runnable fake: ensure_sfw_fresh execs the download before it may
+      # replace the live binary; the embedded URL pins os/arch/tag assembly.
+      printf '#!/usr/bin/env bash\n# downloaded-from %s\necho "Socket Firewall Free, version 9.9.9"\n' \
+        "\$url" > "\$out"
+    fi
+    ;;
 esac
 exit 0
 STUB
@@ -350,10 +360,43 @@ log="$(run_update)"
 
 check "sfw stale: update logged" \
   "1" "$(grep -c 'sfw: updated 1.0.0 -> 9.9.9' <<< "$log")"
-check "sfw stale: binary replaced in place" \
-  "new-sfw-binary" "$(head -1 "$fake_home/.local/bin/sfw" | cut -d' ' -f1)"
+# Mirror the os/arch mapping so the check pins the URL template (repo path,
+# ${os}-${arch} order, the v in the tag) on whatever host runs the suite.
+exp_os="linux"
+[ "$(uname -s)" = Darwin ] && exp_os="macos"
+case "$(uname -m)" in aarch64 | arm64) exp_arch="arm64" ;; *) exp_arch="x86_64" ;; esac
+check "sfw stale: binary replaced, download URL correct" \
+  "# downloaded-from https://github.com/SocketDev/sfw-free/releases/download/v9.9.9/sfw-free-${exp_os}-${exp_arch}" \
+  "$(sed -n 2p "$fake_home/.local/bin/sfw")"
 check "sfw stale: replacement is executable" \
   "1" "$([ -x "$fake_home/.local/bin/sfw" ] && echo 1 || echo 0)"
+
+# --- sfw refresh: a failed download leaves the old binary in place ------------
+setup_repo
+stub_sfw "1.0.0"
+stub_curl download-fail
+log="$(run_update)"
+
+check "sfw download-fail: failure logged with curl exit" \
+  "1" "$(grep -c 'sfw: FAILED to update to 9.9.9 (curl exit 22)' <<< "$log")"
+check "sfw download-fail: old binary intact" \
+  "1" "$(grep -c 'version 1.0.0' "$fake_home/.local/bin/sfw")"
+check "sfw download-fail: old binary still executable" \
+  "1" "$([ -x "$fake_home/.local/bin/sfw" ] && echo 1 || echo 0)"
+check "sfw download-fail: exits 0" "0" "$(cat "$work/status")"
+
+# --- sfw refresh: a garbage download is rejected, never installed --------------
+setup_repo
+stub_sfw "1.0.0"
+stub_curl download-garbage
+log="$(run_update)"
+
+check "sfw garbage: rejection logged" \
+  "1" "$(grep -c 'sfw: FAILED to update to 9.9.9 (downloaded file is not a working sfw)' <<< "$log")"
+check "sfw garbage: old binary intact" \
+  "1" "$(grep -c 'version 1.0.0' "$fake_home/.local/bin/sfw")"
+check "sfw garbage: no temp file left beside the binary" \
+  "0" "$(find "$fake_home/.local/bin" -name 'sfw.*' | wc -l | tr -d ' ')"
 
 # --- sfw refresh: a current binary is left untouched --------------------------
 setup_repo
