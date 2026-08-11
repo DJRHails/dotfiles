@@ -216,6 +216,44 @@ refresh_pi_packages() {
   done < <(jq -r '.packages[]? // empty' "$settings")
 }
 
+# Keep the Socket Firewall binary current. Socket drops support for old sfw
+# releases, so a stale binary eventually stops filtering — a firewall that
+# silently rots is worse than none, because it still *looks* installed. Only
+# the ~/.local/bin copy the sfw module installs is touched (user-writable, so
+# this timer can replace it without sudo). Every failure path returns 0: an
+# offline host or a GitHub hiccup must not block the steps around it.
+ensure_sfw_fresh() {
+  local bin="$HOME/.local/bin/sfw" api tag cur os arch tmp
+  [ -x "$bin" ] || return 0
+
+  # Buffer the API response before matching — piping curl straight into
+  # `grep -m1` makes grep close the pipe on the first match and curl die
+  # with SIGPIPE (same trap as install::release_binary).
+  api="$(curl -fsSL --max-time 15 \
+    https://api.github.com/repos/SocketDev/sfw-free/releases/latest 2>/dev/null)" || true
+  tag="$(printf '%s' "$api" | grep -m1 '"tag_name"' |
+    sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')" || true
+  [ -n "$tag" ] || {
+    log "sfw: release check failed (offline?)"
+    return 0
+  }
+
+  cur="$("$bin" --version 2>/dev/null | sed -E 's/.*version ([0-9.]+).*/\1/')" || true
+  [ "$cur" = "${tag#v}" ] && return 0
+
+  case "$(uname -s)" in Darwin) os="macos" ;; *) os="linux" ;; esac
+  case "$(uname -m)" in aarch64 | arm64) arch="arm64" ;; *) arch="x86_64" ;; esac
+  tmp="$(mktemp)"
+  if curl -fsSL --max-time 300 -o "$tmp" \
+    "https://github.com/SocketDev/sfw-free/releases/download/${tag}/sfw-free-${os}-${arch}" &&
+    install -m 0755 "$tmp" "$bin"; then
+    log "sfw: updated ${cur:-?} -> ${tag#v}"
+  else
+    log "sfw: FAILED to update to ${tag#v}"
+  fi
+  rm -f "$tmp"
+}
+
 # Keep ~/.gitconfig.github-ssh in step with this host's GitHub SSH key. The
 # tracked gitconfig only *includes* that file (see modules/git/gitconfig): the
 # HTTPS -> SSH rewrite belongs on hosts whose ssh config has a Host entry for
@@ -245,5 +283,6 @@ ensure_github_ssh_rewrite() {
 
 update_dotfiles
 repair_glassine_worktree
+ensure_sfw_fresh
 ensure_github_ssh_rewrite
 refresh_pi_packages

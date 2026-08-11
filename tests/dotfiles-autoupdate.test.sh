@@ -8,6 +8,12 @@
 # popped into the working tree as conflict markers.
 set -u
 
+# The suite drives git in throwaway repos under $work, so ambient repo
+# pointers must not leak in: pre-commit/prek export GIT_DIR (and friends)
+# when the commit runs from a linked worktree, which silently redirects every
+# `git -C "$clone"` at the worktree's own repo and fails half the checks.
+unset GIT_DIR GIT_INDEX_FILE GIT_WORK_TREE GIT_OBJECT_DIRECTORY
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 update_sh="$repo_root/modules/dotfiles-autoupdate/update.sh"
@@ -41,6 +47,22 @@ setup_repo() {
   git init --quiet --bare "$work/origin"
   git clone --quiet "$work/origin" "$work/clone" 2> /dev/null
   clone="$work/clone"
+  # Refuse to continue unless git actually resolves to the sandbox clone. The
+  # 2026-08-11 incident: prek exports GIT_DIR for a commit made from a linked
+  # worktree, which redirected every `git -C "$clone"` here at the real repo —
+  # fixture commits landed on the real branch and `push origin HEAD:main`
+  # fast-forwarded the real remote's main. The unset at the top fixes that
+  # leak; this guard refuses any future one before a single commit is made.
+  local resolved
+  resolved="$(git -C "$clone" rev-parse --absolute-git-dir 2> /dev/null)"
+  case "$resolved" in
+    "$work"/*) ;;
+    *)
+      printf 'ABORT: git -C clone resolves to [%s], outside the sandbox %s — ambient git env leaked\n' \
+        "${resolved:-nothing}" "$work" >&2
+      exit 1
+      ;;
+  esac
   printf 'default\n' > "$clone/settings.json"
   printf 'untouched\n' > "$clone/other.txt"
   git_quiet add -A
@@ -264,6 +286,78 @@ check "clean-tree update: exits 0" "0" "$(cat "$work/status")"
 check "clean-tree update: no stash was taken" \
   "0" "$(git -C "$clone" stash list | wc -l | tr -d ' ')"
 check "clean-tree update: later steps still ran" \
+  "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
+# --- sfw refresh: stubs -------------------------------------------------------
+# ensure_sfw_fresh talks to the network twice (release check, binary download),
+# so both ride a curl stub; sfw itself is a stub that reports a fixed version.
+# Everything lands in $fake_home/.local/bin, which update.sh prepends to PATH.
+stub_sfw() {
+  mkdir -p "$fake_home/.local/bin"
+  printf '#!/usr/bin/env bash\necho "Socket Firewall Free, version %s"\n' "$1" \
+    > "$fake_home/.local/bin/sfw"
+  chmod +x "$fake_home/.local/bin/sfw"
+}
+
+stub_curl() {
+  local mode=${1:-ok}
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/curl" << STUB
+#!/usr/bin/env bash
+[ "$mode" = offline ] && exit 6
+out="" url=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o) out=\$2; shift ;;
+    http*) url=\$1 ;;
+  esac
+  shift
+done
+case "\$url" in
+  *api.github.com*) printf '{"tag_name": "v9.9.9"}\n' ;;
+  *releases/download*) printf 'new-sfw-binary %s\n' "\${url##*/}" > "\$out" ;;
+esac
+exit 0
+STUB
+  chmod +x "$fake_home/.local/bin/curl"
+}
+
+# --- sfw refresh: a stale binary is replaced in place ------------------------
+setup_repo
+stub_sfw "1.0.0"
+stub_curl ok
+log="$(run_update)"
+
+check "sfw stale: update logged" \
+  "1" "$(grep -c 'sfw: updated 1.0.0 -> 9.9.9' <<< "$log")"
+check "sfw stale: binary replaced in place" \
+  "new-sfw-binary" "$(head -1 "$fake_home/.local/bin/sfw" | cut -d' ' -f1)"
+check "sfw stale: replacement is executable" \
+  "1" "$([ -x "$fake_home/.local/bin/sfw" ] && echo 1 || echo 0)"
+
+# --- sfw refresh: a current binary is left untouched --------------------------
+setup_repo
+stub_sfw "9.9.9"
+stub_curl ok
+log="$(run_update)"
+
+check "sfw current: nothing logged" \
+  "0" "$(grep -c 'sfw:' <<< "$log")"
+check "sfw current: binary untouched" \
+  "#!/usr/bin/env" "$(head -1 "$fake_home/.local/bin/sfw" | cut -d' ' -f1)"
+
+# --- sfw refresh: an offline release check is logged and never fatal ----------
+setup_repo
+stub_sfw "1.0.0"
+stub_curl offline
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+log="$(run_update)"
+
+check "sfw offline: skip logged" \
+  "1" "$(grep -c 'sfw: release check failed (offline?)' <<< "$log")"
+check "sfw offline: exits 0" "0" "$(cat "$work/status")"
+check "sfw offline: later steps still ran" \
   "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
 
 if ((fails)); then

@@ -51,6 +51,7 @@ cd ~/.files
 | `python`                | python3, uv, and virtualenv quality-of-life aliases.
 | `raycast`               | Raycast (macOS launcher).
 | `rust`                  | Rust toolchain via rustup, plus cargo tools.
+| `sfw`                   | Socket Firewall — blocks known-malicious packages on npm/pnpm/yarn/pip/uv/cargo installs.
 | `slurm`                 | Slurm helper aliases for GPU clusters.
 | :sparkle: `ssh`         | ssh config template for commonly used machines.
 | `tailscale`             | Tailscale VPN (exit-node advertising is opt-in).
