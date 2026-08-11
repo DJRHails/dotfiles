@@ -80,7 +80,13 @@ update_dotfiles() {
     log "skip: $branch diverged from upstream — needs a manual pull"
   fi
 
-  [ "$stashed" = true ] && restore_stash
+  # An `&&` one-liner here would make the function return 1 whenever no stash
+  # was taken, and `set -e` then kills the script before the steps below it: on
+  # 2026-08-05 two clean-tree fast-forwards (13:13, 13:27) silently skipped the
+  # pi package refresh entirely. Every early return above is a deliberate 0.
+  if [ "$stashed" = true ]; then
+    restore_stash
+  fi
 }
 
 # Reapply the stash taken above — but only when it applies cleanly.

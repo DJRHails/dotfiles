@@ -27,9 +27,17 @@ check() {
 
 git_quiet() { git -C "$clone" -c user.email=t@t -c user.name=t "$@" > /dev/null 2>&1; }
 
+# The script prepends $HOME/.local/bin to PATH, so a fake HOME is the only way
+# to put a stub ahead of a real glassine — and it keeps the suite from writing
+# ~/.gitconfig.github-ssh into the developer's actual home. git identity has to
+# be supplied because the stash the updater takes creates commit objects.
+fake_home="$work/home"
+
 # A bare origin plus a clone, so the script's fetch/merge run for real.
 setup_repo() {
-  rm -rf -- "$work/origin" "$work/clone" "$work/state"
+  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home"
+  mkdir -p "$fake_home"
+  printf '[user]\n\tname = t\n\temail = t@t\n' > "$fake_home/.gitconfig"
   git init --quiet --bare "$work/origin"
   git clone --quiet "$work/origin" "$work/clone" 2> /dev/null
   clone="$work/clone"
@@ -52,8 +60,12 @@ push_upstream() {
   git -C "$up" push --quiet origin HEAD:main
 }
 
+# Runs in a subshell via `log="$(run_update)"`, so the exit status goes to a
+# file rather than a variable the caller could never see.
 run_update() {
-  DOTFILES="$clone" XDG_STATE_HOME="$work/state" bash "$update_sh" > /dev/null 2>&1
+  DOTFILES="$clone" XDG_STATE_HOME="$work/state" HOME="$fake_home" \
+    bash "$update_sh" > /dev/null 2>&1
+  printf '%s\n' "$?" > "$work/status"
   cat "$work/state/dotfiles/autoupdate.log"
 }
 
@@ -121,6 +133,23 @@ log="$(run_update)"
 
 check "diverged: HEAD untouched" "$local_head" "$(git -C "$clone" rev-parse HEAD)"
 check "diverged: logged" "1" "$(grep -c 'diverged from upstream' <<< "$log")"
+
+# --- a clean-tree update still runs the steps after the pull ----------------
+# `update_dotfiles` ends on the stash branch, so an `&&` one-liner there made it
+# return 1 whenever no stash was taken; `set -e` then killed the run before the
+# pi refresh and the ssh-rewrite. Two fast-forwards on 2026-08-05 skipped them
+# silently, so assert on a side effect of the last step, not just the exit code.
+setup_repo
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "clean-tree update: exits 0" "0" "$(cat "$work/status")"
+check "clean-tree update: no stash was taken" \
+  "0" "$(git -C "$clone" stash list | wc -l | tr -d ' ')"
+check "clean-tree update: later steps still ran" \
+  "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
 
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
