@@ -96,9 +96,16 @@ STUB
   chmod +x "$fake_home/.local/bin/glassine"
 }
 
-# Mark the clone as a glassine repo without installing real filters: the updater
-# gates on this config alone, and a real clean filter would need sops.
-enable_glassine_filter() { git -C "$clone" config filter.glassine.clean 'glassine clean %f'; }
+# Mark the clone as a glassine repo the way a real one is marked: a tracked
+# .gitattributes rule. That, not the local config, is what the updater gates on.
+enable_glassine_filter() {
+  printf 'secret/** filter=glassine\n' > "$clone/.gitattributes"
+  git_quiet add .gitattributes
+  git_quiet commit -m "declare a glassine rule"
+  # Push it: an unpushed commit would diverge the clone and suppress the pull
+  # these cases still depend on.
+  git_quiet push origin HEAD:main
+}
 
 # --- a local edit that does not collide is carried over the update ----------
 setup_repo
@@ -214,6 +221,33 @@ check "glassine failure: the update still landed" \
   "upstream-changed" "$(cat "$clone/other.txt")"
 check "glassine failure: no repair claimed" \
   "0" "$(grep -c 'repaired unsmudged files' <<< "$log")"
+
+# --- a lost filter config is restored, and said out loud --------------------
+# filter.glassine.* lives in .git/config, so it is never cloned and easily lost.
+# Meanwhile .gitattributes still declares the rule, so git runs no filter and
+# stages managed files as plaintext. Gating on that config would skip this repo.
+setup_repo
+stub_glassine
+enable_glassine_filter
+git -C "$clone" config --unset filter.glassine.clean 2> /dev/null
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "lost config: repaired anyway, not skipped" \
+  "init" "$(cat "$work/glassine.calls")"
+check "lost config: warns that plaintext was staging" \
+  "1" "$(grep -c 'restored the missing glassine filter config' <<< "$log")"
+
+# A repo already holding the config is repaired without the scary line.
+setup_repo
+stub_glassine
+enable_glassine_filter
+git -C "$clone" config filter.glassine.clean 'glassine clean %f'
+push_upstream other.txt "upstream-changed"
+log="$(run_update)"
+
+check "intact config: no spurious restore warning" \
+  "0" "$(grep -c 'restored the missing glassine filter config' <<< "$log")"
 
 # --- a clean-tree update still runs the steps after the pull ----------------
 # `update_dotfiles` ends on the stash branch, so an `&&` one-liner there made it

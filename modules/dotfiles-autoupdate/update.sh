@@ -148,18 +148,31 @@ restore_stash() {
 # `glassine init` is idempotent (it writes .sops.yaml only when absent) and its
 # refresh loop re-smudges exactly these files, so run it daily and log only a
 # real repair.
+# It also restores the filter config when that has gone missing, which is the
+# more dangerous half. `filter.glassine.*` lives in .git/config — untracked, so
+# never cloned and easily lost. While .gitattributes still says filter=glassine,
+# git has no filter to run and stages managed files as PLAINTEXT, secrets and
+# all; only the pre-commit hook stands in the way, and that is local state too.
+# So gate on the tracked .gitattributes, never on the config: the config being
+# absent is the very state worth repairing, and gating on it would skip exactly
+# the repo that needs this most. A repo with no glassine rule is still left
+# alone, which is the property the gate is for.
 repair_glassine_worktree() {
   command -v glassine >/dev/null 2>&1 || return 0
   cd "$DOTFILES" 2>/dev/null || return 0
-  # Only repos that already opted into the filter — never bootstrap glassine
-  # into a repo that has not.
-  git config --get filter.glassine.clean >/dev/null 2>&1 || return 0
+  git grep -q 'filter=glassine' -- '*.gitattributes' 2>/dev/null || return 0
 
-  local out repaired
+  local had_filter=true out repaired
+  git config --get filter.glassine.clean >/dev/null 2>&1 || had_filter=false
+
   if ! out="$(glassine init 2>&1)"; then
     log "WARNING: glassine init failed; managed files may still be ciphertext in the worktree"
     return 0
   fi
+
+  # Loud, because until this ran the repo would have committed plaintext.
+  [ "$had_filter" = true ] ||
+    log "restored the missing glassine filter config — managed files were staging as plaintext"
 
   repaired="$(printf '%s\n' "$out" | grep 'decrypted .* file' || true)"
   [ -n "$repaired" ] || return 0
