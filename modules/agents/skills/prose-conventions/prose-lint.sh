@@ -75,6 +75,17 @@ BANNED_PHRASES=(
   "dive into" "align with" "in conclusion" "that said"
 )
 
+TAKEAWAY_ANNOUNCEMENTS=(
+  "\\b(the (number worth carrying|thing to remember|interesting part|real story|key insight|key takeaway|important part)|what matters here) (is|was)\\b"
+  "\\bthis is the (number|part|bit|thing) that\\b"
+)
+
+# Scoped to the summarising-predicate use only. The literal sense stays legal,
+# so "identify the gap in prior work" must not match.
+PUNCHLINE_ABSTRACTIONS=(
+  "\\b(is|was|remains|becomes) the (gap|disconnect|tension|delta)\\b"
+)
+
 # --- Helpers ---
 
 total_hits=0
@@ -162,6 +173,18 @@ done
 
 for phrase in "${BANNED_PHRASES[@]}"; do
   scan_pattern "banned-vocab" "\\b$phrase\\b" "${files[@]}"
+done
+
+# --- 7d. Takeaway announcements ---
+
+for pattern in "${TAKEAWAY_ANNOUNCEMENTS[@]}"; do
+  scan_pattern "takeaway-announcement" "$pattern" "${files[@]}"
+done
+
+# --- 7e. Punchline abstractions ---
+
+for pattern in "${PUNCHLINE_ABSTRACTIONS[@]}"; do
+  scan_pattern "punchline-abstraction" "$pattern" "${files[@]}"
 done
 
 # --- 8. Excessive em dashes (3+ in one file) ---

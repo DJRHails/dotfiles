@@ -27,3 +27,8 @@ pre-commit:
     # regression in what it considers "undeclared drift" is destructive.
     link-symlinks-tests:
       run: bash tests/link-symlinks.test.sh
+    # prose-lint's newest rules ban `the gap` only as a summarising predicate, and
+    # the guide's own Abstract section depends on the literal sense staying legal.
+    # A word-list "simplification" reads as tidier and quietly kills the carve-out.
+    prose-lint-tests:
+      run: bash tests/prose-lint.test.sh
