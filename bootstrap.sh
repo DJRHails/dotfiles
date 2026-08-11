@@ -54,7 +54,7 @@ parse_args() {
             allModules=true
           ;;
           -c|--cli)
-            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/python" "$DOTFILES/modules/node" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/cloudflared" "$DOTFILES/modules/claude" "$DOTFILES/modules/agents" "$DOTFILES/modules/dotfiles-autoupdate")
+            scanned_valid_modules+=("$DOTFILES/modules/zsh" "$DOTFILES/modules/ssh" "$DOTFILES/modules/git" "$DOTFILES/modules/python" "$DOTFILES/modules/node" "$DOTFILES/modules/piknik" "$DOTFILES/modules/tailscale" "$DOTFILES/modules/cloudflared" "$DOTFILES/modules/claude" "$DOTFILES/modules/agents" "$DOTFILES/modules/sfw" "$DOTFILES/modules/dotfiles-autoupdate")
           ;;
           *)
             if [ -d "$DOTFILES/modules/$1" ]; then
@@ -182,7 +182,7 @@ main() {
   for idx in "${!scanned_valid_modules[@]}"
   do
     local module_dir="${scanned_valid_modules[$idx]}"
-    if [[ ! -z $module_dir ]]; then
+    if [[ -n $module_dir ]]; then
       log::header "$((idx+1)). Running '${module_dir##*/}'"
       create_links "$module_dir"
       run "$module_dir" "install.sh"
