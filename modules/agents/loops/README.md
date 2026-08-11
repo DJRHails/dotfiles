@@ -54,3 +54,8 @@ editing one file.
   highest-value inaccuracy or gap.
 - **`perf-bestofn`** — measure the top bottleneck, race N candidate fixes in
   isolation, merge the winner.
+- **`paper-watch`** — sweep recent arXiv for papers relevant to the repo's
+  research questions; curate into `docs/paper-watch/` + one Slack post (first
+  run backfills 6 months and distils the repo's `queries.md`; later runs use
+  1-week windows, deduped by the ledger). May escalate one paper per run into
+  a spawned peer worker that implements it as a PR.
