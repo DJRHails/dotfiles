@@ -18,7 +18,9 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"
 update_sh="$repo_root/modules/dotfiles-autoupdate/update.sh"
 
-work="$(mktemp -d)"
+# pwd -P: git canonicalizes paths (macOS /var -> /private/var), so the
+# sandbox-escape guard's prefix match needs $work canonicalized the same way.
+work="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf -- "$work"' EXIT
 
 fails=0
