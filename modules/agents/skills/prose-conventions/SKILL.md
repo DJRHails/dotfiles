@@ -129,7 +129,7 @@ These patterns signal machine-generated text. Never use them.
 - **Sensory abstractions** — attaching physical senses to abstract concepts
 - **Synonym cycling** — calling the same thing "the protagonist", "the main character", "the central figure", "the hero" across consecutive sentences. Pick one name and stick with it.
 - **False ranges** — "from X to Y, from A to B" where X/Y aren't on a meaningful scale. "From the Big Bang to dark matter" is not a range.
-- **Takeaway announcements** — "The number worth carrying is X", "The thing to remember is Y", "What matters here is Z", "The interesting part is...", "The real story is...", "The key insight is...", "This is the number that...". A label pasted on a fact, telling the reader which bit to be impressed by before they have seen it. If the fact is striking, it lands unannounced; if it needs the label, it is not striking. Cut the frame and state the fact. Watch for it clustering: the tic repeats across a document once it appears, and every instance reads as the same voice-over.
+- **Takeaway announcements** — "The number worth carrying is X", "The thing to remember is Y", "What matters here is Z", "The interesting part is...", "The important part is...", "The real story is...", "The key insight is...", "The key takeaway is...", and "This is the number/part/bit/thing that...". A label pasted on a fact, telling the reader which bit to be impressed by before they have seen it. If the fact is striking, it lands unannounced; if it needs the label, it is not striking. Cut the frame and state the fact. Watch for it clustering: the tic repeats across a document once it appears, and every instance reads as the same voice-over. Essay register only — an abstract's contribution sentence ("Our key insight is that X") is doing the work the section exists for, not pasting a label on it.
 
 ### Content Inflation Patterns
 
@@ -266,7 +266,7 @@ Ask: does this change make the writing better, or just more uniform?
 
 Two helpers ship in this skill's directory:
 
-- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, superficial "-ing" openers, vague attribution, rule-of-three). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
+- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, superficial "-ing" openers, vague attribution, rule-of-three, takeaway announcements, punchline abstractions). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
 - `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences. Strips YAML frontmatter, tables, imports, and JSX before counting, so MDX files report prose only.
 
 Run both before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
