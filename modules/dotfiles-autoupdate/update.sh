@@ -229,7 +229,7 @@ refresh_pi_packages() {
 # this timer can replace it without sudo). Every failure path returns 0: an
 # offline host or a GitHub hiccup must not block the steps around it.
 ensure_sfw_fresh() {
-  local bin="$HOME/.local/bin/sfw" api tag cur os arch tmp
+  local bin="$HOME/.local/bin/sfw" api tag cur os arch tmp rc
   [ -x "$bin" ] || return 0
 
   # Buffer the API response before matching — piping curl straight into
@@ -244,18 +244,46 @@ ensure_sfw_fresh() {
     return 0
   }
 
-  cur="$("$bin" --version 2>/dev/null | sed -E 's/.*version ([0-9.]+).*/\1/')" || true
+  # grep -o, not a sed substitution: sed prints its input unchanged when the
+  # pattern misses, and the garbage $cur would re-download the binary nightly
+  # forever while logging "updated".
+  cur="$("$bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)*' | head -1)" || true
+  [ -n "$cur" ] || log "sfw: cannot parse current version, refreshing"
   [ "$cur" = "${tag#v}" ] && return 0
 
   case "$(uname -s)" in Darwin) os="macos" ;; *) os="linux" ;; esac
-  case "$(uname -m)" in aarch64 | arm64) arch="arm64" ;; *) arch="x86_64" ;; esac
-  tmp="$(mktemp)"
+  case "$(uname -m)" in
+    aarch64 | arm64) arch="arm64" ;;
+    x86_64 | amd64) arch="x86_64" ;;
+    *)
+      # install.sh refuses these arches, but a hand-installed binary passes
+      # the -x gate above — never replace it with an x86_64 one.
+      log "sfw: unsupported architecture $(uname -m), not refreshing"
+      return 0
+      ;;
+  esac
+  # Same-directory temp file so the mv below is an atomic rename — a
+  # concurrent sfw invocation must never exec a half-written binary. Guarded:
+  # unlike /tmp, this directory can be unwritable (or the disk full), and a
+  # bare failing assignment under set -e would kill the whole update run.
+  tmp="$(mktemp "${bin}.XXXXXX")" || {
+    log "sfw: FAILED to create temp file beside $bin, not refreshing"
+    return 0
+  }
   if curl -fsSL --max-time 300 -o "$tmp" \
-    "https://github.com/SocketDev/sfw-free/releases/download/${tag}/sfw-free-${os}-${arch}" &&
-    install -m 0755 "$tmp" "$bin"; then
-    log "sfw: updated ${cur:-?} -> ${tag#v}"
+    "https://github.com/SocketDev/sfw-free/releases/download/${tag}/sfw-free-${os}-${arch}"; then
+    # Prove the download runs before it replaces the live firewall: a 200
+    # with wrong content (captive portal, renamed asset) must not brick sfw
+    # while logging success.
+    chmod 0755 "$tmp"
+    if "$tmp" --version > /dev/null 2>&1 && mv -f "$tmp" "$bin"; then
+      log "sfw: updated ${cur:-?} -> ${tag#v}"
+    else
+      log "sfw: FAILED to update to ${tag#v} (downloaded file is not a working sfw)"
+    fi
   else
-    log "sfw: FAILED to update to ${tag#v}"
+    rc=$?
+    log "sfw: FAILED to update to ${tag#v} (curl exit $rc)"
   fi
   rm -f "$tmp"
 }

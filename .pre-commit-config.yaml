@@ -57,3 +57,10 @@ repos:
         entry: bash tests/prose-lint.test.sh
         language: system
         pass_filenames: false
+      # The sfw wrappers are a security control: a silently broken case pattern
+      # means installs bypass the firewall while it still looks installed.
+      - id: sfw-aliases-tests
+        name: sfw wrapper routing suite
+        entry: zsh -f tests/sfw-aliases.test.zsh
+        language: system
+        pass_filenames: false
