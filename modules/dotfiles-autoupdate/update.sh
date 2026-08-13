@@ -168,6 +168,11 @@ repair_glassine_worktree() {
 
   if ! out="$(glassine init 2>&1)"; then
     log "WARNING: glassine init failed; managed files may still be ciphertext in the worktree"
+    # init dies before writing any filter config (its sops check runs first),
+    # so a missing config stays missing — name the dangerous half, not just
+    # the cosmetic one.
+    [ "$had_filter" = true ] ||
+      log "WARNING: the glassine filter config is still missing — git stages managed files as PLAINTEXT until glassine init succeeds"
     return 0
   fi
 
