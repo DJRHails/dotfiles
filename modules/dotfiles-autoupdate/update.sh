@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Daily auto-update — fast-forward pull of the dotfiles repo, then a refresh of
+# Daily auto-update — fast-forward pull of the dotfiles repo, then convergence
+# steps bootstrap couldn't finish (the gh-stack extension) and a refresh of
 # pi's installed extension packages.
 #
 # Safe by construction: never clobbers local work (skips a dirty tree), never
@@ -281,8 +282,28 @@ ensure_github_ssh_rewrite() {
   fi
 }
 
+# Install the gh-stack extension where bootstrap couldn't. modules/git/setup.sh
+# warns-and-skips it when gh is missing or unauthenticated at bootstrap time
+# (extension installs clone through the API), on the promise that the daily
+# autoupdate converges the host once gh is logged in — this function keeps
+# that promise.
+ensure_gh_stack() {
+  command -v gh >/dev/null 2>&1 || return 0
+  gh extension list 2>/dev/null | grep -q 'github/gh-stack' && return 0
+  if ! gh auth status >/dev/null 2>&1; then
+    log "gh-stack: skip — gh not authenticated"
+    return 0
+  fi
+  if gh extension install github/gh-stack >>"$LOG" 2>&1; then
+    log "gh-stack: installed"
+  else
+    log "gh-stack: FAILED to install (see errors above)"
+  fi
+}
+
 update_dotfiles
 repair_glassine_worktree
 ensure_sfw_fresh
 ensure_github_ssh_rewrite
+ensure_gh_stack
 refresh_pi_packages
