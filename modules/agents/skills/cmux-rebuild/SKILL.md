@@ -1,6 +1,6 @@
 ---
 name: cmux-rebuild
-description: "Manage the user's durable dev sessions — zellij sessions on remote hosts (bonbon, taffy) reached over mosh, plus the local host's (trifle) own detached zellij sessions, surfaced as cmux tabs via `ssh::durable` / `zellij::resume`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, resume detached local zellij sessions, reconnect/sort sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: 'ssh::durable', 'durable sessions', 'resurrect/rebuild cmux', 'lost my bonbon connections', 'reap mosh-servers', 'the green dot'."
+description: "Manage the user's durable dev sessions — zellij sessions on remote hosts (bonbon, taffy) reached over mosh, plus the local host's (trifle) own detached zellij sessions, surfaced as cmux tabs via `ssh::durable` / `zellij::resume`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, resume detached local zellij sessions, reconnect/sort sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, judge dead claude/pi sessions from their transcripts and resume the unfinished ones (claude::resume / pi::resume, local or via a remote zellij layout), or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: 'ssh::durable', 'durable sessions', 'resurrect/rebuild cmux', 'cmux-resurrect', 'resume unfinished claude/pi sessions', 'lost my bonbon connections', 'reap mosh-servers', 'the green dot'."
 ---
 
 # cmux durable sessions
@@ -167,6 +167,55 @@ Then map title → resumable session id in pi's own store
 are ephemeral pi workers, not sessions worth restoring (36 touchstone skeletons collapsed to 6 real
 sessions). `resurrect` (`~/.local/bin/resurrect`) is claude-transcript-based and will not see pi
 work at all.
+
+## Resurrecting unfinished agent work (judge-and-resume)
+When sessions die — a local reboot kills every trifle zellij server, a remote skeleton EXITs, a tab
+gets killed — most of the claude/pi conversations inside them ended **at rest** on a completed
+answer. Resurrect only the ones that died mid-task. The workflow (proven over a 2026-08-14 sweep:
+41 transcripts judged across trifle + taffy, 6 resumed):
+
+1. **Inventory the dead.** Local: EXITED `zellij list-sessions` + the serialized pane titles
+   (previous section) name the work — `✳ <task>` is claude, `π - <task> - <repo>` is pi. When
+   titles are generic or metadata is missing (common on remote hosts), go by transcripts: recent
+   files under `~/.claude*/projects/` and `~/.pi/agent/sessions/`, excluding `*/subagents/*`.
+2. **Establish liveness before judging — a live session's transcript looks identical to a dead
+   one's.** Never resume a session that may be attached to a live tab; that runs it twice.
+   fd-scanning is USELESS (claude and pi append-and-close; no held file handle). What works:
+   - **Statusline ids**: both TUIs print their session uuid in the footer — `cmux read-screen`
+     each live tab and regex the uuid out. Any transcript matching a live tab's id is live.
+   - **pi process etimes bound the candidates**: a pi session file *created* after every live
+     `pi` process started cannot belong to any of them — dead for certain.
+3. **Judge from the last turns**: last real user ask vs last assistant turn. FINISHED = the final
+   assistant text is a completion report with nothing outstanding. UNFINISHED = pending tool call,
+   an unanswered ask or AskUserQuestion, or self-flagged undone items ("Not committed"). Fan the
+   reading out to subagents (a few files each, head/tail/jq only — never whole transcripts). Traps:
+   - **mtime is not activity.** Syncs and bookkeeping records (`last-prompt`, `ai-title`) bump
+     mtimes long after the conversation ended; a batch of files sharing one mtime to the second is
+     a sync artifact. Judge by record timestamps inside the file.
+   - `[subagent]`-named pi sessions and single-prompt headless one-shots are ephemeral workers —
+     their output was already consumed by a parent; never resume them.
+   - `/tmp`-cwd claude project dirs are batch workers; `/clear`-only 5-line files are empty stubs.
+4. **Resume each unfinished session** with `scripts/resume-agent-session.py`:
+
+```bash
+python3 scripts/resume-agent-session.py --kind pi --id 019ffb15-8130 \
+    --slug wall-fixes --workspace sharetrawl --host taffy        # remote
+python3 scripts/resume-agent-session.py --kind claude --id 375fda41 \
+    --slug submodule-token --workspace hails.info                # local
+```
+
+It resolves the id fragment against the host's transcript stores (aborting if ambiguous — pi's
+`--session` takes partial uuids and `head -1` would silently pick one of two), then: **local**,
+sends `claude::resume <id>` / `pi::resume <id>` (modules/claude + modules/pi aliases; they cd to
+the transcript's recorded cwd and route the owning config dir) into a fresh surface; **remote**,
+declares the resume in a layout (`zsh -ic "<kind>::resume <id> || exec zsh"` — write-chars is
+dropped against detached sessions, and the `|| exec zsh` keeps a failed resume debuggable) and
+sends `mosh <host> -- zellij --session cmux-<host>-<kind>-<slug> --new-session-with-layout <abs
+path>`. Sends into a booting surface are eaten silently (~half of first sends), so it polls for
+the session id on the statusline / the session existing remotely and re-sends until one lands,
+then retitles the tab `<slug> <short-id>`. Layout-created sessions carry no resume binding
+(`--bind` skips them); the next rebuild pass reconnects them via REMOTE_CONN's `zellij --session`
+match.
 
 ## Moving a pi session to another host
 pi keys a session to a project by the DIRECTORY it lives in, so migrating means placing the file in

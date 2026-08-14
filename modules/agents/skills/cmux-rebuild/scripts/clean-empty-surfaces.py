@@ -42,6 +42,10 @@ _SPEC = importlib.util.spec_from_file_location(
 _RD = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_RD)
 
+# `cmux tree` times out intermittently once the surface count is high; one retry has been enough.
+TREE_ATTEMPTS = 3
+TREE_RETRY_WAIT = 15
+
 CLOSE = "--close" in sys.argv
 SELF_SURFACE = os.environ.get("CMUX_SURFACE_ID", "")
 KEEP = {s for a in sys.argv if a.startswith("--keep=") for s in a[len("--keep="):].split(",") if s}
@@ -105,6 +109,33 @@ def cmux(*args: str) -> str:
     ).stdout.strip()
 
 
+class TreeSnapshotError(RuntimeError):
+    """The surface snapshot could not be read, so emptiness cannot be judged."""
+
+
+def cmux_tree() -> str:
+    """The `cmux tree` snapshot, retried, raising rather than degrading to nothing.
+
+    `cmux tree` is genuinely flaky under a big surface count — it times out on one call and
+    succeeds on the next. Routing it through `cmux()` swallowed that: a timed-out snapshot parsed
+    to zero surfaces and the run reported "no empty surfaces", which is indistinguishable from a
+    clean tree and silently cancels the cleanup. Fail loudly instead; a wrong "nothing to do" is
+    worse than an error, because it looks like success.
+    """
+    for attempt in range(TREE_ATTEMPTS):
+        done = subprocess.run(["cmux", "tree", "--all", "--id-format", "both"],
+                              capture_output=True, text=True)
+        if done.returncode == 0 and SURFACE_ROW.search(done.stdout):
+            return done.stdout
+        if attempt + 1 < TREE_ATTEMPTS:
+            time.sleep(TREE_RETRY_WAIT)
+    detail = (done.stderr.strip() or done.stdout.strip() or "no output")[:200]
+    raise TreeSnapshotError(
+        f"`cmux tree` gave no surfaces after {TREE_ATTEMPTS} attempts: {detail}. "
+        "Refusing to report on an unreadable tree — re-run once cmux responds."
+    )
+
+
 def cmux_checked(*args: str) -> tuple[bool, str]:
     """Run a cmux command, returning (ok, message) with stderr folded in.
 
@@ -140,7 +171,7 @@ def close_workspace_holding(surface: dict) -> tuple[bool, str]:
 
 def surfaces() -> list[dict]:
     """Every terminal surface in the tree, tagged with its workspace."""
-    tree = cmux("tree", "--all", "--id-format", "both")
+    tree = cmux_tree()
     rows, workspace = [], {"ref": "?", "uuid": "", "name": "?"}
     for line in tree.splitlines():
         if m := WORKSPACE_ROW.search(line):
