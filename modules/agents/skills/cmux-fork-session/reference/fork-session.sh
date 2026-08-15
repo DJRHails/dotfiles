@@ -56,16 +56,17 @@ die() {
   exit 1
 }
 
-# Shared cmux transport (run_cmux / cmux_is_local / CMUX_APP_HOST / CMUX_APP_BIN),
-# kept in one place so this script and the rename hook can't drift — e.g. the socket
-# path move ("~/Library/Application Support/cmux" -> "~/.local/state/cmux") that
-# broke the old hardcode. APP_HOST/APP_CMUX stay as aliases for the refs below.
+# Shared cmux transport: run_cmux, cmux_is_local, cmux_tree, cmux_rename_tab,
+# cmux_surface_for_zellij. Kept in one place so this script and the rename hook cannot drift on
+# the things that move between builds — the binary path, the socket path, and the argument
+# shapes. APP_HOST stays as an alias for the refs below.
 # shellcheck source=/dev/null
 source "${CMUX_REMOTE_LIB:-$HOME/.files/modules/claude/hooks/lib/cmux-remote.sh}"
 APP_HOST="$CMUX_APP_HOST"
-APP_CMUX="$CMUX_APP_BIN"
 
-if [ -x "$APP_CMUX" ]; then MODE=local; else MODE=remote; fi
+# Ask the transport, don't re-derive it: the binary path differs between builds, so a second
+# copy of the check here would drift out of step with the one run_cmux actually uses.
+if cmux_is_local; then MODE=local; else MODE=remote; fi
 
 command -v jq >/dev/null 2>&1 || die "jq not found on PATH"
 
@@ -187,31 +188,71 @@ esac
 TITLE="${PREFIX}${NAME:-$SID}"
 
 # --- targeting: resolve THIS session's live cmux surface ------------------------------
-# Map the session to its surface by the one key that is focus-independent and survives cmux
-# re-minting UUIDs across app restarts: the surface *title*. What that title contains is
-# agent-specific — MATCH_KEY, set by the resolver above (Claude: the session name, via the
-# tab-sync hook; pi: the zellij session name, since pi has no such hook). Locally we trust
-# the fresh $CMUX_SURFACE_ID instead (cmux injects it per surface; no app round-trip).
-# NOT the forwarded env or the live-ids sidecar (both go stale), and NOT "focused" (drifts).
+# Locally, trust the freshly-injected $CMUX_SURFACE_ID (cmux sets it per surface; no round-trip).
+# Remotely, two strategies in order of reliability:
+#   1. cmux_surface_for_zellij — pid chain, deterministic, ignores titles entirely.
+#   2. title match on MATCH_KEY, then $ZELLIJ_SESSION_NAME — heuristic, and the reason (1) exists:
+#      a pane's title can go stale against the session actually running in it.
+# NOT the forwarded env or the live-ids sidecar on a remote (both go stale → "Workspace not
+# found"), and NOT "focused" (drifts between tabs).
 SURFACE="${CMUX_SURFACE_ID:-}"
 LIVE_WS="${CMUX_WORKSPACE_ID:-}"
 sidecar="${XDG_CACHE_HOME:-$HOME/.cache}/cmux-zellij/live-${ZELLIJ_SESSION_NAME:-}"
 if [ "$MODE" = remote ]; then
-  [ -n "$MATCH_KEY" ] || die "no $MATCH_WHAT to match a tab title against (Claude: /rename the session; pi: run inside a zellij session)"
-  tree=$(run_cmux --id-format both tree --all 2>/dev/null) || die "cmux tree failed (app host unreachable?)"
-  match=$(printf '%s\n' "$tree" | awk -v name="$MATCH_KEY" '
-    /workspace workspace:/ {
-      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) ws = substr($0, RSTART, RLENGTH)
-    }
-    /surface surface:/ && index($0, name) {
-      if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
-        print substr($0, RSTART, RLENGTH), ws
-        exit
+  tree=$(cmux_tree) || die "cmux tree returned nothing — is the cmux app running on ${CMUX_APP_HOST}?"
+  SURFACE=$(cmux_surface_for_zellij "${ZELLIJ_SESSION_NAME:-}" 2>/dev/null || true)
+  if [ -n "$SURFACE" ]; then
+    LIVE_WS=$(printf '%s\n' "$tree" | awk -v s="$SURFACE" '
+      /workspace workspace:/ {
+        if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) ws = substr($0, RSTART, RLENGTH)
       }
-    }')
-  SURFACE="${match%% *}"
-  LIVE_WS="${match#* }"
-  [ -n "$SURFACE" ] || die "no cmux surface titled with $MATCH_WHAT \"$MATCH_KEY\""
+      index($0, s) { print ws; exit }')
+  fi
+  [ -n "$SURFACE" ] || [ -n "$MATCH_KEY" ] ||
+    die "could not resolve this surface: no zellij session to trace, and no $MATCH_WHAT to match a tab title against (Claude: /rename the session; pi: run inside a zellij session)"
+  _match_surface() { # $1 = substring to find in a surface title -> "<surface-uuid> <ws-uuid>"
+    printf '%s\n' "$tree" | awk -v name="$1" '
+      /workspace workspace:/ {
+        if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) ws = substr($0, RSTART, RLENGTH)
+      }
+      /surface surface:/ && index($0, name) {
+        if (match($0, /[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}/)) {
+          print substr($0, RSTART, RLENGTH), ws
+          exit
+        }
+      }'
+  }
+
+  # Fallback only — the pid chain above already succeeded in the normal case. Try the agent's own
+  # key, then the zellij session name, since a title can carry either (or neither, when stale).
+  if [ -z "$SURFACE" ]; then
+    match=""
+    MATCHED_ON=""
+    for _key in "$MATCH_KEY" "${ZELLIJ_SESSION_NAME:-}"; do
+      [ -n "$_key" ] || continue
+      match=$(_match_surface "$_key")
+      [ -n "$match" ] && { MATCHED_ON="$_key"; break; }
+    done
+    SURFACE="${match%% *}"
+    LIVE_WS="${match#* }"
+    [ -z "$SURFACE" ] || printf 'fork-session: pid chain failed; matched on title "%s"\n' \
+      "$MATCHED_ON" >&2
+  fi
+  if [ -z "$SURFACE" ]; then
+    # Show what IS there: the usual cause is a title carrying an older session name, and the
+    # fix ("/rename", or retitle that tab) is only obvious once you can see the candidates.
+    printf 'fork-session: could not resolve this surface.\n' >&2
+    printf '  pid chain : no process for zellij session "%s"\n' "${ZELLIJ_SESSION_NAME:-<unset>}" >&2
+    printf '  titles    : none contain %s "%s"' "$MATCH_WHAT" "$MATCH_KEY" >&2
+    [ -n "${ZELLIJ_SESSION_NAME:-}" ] && printf ' or "%s"' "$ZELLIJ_SESSION_NAME" >&2
+    printf '\n\nterminal surfaces currently open:\n' >&2
+    printf '%s\n' "$tree" | grep -o 'surface surface:[0-9]* .*' | sed 's/^/  /' >&2
+    printf '\nFix: /rename this session (the tab-sync hook then pushes the name into the title),\n' >&2
+    printf 'or retitle this tab directly:\n' >&2
+    printf '  cmux rpc tab.action '"'"'{"action":"rename","tab_id":"<THIS surface uuid>","title":"%s"}'"'"'\n' "$MATCH_KEY" >&2
+    printf '(note: tab.action wants tab_id = a SURFACE uuid, not a workspace uuid)\n' >&2
+    exit 1
+  fi
   # Heal the sidecar so cmux-session-tab / the tab-sync hook pick up the live id too.
   if [ -n "${ZELLIJ_SESSION_NAME:-}" ]; then
     mkdir -p "$(dirname "$sidecar")"
