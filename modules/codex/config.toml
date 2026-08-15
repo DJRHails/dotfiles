@@ -1,0 +1,5 @@
+approvals_reviewer = "user"
+service_tier = "default"
+
+[projects."/home/d/projects/github.com/DJRHails/touchstone"]
+trust_level = "trusted"

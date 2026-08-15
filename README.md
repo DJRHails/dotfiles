@@ -36,6 +36,7 @@ cd ~/.files
 | :sparkle: `claude`      | Claude Code setup — settings, guardrail hooks, MCP servers, statusline.
 | `cloudflared`           | Cloudflare Tunnel client via signed apt repo.
 | `code`                  | VS Code settings.
+| `codex`                 | Codex CLI configuration.
 | `docker`                | Docker runtime via Colima (macOS) or Docker Engine (Linux).
 | `execblock`             | Execute code blocks from markdown files (`bin/execblock`).
 | `explaincron`           | Explain crontab entries (`bin/explaincron`).
