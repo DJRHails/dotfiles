@@ -212,8 +212,10 @@ declares the resume in a layout (`zsh -ic "<kind>::resume <id> || exec zsh"` —
 dropped against detached sessions, and the `|| exec zsh` keeps a failed resume debuggable) and
 sends `mosh <host> -- zellij --session cmux-<host>-<kind>-<slug> --new-session-with-layout <abs
 path>`. Sends into a booting surface are eaten silently (~half of first sends), so it polls for
-the session id on the statusline / the session existing remotely and re-sends until one lands,
-then retitles the tab `<slug> <short-id>`. Layout-created sessions carry no resume binding
+evidence (the command's echo, the session id on the statusline, the session existing remotely)
+and re-sends — up to 3 attempts, only while nothing has landed — then retitles the tab
+`<slug> <short-id>` and exits nonzero unless the id was verified on the statusline.
+Layout-created sessions carry no resume binding
 (`--bind` skips them); the next rebuild pass reconnects them via REMOTE_CONN's `zellij --session`
 match.
 

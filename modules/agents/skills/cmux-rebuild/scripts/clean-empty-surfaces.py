@@ -42,9 +42,11 @@ _SPEC = importlib.util.spec_from_file_location(
 _RD = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_RD)
 
-# `cmux tree` times out intermittently once the surface count is high; one retry has been enough.
+# `cmux tree` times out intermittently once the surface count is high; one retry has been enough
+# in practice — 3 attempts is deliberate headroom, and bounds a hung (not just erroring) call.
 TREE_ATTEMPTS = 3
 TREE_RETRY_WAIT = 15
+TREE_TIMEOUT = 60
 
 CLOSE = "--close" in sys.argv
 SELF_SURFACE = os.environ.get("CMUX_SURFACE_ID", "")
@@ -120,16 +122,22 @@ def cmux_tree() -> str:
     succeeds on the next. Routing it through `cmux()` swallowed that: a timed-out snapshot parsed
     to zero surfaces and the run reported "no empty surfaces", which is indistinguishable from a
     clean tree and silently cancels the cleanup. Fail loudly instead; a wrong "nothing to do" is
-    worse than an error, because it looks like success.
+    worse than an error, because it looks like success. A readable tree always contains at least
+    this script's own surface, so zero surface rows is treated as unreadable, not as clean.
     """
+    detail = "no output"
     for attempt in range(TREE_ATTEMPTS):
-        done = subprocess.run(["cmux", "tree", "--all", "--id-format", "both"],
-                              capture_output=True, text=True)
-        if done.returncode == 0 and SURFACE_ROW.search(done.stdout):
-            return done.stdout
+        try:
+            done = subprocess.run(["cmux", "tree", "--all", "--id-format", "both"],
+                                  capture_output=True, text=True, timeout=TREE_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            detail = f"hung >{TREE_TIMEOUT}s"
+        else:
+            if done.returncode == 0 and SURFACE_ROW.search(done.stdout):
+                return done.stdout
+            detail = (done.stderr.strip() or done.stdout.strip() or "no output")[:200]
         if attempt + 1 < TREE_ATTEMPTS:
             time.sleep(TREE_RETRY_WAIT)
-    detail = (done.stderr.strip() or done.stdout.strip() or "no output")[:200]
     raise TreeSnapshotError(
         f"`cmux tree` gave no surfaces after {TREE_ATTEMPTS} attempts: {detail}. "
         "Refusing to report on an unreadable tree — re-run once cmux responds."
