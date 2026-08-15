@@ -93,11 +93,11 @@ recover the WORK: judge each dead claude/pi conversation from its transcript and
 unfinished ones. Most died at rest on a completed answer.
 
 1. **Inventory the dead.** Serialized pane titles name the work — `✳ <task>` is claude,
-   `π - <task> - <repo>` is pi. zellij cannot dump-layout an EXITED session; read the cache
-   (macOS `~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info`,
-   linux `~/.cache/zellij/contract_version_1/session_info`):
+   `π - <task> - <repo>` is pi. zellij cannot dump-layout an EXITED session; read the cache:
 
    ```bash
+   CACHE=~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info
+   # linux: CACHE=~/.cache/zellij/contract_version_1/session_info
    rg -o '^\s+title "(.*)"' "$CACHE/<session>/session-metadata.kdl"
    ```
 
@@ -156,8 +156,9 @@ no TTY needed). Then start it with the layout trick above, remembering that `$HO
 
 - **cmux app restart:** zellij servers survive the pty SIGHUP — sessions sit detached with work
   running. Rebuild, or let resume bindings reattach automatically.
-- **macOS reboot:** servers die. Session-serialization leaves EXITED skeletons (`zellij attach`
-  resurrects layout/cwd/scrollback with fresh shells); recover agent work via judge-and-resume.
+- **macOS reboot:** servers die. Session-serialization (`session_serialization true` + viewport
+  in config.kdl) leaves EXITED skeletons (`zellij attach` resurrects layout/cwd/scrollback with
+  fresh shells); recover agent work via judge-and-resume.
 
 Every attach path registers a per-surface restart command (`cmux surface resume set`):
 auto-attach.zsh (local wrappers, guarded to empty `$CMUX_REMOTE_TRANSPORT`), `zellij::resume`
