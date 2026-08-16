@@ -1,0 +1,65 @@
+#!/usr/bin/env zsh
+
+##? code — host-aware VS Code launcher.
+##?
+##? On a UI-capable host (ssh::ui_host), execs the real VS Code CLI.
+##? Anywhere else, opens VS Code on the UI host with Remote-SSH pointed
+##? back at this host's filesystem.
+##?
+##? A script on ~/.local/bin rather than a shell function so it also works
+##? from non-interactive shells (cron, agent Bash tools), which never
+##? source zshrc.
+##?
+##? USAGE:
+##?     code [path]       # remote host: open path in VS Code on the UI host
+##?     code [args...]    # UI host: passed through to the real CLI
+
+set -euo pipefail
+
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { sed -n 's/^##? \{0,1\}//p' "$0"; exit 0; }
+
+# $0 is only the script path at the top level (zsh's FUNCTION_ARGZERO
+# rebinds it inside functions), so resolve self here for real_cli.
+typeset -g SELF=${0:A}
+
+: "${DOTFILES:=$HOME/.files}"
+source "$DOTFILES/modules/ssh/lib.zsh"
+
+# First `code` on PATH that isn't this script — on the UI host the
+# ~/.local/bin symlink shadows the real CLI.
+real_cli() {
+  local cand
+  for cand in ${(f)"$(whence -ap code || true)"}; do
+    [[ "${cand:A}" == "$SELF" ]] && continue
+    print -r -- "$cand"
+    return 0
+  done
+  return 1
+}
+
+main() {
+  local ui self scheme abs root cli
+  ui=$(ssh::ui_host)
+  self=$(ssh::self)
+  abs=$(path::abs "${1:-.}")
+  root=$(git -C "${abs%/*}" rev-parse --show-toplevel 2>/dev/null) || root=''
+
+  if [[ "$ui" == "$self" ]]; then
+    if ! cli=$(real_cli); then
+      print -u2 "code: no VS Code CLI on PATH besides this wrapper"
+      return 127
+    fi
+    if [[ -n "$root" && -f "$abs" && "$abs" != "$root" ]]; then
+      exec "$cli" "$root" --goto "$abs"
+    fi
+    exec "$cli" "$@"
+  fi
+
+  scheme="${CODE_URL_SCHEME:-vscode}"
+  if [[ -n "$root" && -f "$abs" && "$abs" != "$root" ]]; then
+    ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${root}"
+  fi
+  ssh::open_url "$ui" "${scheme}://vscode-remote/ssh-remote+${self}${abs}"
+}
+
+main "$@"
