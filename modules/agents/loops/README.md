@@ -31,7 +31,8 @@ editing one file.
    open PR from a previous iteration (`gh pr list --author @me`) whose review has landed
    before starting new work — that can be the whole iteration.
 2. **One improvement** — pick the single highest-value item and finish it (code,
-   test, doc); don't start a second.
+   test, doc); don't start a second unless the loop file itself sanctions a
+   bounded follow-on (doc-critic allows one warm-context second, never a third).
 3. **Write state back** — record the iteration in the repo's log if it has one
    (`EXPERIMENT_LOG.md`, `CHANGELOG.md`, else a `[<name>]` line in a `docs/loop-log.md`),
    commit small, and ship it through the **merge gate** (a verbatim-identical section in
