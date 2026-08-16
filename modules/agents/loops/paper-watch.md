@@ -51,6 +51,13 @@ backfill ≤ 25) — if more clear the bar, raise the bar and say so in the writ
 For each curated paper, read the abstract (skim the intro if the abstract is
 ambiguous) — enough to say something a title alone couldn't.
 
+**Zero-yield exit:** if the window yields 0 new candidates after ledger dedup
+AND there is no open loop PR to resume and no finished escalation to close out,
+stop here — no dated brief, no PR, no Slack post; end with a ≤4-line status
+naming the verified high-water mark. The next non-empty run's run-facts line
+records the skipped dates. (arXiv announces nothing Friday/Saturday nights, so
+weekend runs are the common zero-yield case — prefer a weekday-only cron.)
+
 ## Write up
 
 Write `docs/paper-watch/YYYY-MM-DD.md` (run date), grouped under descriptive
@@ -84,7 +91,11 @@ dedup hides those — re-read the last few writeups when picking). For at most
   be self-contained: arXiv id + title + link, what to implement and where it
   lands in the repo, acceptance criteria (tests, eval numbers, or a doc'd
   comparison), and the instruction to ship as a PR on a branch — never push to
-  `main`, never merge unreviewed.
+  `main`, never merge unreviewed. The brief must also name a budget: the
+  smallest shippable slice (one PR, one mechanism), an explicit spend ceiling
+  (stop and ship a partial + issues past ~$50 of API spend), and a sample-size
+  floor for any headline number — an experiment that can't reach an n where its
+  expected effect clears resampling noise is scoped out, not run.
 - Record it: ledger verdict `implementing` with the spawned `thread` key, and
   name the spawned run in the writeup entry and the Slack message.
 
