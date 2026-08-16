@@ -101,9 +101,6 @@ zle -N down-line-or-beginning-search
 bindkey "^[[A" up-line-or-beginning-search # Up
 bindkey "^[[B" down-line-or-beginning-search # Down
 
-# Add bin to path
-export PATH=${PATH:+$PATH:}${DOTFILES}/bin
-
 # Starship prompt (cached: skips the ~40ms init subprocess; see zshenv)
 (( $+commands[starship] )) && _cached_eval starship init zsh
 
