@@ -43,7 +43,12 @@ comment.
 ## Write state back
 
 Append a `[hygiene]` entry to the repo's log **only if something was found/fixed**
-(no empty heartbeat entries). Ship it through the merge gate below. End with a ≤3-line status.
+(no empty heartbeat entries). **Earn the PR — a meaningless PR is worse than
+none.** Fold the ledger append into the substantive fix PR; never open a second
+log-entry-only PR, and never open a PR at all when the iteration's only artifact
+is the ledger line (branch pruning and PR closures need no code PR — record them
+in the Slack report and the next fix PR's entry). Ship real changes through the
+merge gate below. End with a ≤3-line status.
 
 ## Merge gate
 

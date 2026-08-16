@@ -2,13 +2,20 @@
 
 Project-agnostic documentation-accuracy loop (suggested cadence: every 2–4 h, or
 after a feature lands). One iteration: audit the repo's docs against the code as a
-skeptical newcomer, then fix the single highest-value inaccuracy or gap. Default
-loop — works in any repo.
+skeptical newcomer, then fix the single highest-value inaccuracy or gap (at most
+two per run — a second only while the first's context is warm and a next-highest
+item is already identified; never a third). Default loop — works in any repo.
 
 ## State first
 
 `rg '\[doc-critic\]'` the repo's log. The docs touched by commits since the last
-iteration are the priority surface; the rest is opportunistic.
+iteration are the priority surface; the rest is opportunistic. Also skim other
+loops' entries in the same log for carried items overlapping your candidate
+finding — if another loop (hygiene, research-critic, …) already carries it,
+defer to that loop and pick the next-highest item instead. And skim the loop's
+Slack channel for an uncommitted all-accurate record from the previous run (a
+no-finding iteration reports there instead of opening a PR — see Act); carry it
+into this iteration's loop-log entry.
 
 Also check this loop's open PRs (`gh pr list --author @me`): one whose review has landed
 gets resumed — address the feedback and judge the merge (see Merge gate) — before any new
@@ -32,16 +39,23 @@ API reference) as someone who just cloned the repo:
 
 ## Act
 
-Fix the single highest-value finding completely — a wrong setup command (blocks
-every newcomer) beats a stale claim beats a dead link. Edit the code's
+Fix the highest-value finding completely (then at most the one warm-context
+second the intro sanctions) — a wrong setup command (blocks every newcomer)
+beats a stale claim beats a dead link. Edit the code's
 self-documentation only to state constraints, not to narrate. If a doc claim is
 unverifiable, mark it as such rather than deleting it. If everything reads
-accurate, say which docs are now trusted and at what depth.
+accurate, say which docs are now trusted and at what depth — in the Slack
+report only. Do **not** open a PR for a no-finding iteration: a
+log-entry-plus-version-bump PR costs a review cycle and, on auto-deploying
+repos, a control-plane restart. Carry the trusted-docs record into your next
+finding PR's loop-log entry instead.
 
 ## Write state back
 
-Append a `[doc-critic]` entry to the repo's log: what was audited, the finding
-fixed (or "accurate"), the next-highest item. Ship it through the merge gate below.
+Only when a finding was fixed: append a `[doc-critic]` entry to the repo's log —
+what was audited, the finding fixed, the next-highest item, plus any all-accurate
+record carried from the previous run — and ship it through the merge gate below.
+An all-accurate iteration writes no entry and opens no PR (see Act).
 End with a ≤4-line status.
 
 ## Merge gate

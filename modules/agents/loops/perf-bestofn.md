@@ -65,7 +65,10 @@ its PR merges — the resumed iteration needs it to address review feedback.
 
 Append a `[perf-bestofn]` entry to the repo's log: bottleneck, the N tacks, a
 benchmark table (baseline + each candidate), winner and why, losers' ideas worth
-keeping. Ship it through the merge gate below. End with a ≤5-line status.
+keeping. Head the entry with the bottleneck's name and the date, never an
+iteration number — concurrent runs fork the counter and numbers rot; the
+bottleneck name is the stable anchor State first greps for. Ship it through the
+merge gate below. End with a ≤5-line status.
 
 ## Merge gate
 
