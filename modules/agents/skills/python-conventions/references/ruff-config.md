@@ -127,7 +127,6 @@ ignore = [
 [tool.ruff.lint.isort]
 force-single-line = false
 known-first-party = ["myproject"]
-required-imports = ["from __future__ import annotations"]
 section-order = [
     "future",
     "standard-library",
@@ -136,6 +135,16 @@ section-order = [
     "local-folder",
 ]
 ```
+
+**Never require (or write) `from __future__ import annotations`.** PEP 563 turns every
+annotation into a string at runtime, which silently breaks every consumer of runtime
+annotations — pydantic/dataclass field resolution, typer CLIs, and annotation-driven
+caching. The 2026-08-18 touchstone incident: the import disabled emboss's model/dataclass
+encoding in all 3,435 files, so cached values pickled by class reference and became
+unreadable once their defining code was deleted (~24.8k records per writer stream, one
+compaction away from permanent loss). On modern Python (3.13+: `X | Y` and builtin
+generics work everywhere) the import buys nothing; quote the rare genuine forward
+reference instead. Python 3.14's lazy annotations (PEP 649) make even that unnecessary.
 
 ## Docstring Style (pydocstyle)
 
