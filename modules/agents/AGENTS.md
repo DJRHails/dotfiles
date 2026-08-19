@@ -377,6 +377,38 @@ inference accepted without the check it demanded of others.
   ("are we rsyncing the whole directory?", "the token shouldn't have expired?") were answered from
   inference when a five-second check was available. Both answers were wrong.
 
+## Performance bugs: read the traces you already have, then instrument the phases — never fix on a plausible suspect
+
+A slow fan-out with an **idle** downstream resource means something serialises between the pool
+and the wire — and which something is a measurement, not an inference. One night (2026-08-19,
+the guard serve-leg re-score) a 1,460-row cell ran ~20 min against a GPU showing `Running: 0-1`:
+three plausible root causes died by evidence before the real one — a cache lock on a network FS
+(refuted on magnitude: 20 ms/op × 1,460 ≈ 30 s, not 20 min), a timeout-retry storm (refuted: the
+timeout was 1800 s and the log held **zero** retry warnings), an AIMD gate collapse (refuted:
+every cut logs, zero cut lines). The real cause — a per-row `endpoint()` resolve whose waiting
+threads collectively stormed `squeue` probes — was finally caught **in logs that already
+existed**. The fix-on-suspect version of that night rewrites the cache lock and ships a
+regression that fixes nothing.
+
+- **We under-utilise the traces we already have. Exhaust them first** — and read the
+  *counterpart's* log, not just your own: the client's story (no retries, no gate cuts) and the
+  server's story (`Running:` counters sawtoothing 0-13 with `Waiting: 0`) together localised the
+  bug to "between the pool and the wire" with no new code. Loguru file sinks under `.data/logs/`,
+  the profiling dumps every script already writes, vLLM engine counters, Slurm job logs — most
+  hypotheses can be killed with what is already on disk.
+- **The absence of an expected log line is evidence.** A gate cut that always logs and didn't
+  log rules the gate out — grep for the warning you *would* see, and let zero hits count.
+- **Sample the whole window, not the tail.** The `Running: 0-1` read came from the last two
+  minutes of a 24-minute cell (the straggler tail) and nearly mis-shaped the fix; the full-window
+  series showed the real signature — bursts of ~8-13 with idle gaps.
+- **A hypothesis must predict the measured magnitude, not just the direction.** Every wrong
+  suspect that night pointed the right way and was off by 40×. Do the arithmetic against the
+  observed wall time before writing any fix.
+- **When the existing traces cannot attribute the time, wrap the seams with timers** — a
+  throwaway phase-bench (resolve / cache get / gate / HTTP / cache set, plus an in-flight gauge
+  and a per-30s throughput series) attributes a pipeline in one run. Then fix the phase that
+  owns the time, and keep the bench as the before/after proof.
+
 ## Background jobs: never pattern-match on process names
 
 `pgrep -f <pattern>` matches **your own command line**, including the shell that *wrote* the script.
