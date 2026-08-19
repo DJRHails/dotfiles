@@ -13,7 +13,7 @@ sudo — live in the [`github-actions` skill](../agents/skills/github-actions/SK
 A personal account cannot have account-level runners; only orgs get runner
 groups. So every repo needs its own registration, and taffy carries one
 `actions.runner.DJRHails-<repo>.taffy-<i>` systemd unit per runner. That is the
-cost of not moving 20 repos into an org.
+cost of not moving ~20 repos into an org.
 
 **A `runs-on` pointing at the `taffy` label in a repo with no pool does not fall
 back — it queues against a label nothing answers, and `timeout-minutes` does not
@@ -36,7 +36,12 @@ Idempotent and convergent:
 - a runner is **(re)installed** when its unit is missing, dead, or anchored at
   the wrong directory,
 - runners with an index **above** the configured count are stopped and
-  deregistered — so lowering a number in `runners.conf` is how you shrink a pool,
+  deregistered — so lowering a number in `runners.conf` is how you shrink a
+  pool, and count `0` drains it. **Deleting a repo's line does not**: the
+  reconciler only visits repos listed in the conf, so removed lines leave their
+  runners running unmanaged,
+- pruning is driven by GitHub's runner list — a local unit GitHub no longer
+  knows about (registration deleted in the UI) must be removed by hand,
 - `prod-*` runners are never touched (only `taffy-<i>` names are managed).
 
 ## Layout

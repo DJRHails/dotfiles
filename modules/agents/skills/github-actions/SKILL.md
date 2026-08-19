@@ -31,7 +31,9 @@ arbitrary code and must never reach taffy:
 
 ```yaml
     runs-on: >-
-      ${{ (github.event.pull_request.head.repo.fork || vars.CI_FALLBACK == 'true')
+      ${{ ((github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name != github.repository)
+      || vars.CI_FALLBACK == 'true')
       && 'ubuntu-latest'
       || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
 ```
@@ -98,7 +100,7 @@ the next sweep. If a job must stay hosted, write the reason on the job.
 | --- | --- | --- |
 | the job executes untrusted code | the ephemeral VM **is** the sandbox's outer half; taffy is persistent, shared, and its runner user is in `docker` (root-equivalent) | bestiary's malware detonation workflows |
 | a fork PR on a public repo | same, via the fork guard above | graphs, agent-browser |
-| the job holds a publishing credential | a PyPI/registry token — even short-lived OIDC — shouldn't sit on a host running 18 other repos' CI as the same user | emboss, graphs `Release to PyPI` |
+| the job holds a publishing credential | a PyPI/registry token — even short-lived OIDC — shouldn't sit on a host running every other pooled repo's CI as the same user | emboss, graphs `Release to PyPI` |
 | the platform isn't in the pool | there are no macOS or Windows self-hosted runners | agent-browser's Windows and cross-platform matrices |
 | output is pinned to the runner image | visual goldens rendered by that image's driver stack will not reproduce elsewhere | decal's SwiftShader `e2e` job |
 

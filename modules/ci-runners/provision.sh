@@ -30,8 +30,15 @@ die() {
   exit 1
 }
 
-runner_dir() { echo "${RUNNER_HOME}/${1#*/}-runner-${2}"; }
-runner_svc() { echo "actions.runner.${1%%/*}-${1#*/}.taffy-${2}.service"; }
+runner_dir() {
+  local repo="$1" idx="$2"
+  echo "${RUNNER_HOME}/${repo#*/}-runner-${idx}"
+}
+
+runner_svc() {
+  local repo="$1" idx="$2"
+  echo "actions.runner.${repo%%/*}-${repo#*/}.taffy-${idx}.service"
+}
 
 # Per-runner tool and cache homes, written to <dir>/.env (the runner sources it
 # for every job).
@@ -69,7 +76,6 @@ write_runner_envs() {
   local repo="$1" n="$2" i dir svc want
   for i in $(seq 1 "$n"); do
     dir="$(runner_dir "$repo" "$i")"
-    svc="$(runner_svc "$repo" "$i")"
     [ -d "$dir" ] || continue
     want="$(runner_env_content "$dir")"
     if [ "$(sudo cat "${dir}/.env" 2>/dev/null || true)" = "$want" ]; then
@@ -77,9 +83,12 @@ write_runner_envs() {
     fi
     echo "  ${repo#*/} runner-${i}: refreshing .env (per-runner caches)"
     printf '%s\n' "$want" | sudo -u "$RUNNER_USER" tee "${dir}/.env" >/dev/null
-    sudo -u "$RUNNER_USER" mkdir -p \
-      "${dir}/_work/_cache" "${dir}/_work/_tool"
-    sudo systemctl restart "$svc" 2>/dev/null || true
+    sudo -u "$RUNNER_USER" mkdir -p "${dir}/_work/_cache" "${dir}/_work/_tool"
+    # The restart aborts an in-flight job (accepted — .env changes are rare); a
+    # failed restart must be loud, or the content check above hides it forever.
+    svc="$(runner_svc "$repo" "$i")"
+    sudo systemctl restart "$svc" ||
+      echo "  warn: ${svc} restart failed — new .env not applied" >&2
   done
 }
 
@@ -101,35 +110,50 @@ missing_indices() {
 }
 
 install_runners() {
-  local repo="$1" indices="$2" tokfile
+  local repo="$1" indices="$2" tokfile rmtokfile
   [ -n "$indices" ] || return 0
 
+  # EXIT (not RETURN) so the token files are cleaned up even when set -e aborts
+  # mid-function — RETURN traps don't fire on abort, and they outlive the
+  # function and re-fire on every later return.
   tokfile="$(mktemp)"
-  chmod 600 "$tokfile"
-  # shellcheck disable=SC2064  # expand $tokfile now, not at trap time
-  trap "rm -f '$tokfile'" RETURN
+  rmtokfile="$(mktemp)"
+  chmod 600 "$tokfile" "$rmtokfile"
+  # shellcheck disable=SC2064  # expand the paths now, not at trap time
+  trap "rm -f '$tokfile' '$rmtokfile'" EXIT
   local _
   for _ in $indices; do
     gh api -X POST "repos/${repo}/actions/runners/registration-token" --jq .token >>"$tokfile"
   done
+  # Tearing down a previously-configured runner needs a REMOVE token —
+  # `config.sh remove` rejects a registration token.
+  gh api -X POST "repos/${repo}/actions/runners/remove-token" --jq .token >"$rmtokfile"
 
-  sudo REPO="$repo" INDICES="$indices" VER="$RUNNER_VERSION" LABELS="$LABELS" \
-    RU="$RUNNER_USER" HD="$RUNNER_HOME" TOKFILE="$tokfile" bash <<'REMOTE'
+  # `sudo env` (not bare `sudo VAR=…`) so the assignments don't depend on a
+  # SETENV-shaped sudoers rule.
+  sudo env REPO="$repo" INDICES="$indices" VER="$RUNNER_VERSION" LABELS="$LABELS" \
+    RU="$RUNNER_USER" HD="$RUNNER_HOME" TOKFILE="$tokfile" RMTOKFILE="$rmtokfile" bash <<'REMOTE'
 set -euo pipefail
 mapfile -t TOKENS <"$TOKFILE"
+RMTOK="$(cat "$RMTOKFILE")"
 SHORT="${REPO#*/}"
 
 id -u "$RU" >/dev/null 2>&1 || useradd -m -s /bin/bash "$RU"
 usermod -aG docker "$RU"
-install -d -o "$RU" -g "$RU" "$HD"
+# Explicit mode: `install -d` on an existing directory resets it to 0755,
+# silently making every runner $HOME world-traversable on a shared host.
+install -d -m 0750 -o "$RU" -g "$RU" "$HD"
 
 # Download the runner tarball once; every runner dir extracts from this cache.
 CACHE="${HD}/.runner-cache"
 runuser -u "$RU" -- mkdir -p "$CACHE"
 if [ ! -f "${CACHE}/runner-${VER}.tgz" ]; then
   echo "  caching actions-runner v${VER}"
-  runuser -u "$RU" -- curl -fsSL -o "${CACHE}/runner-${VER}.tgz" \
+  # Download to a temp name — a partial file left by a dead curl would satisfy
+  # the -f guard forever and wedge every later install at the tar step.
+  runuser -u "$RU" -- curl -fsSL -o "${CACHE}/runner-${VER}.tgz.tmp" \
     "https://github.com/actions/runner/releases/download/v${VER}/actions-runner-linux-x64-${VER}.tar.gz"
+  runuser -u "$RU" -- mv "${CACHE}/runner-${VER}.tgz.tmp" "${CACHE}/runner-${VER}.tgz"
 fi
 
 k=0
@@ -146,44 +170,102 @@ for i in $INDICES; do
     systemctl stop "$OLD" 2>/dev/null || true
     if [ -n "$PREV" ] && [ -x "${PREV}/svc.sh" ]; then
       (cd "$PREV" && ./svc.sh uninstall) || true
-      runuser -u "$RU" -- bash -c "cd '$PREV' && ./config.sh remove --token '${TOK}'" || true
+      # Tokens travel via env + positional args, not spliced into script text —
+      # that keeps them off the intermediate bash cmdline and closes the quoting
+      # hole. config.sh's own argv still shows the token while it runs; that is
+      # upstream's interface, and the tokens are single-purpose and expire in 1h.
+      runuser -u "$RU" -- env RMTOK="$RMTOK" bash -c \
+        'cd "$1" && ./config.sh remove --token "$RMTOK"' _ "$PREV" ||
+        echo "  warn: could not deregister old ${SHORT} runner-${i}; wiping local state" >&2
+    else
+      # The directory (and its svc.sh) is gone but the unit survives — remove
+      # it by hand or ./svc.sh install below refuses with "error: exists <unit>".
+      systemctl disable "$OLD" 2>/dev/null || true
+      rm -f "/etc/systemd/system/${OLD}"
+      systemctl daemon-reload
     fi
+    # Clear out a deregistered old install left at a different anchor.
+    case "$PREV" in
+    "$HD"/?*) if [ "$PREV" != "$DIR" ] && [ -d "$PREV" ]; then rm -rf -- "$PREV"; fi ;;
+    esac
   fi
 
-  runuser -u "$RU" -- bash -c "mkdir -p '${DIR}' && cd '${DIR}' && tar xzf '${CACHE}/runner-${VER}.tgz'"
-  runuser -u "$RU" -- bash -c "cd '${DIR}' && ./config.sh \
-    --url 'https://github.com/${REPO}' --token '${TOK}' \
-    --name 'taffy-${i}' --labels '${LABELS}' --unattended --replace"
+  # Start from a clean slate: stale .runner/.credentials from a failed remove
+  # would make config.sh refuse with "already configured" (--replace only
+  # resolves the server-side name collision, not the local guard).
+  rm -rf -- "${DIR:?}"
+  runuser -u "$RU" -- bash -c 'mkdir -p "$1" && cd "$1" && tar xzf "$2"' _ \
+    "$DIR" "${CACHE}/runner-${VER}.tgz"
+  runuser -u "$RU" -- env RTOK="$TOK" bash -c \
+    'cd "$1" && ./config.sh --url "$2" --token "$RTOK" \
+      --name "$3" --labels "$4" --unattended --replace' _ \
+    "$DIR" "https://github.com/${REPO}" "taffy-${i}" "$LABELS"
   (cd "$DIR" && ./svc.sh install "$RU" && ./svc.sh start)
 done
 REMOTE
+
+  rm -f "$tokfile" "$rmtokfile"
+  trap - EXIT
 }
 
 # Deregister every taffy-<i> above the configured count, locally and on GitHub.
+# Driven by GitHub's runner list — a local unit GitHub no longer knows about is
+# not swept here.
 prune_runners() {
-  local repo="$1" n="$2" name idx id
+  local repo="$1" n="$2" listing name idx id svc dir have
+  # Capture first so a failed listing dies loudly — a failing process
+  # substitution is invisible under set -e and would skip pruning silently.
+  listing="$(gh api --paginate "repos/${repo}/actions/runners" \
+    --jq '.runners[] | select(.name|startswith("taffy-")) | "\(.name) \(.id)"')" ||
+    die "could not list ${repo} runners — refusing to prune blind"
   while read -r name id; do
     [ -n "$name" ] || continue
     idx="${name#taffy-}"
     case "$idx" in '' | *[!0-9]*) continue ;; esac
-    [ "$idx" -le "$n" ] && continue
+    # Inverted so a test *error* selects skip, never prune.
+    [ "$idx" -gt "$n" ] || continue
 
     echo "  ${repo#*/} ${name}: pruning (pool is ${n})"
-    local svc dir
     svc="$(runner_svc "$repo" "$idx")"
     dir="$(runner_dir "$repo" "$idx")"
     if systemctl cat "$svc" >/dev/null 2>&1; then
-      dir="$(systemctl show -p WorkingDirectory --value "$svc" 2>/dev/null || echo "$dir")"
+      # `systemctl show` prints "" with exit 0 when the property is unset, and
+      # a hand-edited unit could anchor anywhere — only trust paths under ours.
+      have="$(systemctl show -p WorkingDirectory --value "$svc" 2>/dev/null || true)"
+      case "$have" in "${RUNNER_HOME}"/?*) dir="$have" ;; esac
       sudo systemctl stop "$svc" 2>/dev/null || true
-      [ -x "${dir}/svc.sh" ] && (cd "$dir" && sudo ./svc.sh uninstall) || true
+      if [ -x "${dir}/svc.sh" ]; then
+        (cd "$dir" && sudo ./svc.sh uninstall) || true
+      fi
     fi
-    gh api -X DELETE "repos/${repo}/actions/runners/${id}" 2>/dev/null || true
-    [ -d "$dir" ] && sudo rm -rf -- "$dir"
-  done < <(gh api "repos/${repo}/actions/runners" --jq '.runners[] | select(.name|startswith("taffy-")) | "\(.name) \(.id)"' 2>/dev/null)
+    # Deregister first, delete local state only on success — a swallowed
+    # failure here (e.g. 422 on a busy runner) would orphan the registration
+    # while destroying the credentials it needs to ever deregister itself.
+    if ! gh api -X DELETE "repos/${repo}/actions/runners/${id}" >/dev/null; then
+      echo "  warn: GitHub deregistration failed for ${name} (id ${id}) — keeping ${dir} for retry" >&2
+      continue
+    fi
+    case "$dir" in
+    "${RUNNER_HOME}"/?*) if [ -d "$dir" ]; then sudo rm -rf -- "$dir"; fi ;;
+    *) echo "  warn: refusing to remove '${dir}' — outside ${RUNNER_HOME}" >&2 ;;
+    esac
+  done <<<"$listing"
+  return 0
 }
 
 reconcile() {
   local repo="$1" n="$2" indices
+  # Validate before acting: an empty or non-numeric count (a conf line missing
+  # its count, an argv typo, a duplicate conf entry via the awk lookup) would
+  # otherwise error out of prune's integer test and deregister the whole pool.
+  case "$repo" in
+  */*/* | /* | */ | *[!A-Za-z0-9._/-]*) die "bad repo '${repo}' — expected <owner>/<repo>" ;;
+  */*) ;;
+  *) die "bad repo '${repo}' — expected <owner>/<repo>" ;;
+  esac
+  case "$n" in
+  '' | *[!0-9]*) die "bad count '${n}' for ${repo} — expected an integer (0 drains the pool)" ;;
+  esac
   echo ">> ${repo} (pool ${n})"
   indices="$(missing_indices "$repo" "$n" | tr '\n' ' ')"
   if [ -n "${indices// /}" ]; then
@@ -210,7 +292,10 @@ main() {
     return
   fi
 
-  while read -r repo n _; do
+  # `|| [ -n "$repo" ]` keeps a final line without a trailing newline — read
+  # populates the vars but returns non-zero, which would silently drop it.
+  local repo n _
+  while read -r repo n _ || [ -n "$repo" ]; do
     case "$repo" in '' | '#'*) continue ;; esac
     reconcile "$repo" "$n"
   done < <(sed 's/#.*//' "$CONF")
