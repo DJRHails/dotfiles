@@ -36,9 +36,36 @@ arbitrary code and must never reach taffy:
       || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
 ```
 
-`github.event.pull_request` is null on push/schedule/dispatch, so the property
-access is falsy there. A public workflow with no `pull_request` trigger (release,
-nightly sync) needs no guard — only people with write access can fire it.
+A public workflow with no `pull_request` trigger (release, nightly sync) needs no
+guard — only people with write access can fire it.
+
+Two traps in that guard, both of which shipped broken once:
+
+- **Compare repo names; never use `github.event.pull_request.head.repo.fork`.**
+  That flag asks "is the head repo a fork *of anything*", not "did this PR come
+  from elsewhere". `DJRHails/agent-browser` and `pi-interactive-subagents` are
+  themselves forks of their upstreams, so the flag is permanently true there and
+  routed **every** job to the billed runner — a silent, total no-op of the
+  migration that only showed up by reading `.labels` on a finished job.
+- **`github.event_name == 'pull_request' &&` is load-bearing.** On push,
+  `github.event.pull_request` is null, so `head.repo.full_name` is null, and
+  `null != 'DJRHails/repo'` is **true** — without the event check, every push
+  would route to hosted.
+
+**The `runs-on` guard is defence in depth, not the control.** A `pull_request`
+run executes the PR's *own* copy of the workflow file, so a fork PR can simply
+edit `runs-on` back to the taffy label. What actually enforces it is the repo's
+fork-PR approval policy — review the workflow diff before approving a fork PR's
+run:
+
+```sh
+gh api repos/DJRHails/<repo>/actions/permissions/fork-pr-contributor-approval \
+  --jq .approval_policy                       # want: all_external_contributors
+gh api -X PUT repos/DJRHails/<repo>/actions/permissions/fork-pr-contributor-approval \
+  -f approval_policy=all_external_contributors
+```
+
+Set that on any public repo before pointing a `pull_request` job at the pool.
 
 Three details that are easy to get wrong:
 

@@ -33,6 +33,56 @@ die() {
 runner_dir() { echo "${RUNNER_HOME}/${1#*/}-runner-${2}"; }
 runner_svc() { echo "actions.runner.${1%%/*}-${1#*/}.taffy-${2}.service"; }
 
+# Per-runner tool and cache homes, written to <dir>/.env (the runner sources it
+# for every job).
+#
+# Without this every runner on the host shares one $HOME, so the toolchain
+# caches collide: pnpm/action-setup puts its content-addressed store under
+# PNPM_HOME (/home/actions/setup-pnpm/...), and two repos installing at the same
+# moment race on the same files — observed as
+# `ERR_PNPM_ENOENT ... copyfile '/home/actions/setup-pnpm/.../store/v10/...'`.
+# corepack, rustup/cargo, uv, npm and go all have the same shape. A hosted
+# runner never hits this because its $HOME is a fresh VM.
+#
+# Scoped to <dir>/_work/ rather than $RUNNER_TEMP so the cache still survives
+# between jobs (a runner only ever runs one job at a time, so per-runner is
+# collision-free without giving up reuse).
+runner_env_content() {
+  local dir="$1"
+  cat <<ENV
+XDG_CACHE_HOME=${dir}/_work/_cache
+PNPM_HOME=${dir}/_work/_tool/pnpm
+COREPACK_HOME=${dir}/_work/_tool/corepack
+CARGO_HOME=${dir}/_work/_tool/cargo
+RUSTUP_HOME=${dir}/_work/_tool/rustup
+GOPATH=${dir}/_work/_tool/go
+GOCACHE=${dir}/_work/_cache/go-build
+UV_CACHE_DIR=${dir}/_work/_cache/uv
+PIP_CACHE_DIR=${dir}/_work/_cache/pip
+npm_config_cache=${dir}/_work/_cache/npm
+ENV
+}
+
+# Converge <dir>/.env for every configured runner, restarting only those whose
+# content actually changed (the runner reads .env at service start).
+write_runner_envs() {
+  local repo="$1" n="$2" i dir svc want
+  for i in $(seq 1 "$n"); do
+    dir="$(runner_dir "$repo" "$i")"
+    svc="$(runner_svc "$repo" "$i")"
+    [ -d "$dir" ] || continue
+    want="$(runner_env_content "$dir")"
+    if [ "$(sudo cat "${dir}/.env" 2>/dev/null || true)" = "$want" ]; then
+      continue
+    fi
+    echo "  ${repo#*/} runner-${i}: refreshing .env (per-runner caches)"
+    printf '%s\n' "$want" | sudo -u "$RUNNER_USER" tee "${dir}/.env" >/dev/null
+    sudo -u "$RUNNER_USER" mkdir -p \
+      "${dir}/_work/_cache" "${dir}/_work/_tool"
+    sudo systemctl restart "$svc" 2>/dev/null || true
+  done
+}
+
 # A runner is healthy only if its unit is active AND anchored at the path we
 # expect — a unit left at an old directory is silently the wrong runner.
 runner_is_healthy() {
@@ -141,6 +191,7 @@ reconcile() {
   else
     echo "  all ${n} runner(s) healthy"
   fi
+  write_runner_envs "$repo" "$n"
   prune_runners "$repo" "$n"
 }
 
