@@ -54,9 +54,17 @@ runner_svc() {
 # Scoped to <dir>/_work/ rather than $RUNNER_TEMP so the cache still survives
 # between jobs (a runner only ever runs one job at a time, so per-runner is
 # collision-free without giving up reuse).
+#
+# HOME itself is repointed because the per-tool variables are not enough:
+# pnpm/action-setup installs to `<os.homedir()>/setup-pnpm` from its own `dest`
+# default, which ignores PNPM_HOME entirely, so two runners still collided with
+# `ENOTEMPTY: directory not empty, rmdir '/home/actions/setup-pnpm'`. Giving each
+# runner its own HOME closes the whole class rather than chasing one tool at a
+# time. .gitconfig is seeded into it so git identity survives the move.
 runner_env_content() {
   local dir="$1"
   cat <<ENV
+HOME=${dir}/_home
 XDG_CACHE_HOME=${dir}/_work/_cache
 PNPM_HOME=${dir}/_work/_tool/pnpm
 COREPACK_HOME=${dir}/_work/_tool/corepack
@@ -83,7 +91,13 @@ write_runner_envs() {
     fi
     echo "  ${repo#*/} runner-${i}: refreshing .env (per-runner caches)"
     printf '%s\n' "$want" | sudo -u "$RUNNER_USER" tee "${dir}/.env" >/dev/null
-    sudo -u "$RUNNER_USER" mkdir -p "${dir}/_work/_cache" "${dir}/_work/_tool"
+    sudo -u "$RUNNER_USER" mkdir -p \
+      "${dir}/_work/_cache" "${dir}/_work/_tool" "${dir}/_home"
+    # Seed git identity into the new HOME, once — rustup/cargo and friends will
+    # populate the rest themselves.
+    if [ -f "${RUNNER_HOME}/.gitconfig" ] && [ ! -f "${dir}/_home/.gitconfig" ]; then
+      sudo -u "$RUNNER_USER" cp "${RUNNER_HOME}/.gitconfig" "${dir}/_home/.gitconfig"
+    fi
     # The restart aborts an in-flight job (accepted — .env changes are rare); a
     # failed restart must be loud, or the content check above hides it forever.
     svc="$(runner_svc "$repo" "$i")"
