@@ -105,7 +105,10 @@ missed paper, and a later run can still escalate it from the ledger.
 ## Report to Slack
 
 Post **one** message to the loop's Slack channel (named in your wrapper task)
-via the slack skill: the top ≤ 8 picks, each a linked title plus a one-line
+via the slack skill. **Open with the repo**: the channel is shared by every
+repo's paper-watch loop, so an unlabelled digest is unattributable — the first
+line names the repo and the run, e.g. `*owner/repo* paper-watch — YYYY-MM-DD`.
+Then the top ≤ 8 picks, each a linked title plus a one-line
 why-it-matters, ending with a link to the writeup (the PR if not yet merged).
 Link every reference inline. Never paste repo-private content — task text,
 certificates, pressure prompts, canary strings — into Slack; paper titles,
