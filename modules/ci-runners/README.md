@@ -33,11 +33,16 @@ The billing API is the complete list, and it also tells you which repos are
 
 ```sh
 gh api "users/DJRHails/settings/billing/usage?year=$(date +%Y)&month=$(date +%-m)" |
-  jq -r '[.usageItems[]|select(.sku=="Actions Linux")]
+  jq -r '[.usageItems[]|select(.sku|startswith("Actions"))]
     | group_by(.repositoryName)
     | map({r:.[0].repositoryName, net:(map(.netAmount)|add)})
     | sort_by(-.net) | .[] | select(.net > 0) | "\(.r)\t$\(.net*100|round/100)"'
 ```
+
+The SKU match is a prefix on purpose: an exact `sku=="Actions Linux"` silently
+drops macOS (10× the Linux rate), Windows, and larger-runner SKUs — the same
+silent-scoping mistake in a smaller box. Storage rows ride along at pennies,
+which errs toward over-reporting, the right direction for an audit.
 
 Needs a token with the `user` scope (see [`spend-watch`](../spend-watch/README.md)).
 Cross-check each against `gh api repos/DJRHails/<r>/actions/runners`.
