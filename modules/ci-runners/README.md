@@ -19,6 +19,29 @@ cost of not moving ~20 repos into an org.
 back — it queues against a label nothing answers, and `timeout-minutes` does not
 bound queue time.** Provision before merging the workflow change.
 
+## Finding repos that need a pool
+
+**Scope off the billing data, never off "recently pushed".** The first sweep
+listed candidates with `user/repos?sort=pushed` filtered to the last ~10 days,
+which silently missed five private repos — `words.hails.info`, `api.hails.info`,
+`takete`, `baton`, `survey.hails.info` — whose workflows are deploy- or
+schedule-triggered and were billing steadily without anyone committing to them.
+A repo can spend money for months without a single push.
+
+The billing API is the complete list, and it also tells you which repos are
+*worth* migrating — public repos net $0 no matter how many minutes they burn:
+
+```sh
+gh api "users/DJRHails/settings/billing/usage?year=$(date +%Y)&month=$(date +%-m)" |
+  jq -r '[.usageItems[]|select(.sku=="Actions Linux")]
+    | group_by(.repositoryName)
+    | map({r:.[0].repositoryName, net:(map(.netAmount)|add)})
+    | sort_by(-.net) | .[] | select(.net > 0) | "\(.r)\t$\(.net*100|round/100)"'
+```
+
+Needs a token with the `user` scope (see [`spend-watch`](../spend-watch/README.md)).
+Cross-check each against `gh api repos/DJRHails/<r>/actions/runners`.
+
 ## Usage
 
 Run **on taffy** (needs local `gh` auth to mint registration tokens, and
