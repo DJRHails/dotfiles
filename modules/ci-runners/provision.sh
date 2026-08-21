@@ -61,10 +61,20 @@ runner_svc() {
 # `ENOTEMPTY: directory not empty, rmdir '/home/actions/setup-pnpm'`. Giving each
 # runner its own HOME closes the whole class rather than chasing one tool at a
 # time. .gitconfig is seeded into it so git identity survives the move.
+#
+# DOCKER_CONFIG is in the same list for the same reason, and it is the one with
+# teeth: buildx stores its *current builder* pointer under $DOCKER_CONFIG, and
+# `docker/setup-buildx-action` does a global `--use`. With it shared, one repo's
+# build repoints "current" mid-flight and another repo's post-step then removes
+# that builder underneath a running build — observed on words.hails.info as a
+# buildkit `graceful_stop` GOAWAY caused by api.hails.info's teardown. It also
+# stops `docker/login-action` writing GHCR credentials into a home directory
+# shared by every repo on the host.
 runner_env_content() {
   local dir="$1"
   cat <<ENV
 HOME=${dir}/_home
+DOCKER_CONFIG=${dir}/_work/_docker
 XDG_CACHE_HOME=${dir}/_work/_cache
 PNPM_HOME=${dir}/_work/_tool/pnpm
 COREPACK_HOME=${dir}/_work/_tool/corepack
@@ -80,11 +90,24 @@ ENV
 
 # Converge <dir>/.env for every configured runner, restarting only those whose
 # content actually changed (the runner reads .env at service start).
+#
+# EVERY filesystem probe below is privileged. /home/actions is owned by the
+# `actions` user at mode 0750 and this script runs as an ordinary user, so a bare
+# `[ -d "$dir" ]` is FALSE for a directory that plainly exists. That is not
+# hypothetical: on 2026-08-21 the mode tightened, every test silently failed, the
+# loop `continue`d past all 47 runners, and eight freshly-built runners were left
+# with no per-runner env at all — no HOME, no DOCKER_CONFIG — which is what let
+# the cross-repo buildx race happen. It printed nothing and exited 0.
 write_runner_envs() {
   local repo="$1" n="$2" i dir svc want
   for i in $(seq 1 "$n"); do
     dir="$(runner_dir "$repo" "$i")"
-    [ -d "$dir" ] || continue
+    if ! sudo test -d "$dir"; then
+      # A configured index with no directory means install did not happen. Say so
+      # — skipping quietly is how this went unnoticed for a whole fleet.
+      echo "  warn: ${repo#*/} runner-${i}: ${dir} missing — no .env written" >&2
+      continue
+    fi
     want="$(runner_env_content "$dir")"
     if [ "$(sudo cat "${dir}/.env" 2>/dev/null || true)" = "$want" ]; then
       continue
@@ -92,10 +115,10 @@ write_runner_envs() {
     echo "  ${repo#*/} runner-${i}: refreshing .env (per-runner caches)"
     printf '%s\n' "$want" | sudo -u "$RUNNER_USER" tee "${dir}/.env" >/dev/null
     sudo -u "$RUNNER_USER" mkdir -p \
-      "${dir}/_work/_cache" "${dir}/_work/_tool" "${dir}/_home"
+      "${dir}/_work/_cache" "${dir}/_work/_tool" "${dir}/_work/_docker" "${dir}/_home"
     # Seed git identity into the new HOME, once — rustup/cargo and friends will
     # populate the rest themselves.
-    if [ -f "${RUNNER_HOME}/.gitconfig" ] && [ ! -f "${dir}/_home/.gitconfig" ]; then
+    if sudo test -f "${RUNNER_HOME}/.gitconfig" && ! sudo test -f "${dir}/_home/.gitconfig"; then
       sudo -u "$RUNNER_USER" cp "${RUNNER_HOME}/.gitconfig" "${dir}/_home/.gitconfig"
     fi
     # The restart aborts an in-flight job (accepted — .env changes are rare); a
@@ -248,7 +271,10 @@ prune_runners() {
       have="$(systemctl show -p WorkingDirectory --value "$svc" 2>/dev/null || true)"
       case "$have" in "${RUNNER_HOME}"/?*) dir="$have" ;; esac
       sudo systemctl stop "$svc" 2>/dev/null || true
-      if [ -x "${dir}/svc.sh" ]; then
+      # Privileged probe: /home/actions is 0750 actions:actions, so an
+      # unprivileged `[ -x ]` is false for a script that exists, and the unit
+      # would be left installed while the registration was deleted.
+      if sudo test -x "${dir}/svc.sh"; then
         (cd "$dir" && sudo ./svc.sh uninstall) || true
       fi
     fi
@@ -260,7 +286,7 @@ prune_runners() {
       continue
     fi
     case "$dir" in
-    "${RUNNER_HOME}"/?*) if [ -d "$dir" ]; then sudo rm -rf -- "$dir"; fi ;;
+    "${RUNNER_HOME}"/?*) if sudo test -d "$dir"; then sudo rm -rf -- "$dir"; fi ;;
     *) echo "  warn: refusing to remove '${dir}' — outside ${RUNNER_HOME}" >&2 ;;
     esac
   done <<<"$listing"
