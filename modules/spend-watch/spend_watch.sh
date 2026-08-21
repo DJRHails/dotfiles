@@ -60,7 +60,7 @@ SLACK_BOT_TOKEN="${SLACK_BOT_TOKEN:-$(sed -n 's/^SLACK_BOT_TOKEN=//p' \
 [ -n "$SLACK_BOT_TOKEN" ] || die "SLACK_BOT_TOKEN is empty — export it or add it to the touchstone .env"
 
 usage_json="$(mktemp)"
-trap 'rm -f "$usage_json"' EXIT
+trap 'rm -f "$usage_json" "${usage_json}.err"' EXIT
 
 # A 404 here is nearly always the missing `user` scope rather than a real
 # absence, and gh prints that hint on stderr — surface it instead of swallowing.
@@ -70,15 +70,19 @@ if ! GH_TOKEN="${GH_BILLING_TOKEN:-${GH_TOKEN:-}}" \
   die "billing API failed: $(tr '\n' ' ' <"${usage_json}.err" | head -c 300)"
 fi
 
-read -r day_net mtd_net mtd_days < <(
+# A month with nothing billed can come back without usageItems at all, and the
+# MTD window stops at $DAY — by post time the API already carries partial items
+# for today, and a re-rendered old day should not report the full month.
+read -r day_net mtd_net billed_days < <(
   jq -r --arg day "$DAY" '
-    [.usageItems[]] as $all
+    [.usageItems // [] | .[] | select(.date[0:10] <= $day)] as $all
     | ([$all[] | select(.date[0:10] == $day) | .netAmount] | add // 0) as $day_net
     | ([$all[] | .netAmount] | add // 0) as $mtd_net
-    | ([$all[] | .date[0:10]] | unique | length) as $mtd_days
-    | "\($day_net) \($mtd_net) \($mtd_days)"
+    | ([$all[] | .date[0:10]] | unique | length) as $billed_days
+    | "\($day_net) \($mtd_net) \($billed_days)"
   ' "$usage_json"
 )
+days_elapsed=$((10#${DAY##*-})) # calendar days complete in the month, DAY included
 
 # Per-repo for the day, biggest first, sub-cent rows folded away as noise.
 #
@@ -90,7 +94,9 @@ read -r day_net mtd_net mtd_days < <(
 # it properly would mean switching this post to rich_text blocks.
 repo_lines="$(
   jq -r --arg day "$DAY" --argjson top "$TOP_REPOS" '
-    [.usageItems[] | select(.date[0:10] == $day)]
+    [.usageItems // [] | .[] | select(.date[0:10] == $day)]
+    | map(.repositoryName = (.repositoryName
+        | if . == null or . == "" then "(account-level)" else . end))
     | group_by(.repositoryName)
     | map({repo: .[0].repositoryName, net: (map(.netAmount) | add)})
     | map(select(.net >= 0.005))
@@ -105,8 +111,10 @@ repo_lines="$(
 )"
 [ -n "$repo_lines" ] || repo_lines="  (nothing above a cent — all self-hosted)"
 
+# Average over calendar days, not billed days: a fully self-hosted zero-spend
+# day must pull the average down, or migrating repos never moves the number.
 # printf, not jq rounding: jq drops a trailing zero, so $60.90 renders as $60.9.
-avg="$(jq -rn --argjson n "$mtd_net" --argjson d "$mtd_days" \
+avg="$(jq -rn --argjson n "$mtd_net" --argjson d "$days_elapsed" \
   '($n / (if $d > 0 then $d else 1 end))')"
 avg="$(printf '%.2f' "$avg")"
 day_fmt="$(printf '%.2f' "$day_net")"
@@ -122,7 +130,7 @@ text="$(
   cat <<MSG
 *GitHub metered spend — ${DAY}*
 Billed that day: *\$${day_fmt}* — ${verdict}
-Month to date: \$${mtd_fmt} over ${mtd_days} days (\$${avg}/day average)
+Month to date: \$${mtd_fmt} over ${days_elapsed} days (\$${avg}/day average; billed on ${billed_days})
 
 By repo:
 ${repo_lines}
@@ -134,12 +142,16 @@ response="$(curl -s -m 15 -X POST "https://slack.com/api/chat.postMessage" \
   --data-urlencode "channel=${SLACK_CHANNEL}" \
   --data-urlencode "text=${text}" 2>/dev/null || true)"
 
-if [ "$(jq -r '.ok // false' <<<"$response")" != "true" ]; then
-  die "slack post rejected: $(jq -r '.error // "no response"' <<<"$response")"
+if [ "$(jq -r '.ok // false' <<<"$response" 2>/dev/null)" != "true" ]; then
+  # On empty input jq emits nothing (the // alternative needs a JSON value to
+  # evaluate against), and a non-JSON body makes it error — fall back to raw.
+  reason="$(jq -r '.error // empty' <<<"$response" 2>/dev/null || true)"
+  reason="${reason:-${response:0:300}}"
+  die "slack post rejected: ${reason:-no response}"
 fi
 
 # Marker only after a confirmed post, so a failed send retries next run rather
 # than silently burning the day's one digest.
 mkdir -p "$STATE_DIR"
 [ "$FORCE" = true ] || echo "$DAY" >"$MARKER"
-log "posted ${DAY}: \$${day_fmt} (MTD \$${mtd_fmt} over ${mtd_days}d)"
+log "posted ${DAY}: \$${day_fmt} (MTD \$${mtd_fmt} over ${days_elapsed}d)"
