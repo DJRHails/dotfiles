@@ -335,6 +335,7 @@ while [ \$# -gt 0 ]; do
 done
 case "\$url" in
   *api.github.com*) printf '{"tag_name": "v9.9.9"}\n' ;;
+  *gantry.hails.info/health*) printf '{"version": "9.9.9"}\n' ;;
   *releases/download*)
     [ "$mode" = download-fail ] && exit 22
     if [ "$mode" = download-garbage ]; then
@@ -443,6 +444,44 @@ check "sfw offline: skip logged" \
 check "sfw offline: exits 0" "0" "$(cat "$work/status")"
 check "sfw offline: later steps still ran" \
   "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
+# --- gantry refresh: the ssh rewrite is in place before the private clone ----
+# ensure_gantry_cli_fresh clones the private gantry repo over https and rides
+# ensure_github_ssh_rewrite's insteadOf on keyed hosts, so the rewrite step
+# must run first (PR #131's post-merge finding: the old order hit an
+# unauthenticated clone on hosts whose rewrite file was missing and converged
+# a day late). The uv stub records whether the rewrite file existed at install
+# time, so a future shuffle of the call list fails here instead of in prod.
+stub_uv() {
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/uv" << STUB
+#!/usr/bin/env bash
+case "\$1 \${2:-}" in
+  "tool list") echo "gantry v$1" ;;
+  "tool install")
+    if [ -f "$fake_home/.gitconfig.github-ssh" ]; then
+      echo present > "$work/uv.rewrite-state"
+    else
+      echo missing > "$work/uv.rewrite-state"
+    fi
+    ;;
+esac
+exit 0
+STUB
+  chmod +x "$fake_home/.local/bin/uv"
+}
+
+setup_repo
+stub_curl ok
+stub_uv "1.0.0"
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+log="$(run_update)"
+
+check "gantry stale: update logged" \
+  "1" "$(grep -c 'gantry: updated 1.0.0 -> ' <<< "$log")"
+check "gantry stale: ssh rewrite existed when the clone ran" \
+  "present" "$(cat "$work/uv.rewrite-state" 2> /dev/null || echo never-invoked)"
 
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
