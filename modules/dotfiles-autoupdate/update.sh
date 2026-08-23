@@ -326,7 +326,10 @@ ensure_gantry_cli_fresh() {
   # --force replaces the receipt whatever its current source (the first run
   # migrates a checkout-directory install to the git source). The https URL
   # rides ensure_github_ssh_rewrite's insteadOf on keyed hosts, so a private
-  # repo still clones from the timer's agent-less environment.
+  # repo still clones from the timer's agent-less environment — which is why
+  # ensure_github_ssh_rewrite must run before this function: a keyed host
+  # whose rewrite file is missing (the migration case that function exists
+  # for) would otherwise hit an unauthenticated https clone here.
   if uv tool install --force 'git+https://github.com/DJRHails/gantry@main' >>"$LOG" 2>&1; then
     new="$(gantry_tool_version)" || true
     log "gantry: updated $cur -> ${new:-?} (prod is $prod)"
@@ -384,7 +387,7 @@ ensure_gh_stack() {
 update_dotfiles
 repair_glassine_worktree
 ensure_sfw_fresh
-ensure_gantry_cli_fresh
 ensure_github_ssh_rewrite
+ensure_gantry_cli_fresh
 ensure_gh_stack
 refresh_pi_packages
