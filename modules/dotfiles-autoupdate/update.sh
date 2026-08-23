@@ -288,6 +288,53 @@ ensure_sfw_fresh() {
   rm -f "$tmp"
 }
 
+# Keep the gantry CLI in step with the deployed control plane. It is a uv
+# tool, and the original installs came from a local checkout directory — a
+# receipt shape that can never self-update: `uv tool upgrade` just re-reads
+# whatever commit that working tree happens to sit at, so the CLI tracks
+# nothing (taffy ran a 16-minor-versions-stale CLI until a missing subcommand
+# gave it away, 2026-08-17). Drift is judged against the version the prod
+# control plane reports at /health — one curl a day on an up-to-date host —
+# and a drifted install is replaced from origin/main, which also rewrites the
+# receipt to the git source so the local checkout stops mattering. gantry
+# deploys straight off main on every push, so main IS the released version.
+# Every failure path returns 0: offline hosts must not block the steps around
+# it.
+gantry_tool_version() {
+  uv tool list 2>/dev/null | grep -m1 '^gantry ' |
+    grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)*' | head -1
+}
+
+ensure_gantry_cli_fresh() {
+  command -v uv >/dev/null 2>&1 || return 0
+
+  local cur prod new
+  cur="$(gantry_tool_version)" || true
+  # Not installed as a uv tool on this host — never install fresh here; that
+  # stays a deliberate human action (the token still needs wiring by hand).
+  [ -n "$cur" ] || return 0
+
+  prod="$(curl -fsSL --max-time 15 https://gantry.hails.info/health 2>/dev/null |
+    grep -oE '"version"[[:space:]]*:[[:space:]]*"[^"]+"' | cut -d'"' -f4)" || true
+  prod="${prod%%+*}"
+  [ -n "$prod" ] || {
+    log "gantry: version check failed (offline?)"
+    return 0
+  }
+  [ "$cur" = "$prod" ] && return 0
+
+  # --force replaces the receipt whatever its current source (the first run
+  # migrates a checkout-directory install to the git source). The https URL
+  # rides ensure_github_ssh_rewrite's insteadOf on keyed hosts, so a private
+  # repo still clones from the timer's agent-less environment.
+  if uv tool install --force 'git+https://github.com/DJRHails/gantry@main' >>"$LOG" 2>&1; then
+    new="$(gantry_tool_version)" || true
+    log "gantry: updated $cur -> ${new:-?} (prod is $prod)"
+  else
+    log "gantry: FAILED to update $cur -> $prod (see errors above)"
+  fi
+}
+
 # Keep ~/.gitconfig.github-ssh in step with this host's GitHub SSH key. The
 # tracked gitconfig only *includes* that file (see modules/git/gitconfig): the
 # HTTPS -> SSH rewrite belongs on hosts whose ssh config has a Host entry for
@@ -337,6 +384,7 @@ ensure_gh_stack() {
 update_dotfiles
 repair_glassine_worktree
 ensure_sfw_fresh
+ensure_gantry_cli_fresh
 ensure_github_ssh_rewrite
 ensure_gh_stack
 refresh_pi_packages
