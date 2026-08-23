@@ -324,10 +324,12 @@ ensure_gantry_cli_fresh() {
   [ "$cur" = "$prod" ] && return 0
 
   # --force replaces the receipt whatever its current source (the first run
-  # migrates a checkout-directory install to the git source). The https URL
-  # rides ensure_github_ssh_rewrite's insteadOf on keyed hosts, so a private
-  # repo still clones from the timer's agent-less environment.
-  if uv tool install --force 'git+https://github.com/DJRHails/gantry@main' >>"$LOG" 2>&1; then
+  # migrates a checkout-directory install to the git source). The ssh URL is
+  # deliberate: https needs a per-host credential helper, and bonbon's gh
+  # helper serves nothing in the timer's non-interactive environment ("could
+  # not read Username", 2026-08-23) — while every gantry host has a working
+  # agent-less GitHub key, the same path the daily pi refresh already proves.
+  if uv tool install --force 'git+ssh://git@github.com/DJRHails/gantry@main' >>"$LOG" 2>&1; then
     new="$(gantry_tool_version)" || true
     log "gantry: updated $cur -> ${new:-?} (prod is $prod)"
   else
