@@ -220,5 +220,6 @@
       "**Classifier visibility**: The classifier sees user messages, CLAUDE.md, and prior tool CALLS (command strings, file paths, script bodies) — but NOT tool RESULTS (sbatch output, squeue output, echo output), and NOT runtime state (env vars, hostname, disk usage, process ownership). If a SOFT rule's applicability depends on something the user has stated in the transcript (e.g. 'I'm inside an srun shell', 'job 12345 is mine', 'that PID is mine'), treat that as user intent."
     ]
   },
-  "// NOTE": "User-level settings for the ant profile: symlinked to ~/.claude-ant/settings.json (see symlinks.conf; self-healed by claude::ant in aliases.zsh), which claude::ant selects via CLAUDE_CONFIG_DIR=$HOME/.claude-ant. Keep auto-mode config here at user level, NOT in a repo's .claude/settings.json — a malicious repo could otherwise inject classifier rules."
+  "// NOTE": "User-level settings for the ant profile: symlinked to ~/.claude-ant/settings.json (see symlinks.conf; self-healed by claude::ant in aliases.zsh), which claude::ant selects via CLAUDE_CONFIG_DIR=$HOME/.claude-ant. Keep auto-mode config here at user level, NOT in a repo's .claude/settings.json — a malicious repo could otherwise inject classifier rules.",
+  "tui": "fullscreen"
 }
