@@ -23,6 +23,8 @@ BANNED_VOCAB=(
   enhance garner vibrant nestled
   breathtaking stunning testament profound
   spine
+  bolstered exemplifies valuable
+  renowned esteemed acclaimed
 )
 
 BANNED_ATMOSPHERIC=(
@@ -34,6 +36,17 @@ BANNED_ATMOSPHERIC=(
 COPULA_AVOIDANCE=(
   "serves as" "stands as (a|an|the)" "marks (a|an)" "represents (a|an)"
   "boasts (a|an)" "features (a|an)" "offers (a|an)"
+  "functions as" "operates as" "maintains (a|an)"
+  # "refers to" is legitimate in definitional technical prose; it is listed
+  # because LLM copyedits reach for it to dodge "is". Expect false positives.
+  "refers to"
+)
+
+# Indirect links that abstract away a relationship the sentence should name.
+# "associated with" is correct in statistical writing about correlation; treat
+# hits in that context as expected, not as defects.
+VAGUE_CONNECTION=(
+  "in connection with" "in association with" "associated with"
 )
 
 FILLER_PHRASES=(
@@ -58,10 +71,15 @@ SIGNIFICANCE_PUFFERY=(
 )
 
 NEGATIVE_PARALLELISMS=(
-  "not only.*but also"
+  "not only.*but"
   "it's not just.*it's"
   "it's not merely.*it's"
   "doesn't just"
+  "is(n't| not) just [^,.;:!?]+[,—-]+ (it|they|that)"
+  "\\bnot (a|an|the) [^,.;:!?]{1,40}, but (a|an|the)\\b"
+  # The "X rather than Y" variant only reads as parallelism in this framing;
+  # a bare "rather than" is ordinary English and is deliberately not matched.
+  "^rather, (it|this|that|they) "
 )
 
 UNNECESSARY_WORDS=(
@@ -79,7 +97,11 @@ IMPERATIVE_NOTE="(^|[.!?:;(][[:space:]]+)[[:space:]]*([-*+]|[0-9]+[.)])?[[:space
 IMPERATIVE_NOTE+="(\\*\\*|__?)?(please )?(note|observe) that\\b"
 
 BANNED_PHRASES=(
-  "dive into" "align with" "in conclusion" "that said"
+  "dive into" "deep dive" "align with" "in conclusion" "that said"
+  "diverse array" "wide range of" "a multitude of"
+  "commitment to" "resonate with"
+  "in the heart of" "natural beauty"
+  "focal point" "reflects broader"
 )
 
 TAKEAWAY_ANNOUNCEMENTS=(
@@ -161,6 +183,12 @@ for phrase in "${COPULA_AVOIDANCE[@]}"; do
   scan_pattern "copula-avoidance" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
+# --- 3b. Vague expression of connection ---
+
+for phrase in "${VAGUE_CONNECTION[@]}"; do
+  scan_pattern "vague-connection" "$phrase" "${files[@]}"
+done
+
 # --- 4. Filler phrases ---
 
 for phrase in "${FILLER_PHRASES[@]}"; do
@@ -224,11 +252,42 @@ for f in "${files[@]}"; do
   fi
 done
 
+# --- 8b. Formatting tells ---
+# Counted per file rather than reported per line: one instance is a choice,
+# a page of them is a paste. Counts are matching lines, not occurrences.
+
+format_count() {
+  local category="$1" pattern="$2" threshold="$3" noun="$4" file="$5"
+  local n
+  n=$(rg -c "$pattern" "$file" 2>/dev/null || echo 0)
+  if [[ "$n" -gt "$threshold" ]]; then
+    ((total_hits++)) || true
+    printf "${YELLOW}%-24s${RESET} ${RED}%s %s${RESET}  ${CYAN}%s${RESET}\n" \
+      "[$category]" "$n" "$noun" "$file"
+  fi
+}
+
+for f in "${files[@]}"; do
+  # shellcheck disable=SC1112  # the curly quotes are the pattern, not syntax
+  format_count curly-quotes '[“”‘’]' 0 "lines with curly quotes" "$f"
+  format_count emoji-heading \
+    '^#{1,6} .*[\x{1F300}-\x{1FAFF}\x{2190}-\x{27BF}\x{FE0F}]' \
+    0 "emoji headings" "$f"
+  # Three consecutive capitalised words in a heading; "Signs of AI Writing"
+  # does not match, because the lowercase "of" breaks the run.
+  format_count title-case-heading '^#{1,6} ([A-Z][a-z]+ ){2,}[A-Z][a-z]+' \
+    0 "Title Case headings" "$f"
+  format_count bold-lead-in-list '^[[:space:]]*[-*] \*\*[^*]+\*\*:?' \
+    4 "bold lead-in bullets" "$f"
+  # Threshold 2 allows the pair of YAML frontmatter delimiters.
+  format_count thematic-break '^-{3,}$' 2 "horizontal rules" "$f"
+done
+
 # --- 9. Superficial -ing phrases ---
 
-ing_pattern="\\b(highlighting|underscoring|emphasizing|ensuring|"
-ing_pattern+="reflecting|symbolizing|contributing to|cultivating|"
-ing_pattern+="fostering|encompassing|showcasing)\\b"
+ing_pattern="\\b(highlighting|underscoring|emphasi[sz]ing|ensuring|"
+ing_pattern+="reflecting|symboli[sz]ing|contributing to|cultivating|"
+ing_pattern+="fostering|encompassing|showcasing|enhancing)\\b"
 scan_pattern "superficial-ing" "$ing_pattern" "${files[@]}"
 
 # --- 10. Vague attribution ---

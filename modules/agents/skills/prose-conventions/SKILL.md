@@ -68,16 +68,25 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Punctuation & Syntax
 
-- **Excessive em dashes** — zero to two in the whole piece. A paired parenthetical (`-- like this --`) counts as one use, and `--` in markdown source counts the same as a typeset `—`. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`.
-- **"It's not X, it's Y"** — formulaic contrast
-- **"You're not X, you're Y"** — formulaic contrast
-- **"No X. No Y. Just Z."** — rule-of-threes literary variant
+- **Excessive em dashes** — zero to two in the whole piece. A paired parenthetical (`-- like this --`) counts as one use, and `--` in markdown source counts the same as a typeset `—`. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`. This is a house style rule, not a detection signal: em dashes are now a weak tell, since OpenAI suppressed them in GPT-5.1 and a July 2026 study found Claude the only current model using them more than professional writers. Since drafting happens in Claude, the rule matters *more* here, not less.
+- **Negative parallelisms** — the whole family, not just the famous one. "Not only X, but also Y"; "It's not X, it's Y"; "You're not X, you're Y"; "No X. No Y. Just Z."; "X isn't A — it's B"; and the quieter variant **"X rather than Y"** / "Rather than A, it constitutes B". The move fakes a correction to a misconception nobody held. State what the thing is.
 - **"An X with Y and Z"** — dismissive constructions
 - **Mid-sentence self-questioning** — "And honestly? That's amazing."
 - **doesn't just** — "doesn't just" is a cliche
-- **Copula avoidance** — "serves as", "stands as", "marks", "represents", "boasts", "features", "offers" instead of "is"/"are"/"has". Use the copula.
+- **Copula avoidance** — "serves as", "stands as", "functions as", "operates as", "marks", "represents", "boasts", "features", "maintains", "offers", "refers to" instead of "is"/"are"/"has". Use the copula. The elaborated form counts too: "ventured into politics as a candidate" is "was a candidate"; "began his career as" is "was". Measured drops of >10% in "is"/"are" are the single most-replicated signature of LLM copyediting.
+- **Vague expression of connection** — "in connection with", "in association with", "associated with", "connected to". Reaching for an abstract link instead of naming the relationship. Use "of", "for", "by", or say what the relationship actually is: "worked with", "used in", "caused by", "founded". "He is associated with the orchestra" → "He plays violin in the orchestra."
+- **Participial commentary** — a sentence that states a fact, then tacks on an `-ing` clause telling the reader what it means: "…, highlighting the collaborative nature of the work", "…, underscoring its importance", "…, reflecting broader trends", "…, ensuring accuracy", "…, contributing to the region's growth". The clause is almost always unfalsifiable filler bolted onto a real fact. Cut it, or make it a separate sentence with a source. Watch `highlighting, underscoring, emphasizing, reflecting, symbolizing, ensuring, fostering, cultivating, encompassing, enhancing`.
 
 ### Banned Vocabulary
+
+The list is not a rule about register. A word being overused by a model does not taint its synonyms, and formal or academic prose is not itself a tell — these are *specific words*, and context still decides ("underscore" the typographic mark is fine). Read this list literally.
+
+**Which words date a draft.** The overused set turns over as models change, so the current tells are the useful ones:
+
+- *2023–mid-2024 (GPT-4 era, now a dating signal for old text):* delve, tapestry, intricate, interplay, boasts, bolstered, garner, meticulous, pivotal, testament, vibrant, landscape, key, valuable, Additionally
+- *Mid-2024–mid-2025:* align with, enhance, enduring, fostering, highlighting, showcasing, underscore, emphasizing, pivotal
+- *Mid-2025 onward — the live ones:* **emphasizing, enhance, highlighting, showcasing**, plus the notability/attribution puffery below
+- *Grok, distinctively:* causal, empirical, correlate — and it still overuses underscore in 2026
 
 | Never use | Why |
 |-----------|-----|
@@ -112,6 +121,19 @@ These patterns signal machine-generated text. Never use them.
 | `complex`, `rich` (as praise) | Vacuous; describe what makes it so |
 | `spine` (metaphorical) | "the spine of the argument" — AI structural metaphor |
 | `the gap`, `the disconnect`, `the tension`, `the delta` (as a punchline) | Abstract noun standing in for the point you failed to make. "The number worth carrying is the gap" says nothing the numbers did not already say. Fine in its literal sense ("identify the gap in prior work"); banned as the predicate of a summarising sentence |
+| `emphasize`, `emphasizing` | Live 2026 tell; usually a [participial commentary](#banned-punctuation--syntax) clause |
+| `bolstered` | AI synonym for "strengthened" or "backed" |
+| `valuable`, `valuable insights` | Empty appraisal; say what the insight was |
+| `key` (as an adjective) | "key craftsmen", "key role" — carries no information |
+| `deep dive` | Corporate AI-speak, same family as `dive into` |
+| `exemplifies` | Copula avoidance dressed as analysis |
+| `renowned`, `esteemed`, `acclaimed` | Unsourced reputation puffery |
+| `diverse array`, `wide range of`, `a multitude of` | Filler quantifier; give the actual set or count |
+| `nestled in the heart of`, `natural beauty` | Travel-brochure AI |
+| `commitment to` | "demonstrates its commitment to" — states an intention, not a fact |
+| `resonate with`, `encompassing` | AI abstraction verbs |
+| `indelible mark`, `deeply rooted`, `focal point`, `turning point` | Significance puffery nouns |
+| `setting the stage for`, `reflects broader` | Narrative glue implying a causal claim you have not made |
 
 ### Banned Atmospheric Words
 
@@ -138,6 +160,30 @@ These patterns signal machine-generated text. Never use them.
 - **Formulaic challenges sections** — "Despite challenges... continues to thrive." State the specific problem and what was done about it.
 - **Generic positive conclusions** — "The future looks bright", "Exciting times lie ahead." End with a concrete fact, not optimism.
 
+### Formatting Tells
+
+Layout gives a draft away faster than vocabulary does, because it survives editing. These apply to markdown, docs, and slides.
+
+- **Title Case Headings** — chatbots capitalise every main word. Use sentence case.
+- **Headings that contain only headings** — an `##` whose entire body is a stack of `###`s. Either write the connecting prose or flatten the level.
+- **Skipped heading levels, stray level-1s** — jumping `#` → `###`, or peppering a document with `#` headings, is markdown-to-anything-else conversion damage.
+- **Inline-header vertical lists** — every bullet shaped `**Bold lead-in:** one sentence of explanation.` A few are fine; a page of nothing else is a slide deck pretending to be prose. Break some into real paragraphs.
+- **Mechanical boldface** — bolding every instance of a chosen term, or bolding the "key takeaway" of each bullet. Bold marks a term on first definition; it is not emphasis paint. Inherited from readmes, listicles and sales decks.
+- **Emoji as formatting** — emoji prefixing headings or bullets. Never.
+- **Thematic breaks between every section** — a `---` rule under each heading. Delete them; the heading is the break.
+- **Curly quotes and apostrophes** — “ ” ’ mixed in with straight ones. Weak on its own (Word, macOS and Chicago style all produce them, and Claude and Gemini typically do not), but inconsistent pairs inside one document mean pasted output.
+- **Tables for things that are not tabular** — two-column tables holding prose, or a table where a list would do.
+
+### Not a tell — do not "fix" these
+
+Over-correction has a cost: stripping these makes prose *more* machine-like, and accusing a person of AI on this evidence is simply wrong.
+
+- **Perfect grammar**, and **fancy, academic or formal prose**. The vocabulary list is specific words, not a register.
+- **Bland or robotic-sounding prose** — that is a genre, not a fingerprint. LLM output actually skews positive and verbose.
+- **Mixed casual/formal register** — normal for technical writers, for the young, and for the playful.
+- **Transition words in isolation** — only a handful are overused; essayists have always used them.
+- **An em dash or a curly quote on its own.** Weak signals; they count only in combination.
+
 ### Human Signals — sprinkle these in
 
 Small imperfections that make prose sound like a person. From the Pangram reflection convergence.
@@ -145,6 +191,15 @@ Small imperfections that make prose sound like a person. From the Pangram reflec
 - **Real asides** — "give or take", "or whatever", "I forget the exact number", "this took me longer than I'd like to admit"
 - **Concrete specifics** — brand names, dollar amounts, street names, weather, times ("8 a.m."), named objects. Replaces vague abstract nouns.
 - **Vary list/step openings** — in numbered or stepped content, don't make every item start with an imperative verb. Alternate structures.
+
+Constructions measured as more common in human writing than in LLM output over 25 years of Wikipedia — LLMs avoid them while reaching for "formal, neutral" tone:
+
+- **Plain is/has phrases** — "there is a", "it has a". The copula rule again, from the other side.
+- **Short verbs over stiff synonyms** — wrote (not authored), moved (not relocated), used (not utilised), tried (not attempted), died (not passed away).
+- **Definite or superlative statements** — "was the first", "is the only", "one of the best". Where the fact supports it, commit.
+- **The occasional wordy construction** — "as a result of", "in order to", "the fact that". These stay on the cut list; an isolated survivor is not a defect.
+
+This cuts against the hedging ban above, and the tension is real: **very**, **perhaps** and **tends to** read as human precisely because they are imprecise. Resolve it by target — cut hedges that dodge a claim you could make, keep the ones that mark genuine uncertainty.
 
 ## Paragraph Craft
 
@@ -264,15 +319,21 @@ Ask: does this change make the writing better, or just more uniform?
 
 ## Scripts
 
-Two helpers ship in this skill's directory:
+Three helpers ship in this skill's directory:
 
-- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, superficial "-ing" openers, vague attribution, rule-of-three, takeaway announcements, punchline abstractions). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
+- `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, vague connection, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, participial "-ing" commentary, vague attribution, rule-of-three, takeaway announcements, punchline abstractions), plus file-level formatting tells (curly quotes, emoji and Title Case headings, bold lead-in bullet runs, stray horizontal rules, em dash density). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
 - `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences. Strips YAML frontmatter, tables, imports, and JSX before counting, so MDX files report prose only.
 
-Run both before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
+- `cliche-check.py <file ...>` — a port of the 38 detectors behind Simon Willison's [LLM cliché highlighter](https://tools.simonwillison.net/llm-cliche-highlighter), including the five that need run-detection rather than a regex: "no X, no Y" chains, echoing sentence runs, stacked rhetorical questions, repeated sentence openers, and the "did not X, did not Y" chain. Reports a count badge for each. `--list` prints the inventory, `--only`/`--skip` select ids. Stdlib only; run it with `uv run cliche-check.py <file>`. `tests/test_cliche_check.py` pins parity against the upstream id list — run `uv run --python 3.13 --with pytest pytest tests/` after refreshing it.
+
+Run all three before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
+
+`prose-lint.sh` and `cliche-check.py` overlap on vocabulary and deliberately stay separate: the first tracks this guide and is yours to edit freely, the second tracks an upstream tool and should only change when upstream does.
 
 ## References
 
-- [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) — comprehensive catalogue of AI text patterns, maintained by WikiProject AI Cleanup
+- [Wikipedia: Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing) — catalogue of AI text patterns, maintained by WikiProject AI Cleanup. Actively edited; last pulled into this guide 28 August 2026. Refetch before trusting the era breakdown — the live tells turn over every few months, and the page keeps a "Historical indicators" section for signals that have aged out (didactic "it's important to note" disclaimers, "In conclusion" section summaries, "as an AI language model", abrupt cut-offs). Those stay banned here on style grounds; their *absence* proves nothing.
+- [LLM cliché highlighter](https://tools.simonwillison.net/llm-cliche-highlighter) (Simon Willison) — paste or load a URL, highlights matched clichés in context with per-pattern toggles and counts. Runs client-side. Complements `prose-lint.sh` for text you did not write.
+- [The load-bearing vocabulary of Claude](https://louisabraham.github.io/load-bearing/) (Louis Abraham) — cluster analysis of GitHub PR text, refreshed daily, tracking which words are becoming characteristic over time. The empirical counterpart to the hand-curated list above; useful for spotting new tells before a style guide catches them.
 - [Shomir Wilson: Guide for Scholarly Writing](https://shomir.net/scholarly_writing.html) — detailed academic writing guide covering language, figures, citations, and LaTeX
 - [Zachary Lipton: Heuristics for Scientific Writing](https://www.approximatelycorrect.com/2018/01/29/heuristics-technical-scientific-writing-machine-learning-perspective/) — ML-focused writing heuristics covering abstracts, introductions, and positioning
