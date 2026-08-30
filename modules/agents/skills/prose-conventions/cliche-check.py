@@ -475,15 +475,146 @@ PATTERNS: tuple[Pattern, ...] = (
 )
 
 
+CONTEXT_WORDS = 12
+SENTENCE_END = frozenset(".!?…")
+TRAILING_CLOSERS = frozenset("\"'”’)]")
+
+
+@dataclass(frozen=True, slots=True)
+class Found:
+    """A match paired with the pattern that produced it."""
+
+    start: int
+    end: int
+    pattern: Pattern
+    badge: str | None
+
+
+@dataclass(slots=True)
+class Region:
+    """A sentence, or run of merged sentences, containing matches."""
+
+    start: int
+    end: int
+    found: list[Found]
+
+
+@dataclass(slots=True)
+class Window:
+    """A region widened by `CONTEXT_WORDS` either side, merged where adjacent."""
+
+    start: int
+    end: int
+    regions: list[Region]
+
+
 @dataclass(frozen=True, slots=True)
 class Hit:
-    """A pattern match located in a specific file and line."""
+    """A surviving match located in a specific file, line and sentence."""
 
     path: Path
     line: int
     pattern: Pattern
     text: str
     badge: str | None
+    sentence: str
+
+
+def collect_matches(text: str, patterns: Sequence[Pattern]) -> tuple[list[Found], dict[str, int]]:
+    """Gather matches from every pattern, dropping any an earlier match covers.
+
+    Matches sort by start ascending then end descending, so at a shared start
+    the longest wins, and anything beginning before the previous match ended is
+    dropped. This is what stops `pivotal` being reported separately inside
+    `plays a pivotal role`.
+
+    Returns:
+        The surviving matches in document order, and a per-pattern hit count.
+    """
+    per_pattern = {p.id: 0 for p in PATTERNS}
+    raw = [Found(m.start, m.end, p, m.badge) for p in patterns for m in p.find(text)]
+    raw.sort(key=lambda f: (f.start, -f.end))
+    kept: list[Found] = []
+    for found in raw:
+        if kept and found.start < kept[-1].end:
+            continue
+        kept.append(found)
+        per_pattern[found.pattern.id] += 1
+    return kept, per_pattern
+
+
+def sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    """Widen a span to the sentence containing it, trailing quotes included."""
+    left = start
+    while left > 0 and text[left - 1] not in SENTENCE_END and text[left - 1] != "\n":
+        left -= 1
+    while left < start and text[left].isspace():
+        left += 1
+    right = end
+    while right < len(text):
+        char = text[right]
+        if char == "\n":
+            break
+        right += 1
+        if char in SENTENCE_END:
+            while right < len(text) and text[right] in TRAILING_CLOSERS:
+                right += 1
+            break
+    return left, right
+
+
+def build_regions(text: str, matches: Sequence[Found]) -> list[Region]:
+    """Expand each match to its sentence, merging sentences that touch."""
+    regions: list[Region] = []
+    for match in matches:
+        start, end = sentence_bounds(text, match.start, match.end)
+        if regions and start <= regions[-1].end:
+            regions[-1].end = max(regions[-1].end, end)
+            regions[-1].found.append(match)
+        else:
+            regions.append(Region(start, end, [match]))
+    return regions
+
+
+def _expand_left(text: str, pos: int, words: int) -> int:
+    index, seen = pos, 0
+    while index > 0 and seen < words:
+        while index > 0 and text[index - 1].isspace():
+            index -= 1
+        if index == 0:
+            break
+        while index > 0 and not text[index - 1].isspace():
+            index -= 1
+        seen += 1
+    return index
+
+
+def _expand_right(text: str, pos: int, words: int) -> int:
+    index, seen, size = pos, 0, len(text)
+    while index < size and seen < words:
+        while index < size and text[index].isspace():
+            index += 1
+        if index == size:
+            break
+        while index < size and not text[index].isspace():
+            index += 1
+        seen += 1
+    return index
+
+
+def build_windows(text: str, regions: Sequence[Region]) -> list[Window]:
+    """Pad each region by `CONTEXT_WORDS` words, merging windows that meet."""
+    windows: list[Window] = []
+    for region in regions:
+        start = _expand_left(text, region.start, CONTEXT_WORDS)
+        end = _expand_right(text, region.end, CONTEXT_WORDS)
+        last = windows[-1] if windows else None
+        if last and (start <= last.end or not text[last.end : start].split()):
+            last.end = max(last.end, end)
+            last.regions.append(region)
+        else:
+            windows.append(Window(start, end, [region]))
+    return windows
 
 
 def _line_starts(text: str) -> list[int]:
@@ -491,13 +622,19 @@ def _line_starts(text: str) -> list[int]:
 
 
 def scan(text: str, path: Path, patterns: Sequence[Pattern]) -> Iterator[Hit]:
-    """Yield every hit in `text`, ordered by pattern then position."""
+    """Yield the surviving hits in document order, each with its sentence."""
     starts = _line_starts(text)
-    for pattern in patterns:
-        for match in pattern.find(text):
-            line = bisect_right(starts, match.start)
-            snippet = " ".join(text[match.start : match.end].split())
-            yield Hit(path, line, pattern, snippet, match.badge)
+    matches, _ = collect_matches(text, patterns)
+    for found in matches:
+        left, right = sentence_bounds(text, found.start, found.end)
+        yield Hit(
+            path,
+            bisect_right(starts, found.start),
+            found.pattern,
+            " ".join(text[found.start : found.end].split()),
+            found.badge,
+            " ".join(text[left:right].split()),
+        )
 
 
 def _select(only: list[str] | None, skip: list[str]) -> tuple[Pattern, ...]:
@@ -505,13 +642,15 @@ def _select(only: list[str] | None, skip: list[str]) -> tuple[Pattern, ...]:
     return tuple(p for p in chosen if p.id not in set(skip))
 
 
-def _report(hit: Hit, *, colour: bool) -> str:
+def _report(hit: Hit, *, colour: bool, context: str) -> str:
     badge = f" [{hit.badge}]" if hit.badge else ""
     label = f"[{hit.pattern.id}]"
-    body = hit.text if len(hit.text) <= 100 else hit.text[:97] + "..."
+    body = hit.sentence if context == "sentence" else hit.text
+    body = body if len(body) <= 160 else body[:157] + "..."
+    where = f"{hit.path}:{hit.line}"
     if not colour:
-        return f"{label:<24} {body}{badge}  {hit.path}:{hit.line}"
-    return f"\033[0;33m{label:<24}\033[0m \033[0;31m{body}{badge}\033[0m  \033[0;36m{hit.path}:{hit.line}\033[0m"
+        return f"{label:<24} {body}{badge}  {where}"
+    return f"\033[0;33m{label:<24}\033[0m \033[0;31m{body}{badge}\033[0m  \033[0;36m{where}\033[0m"
 
 
 def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -521,7 +660,29 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--only", action="append", metavar="ID", help="run only this pattern id")
     parser.add_argument("--skip", action="append", default=[], metavar="ID", help="disable an id")
     parser.add_argument("--no-colour", action="store_true", help="plain output")
+    parser.add_argument(
+        "--context",
+        choices=("span", "sentence"),
+        default="span",
+        help="print the matched span (default) or the sentence containing it",
+    )
+    parser.add_argument(
+        "--windows",
+        action="store_true",
+        help="print merged ±12-word context blocks instead of one line per hit",
+    )
+    parser.add_argument("--stats", action="store_true", help="print per-pattern hit counts")
     return parser.parse_args(argv)
+
+
+def _print_windows(text: str, path: Path, patterns: Sequence[Pattern]) -> None:
+    """Print the merged context blocks that back the tool's highlights-only view."""
+    matches, _ = collect_matches(text, patterns)
+    for window in build_windows(text, build_regions(text, matches)):
+        ids = sorted({f.pattern.id for r in window.regions for f in r.found})
+        print(f"--- {path} [{', '.join(ids)}]")
+        print(" ".join(text[window.start : window.end].split()))
+        print()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -540,17 +701,29 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     patterns = _select(args.only, args.skip)
     colour = not args.no_colour and sys.stdout.isatty()
-    hits = []
+    hits: list[Hit] = []
+    totals: dict[str, int] = {p.id: 0 for p in PATTERNS}
     for path in args.files:
         try:
             text = path.read_text(encoding="utf-8")
         except OSError as err:
             print(f"cliche-check: cannot read {path}: {err}", file=sys.stderr)
             return 2
+        if args.windows:
+            _print_windows(text, path, patterns)
         hits.extend(scan(text, path, patterns))
+        for pattern_id, count in collect_matches(text, patterns)[1].items():
+            totals[pattern_id] += count
 
-    for hit in sorted(hits, key=lambda h: (str(h.path), h.line)):
-        print(_report(hit, colour=colour))
+    if not args.windows:
+        for hit in sorted(hits, key=lambda h: (str(h.path), h.line)):
+            print(_report(hit, colour=colour, context=args.context))
+
+    if args.stats:
+        print()
+        for pattern_id, count in sorted(totals.items(), key=lambda kv: (-kv[1], kv[0])):
+            if count:
+                print(f"{count:>4}  {pattern_id}")
 
     print()
     if not hits:

@@ -324,7 +324,16 @@ Three helpers ship in this skill's directory:
 - `prose-lint.sh <file ...>` — scans files for the patterns above (banned vocabulary, copula avoidance, vague connection, filler, sycophancy, significance puffery, negative parallelisms, unnecessary words and hedges, participial "-ing" commentary, vague attribution, rule-of-three, takeaway announcements, punchline abstractions), plus file-level formatting tells (curly quotes, emoji and Title Case headings, bold lead-in bullet runs, stray horizontal rules, em dash density). Word lists are kept in sync with this guide. Skips markdown tables, import lines, and YAML frontmatter keys. Requires `rg`; exits non-zero when it finds hits.
 - `sentence-stats.sh <file>` — per-sentence word counts plus a summary (average, range, standard deviation). Flags sentences over 40 words, low rhythm variety (stddev < 4), and a lack of short punchy sentences. Strips YAML frontmatter, tables, imports, and JSX before counting, so MDX files report prose only.
 
-- `cliche-check.py <file ...>` — a port of the 38 detectors behind Simon Willison's [LLM cliché highlighter](https://tools.simonwillison.net/llm-cliche-highlighter), including the five that need run-detection rather than a regex: "no X, no Y" chains, echoing sentence runs, stacked rhetorical questions, repeated sentence openers, and the "did not X, did not Y" chain. Reports a count badge for each. `--list` prints the inventory, `--only`/`--skip` select ids. Stdlib only; run it with `uv run cliche-check.py <file>`. `tests/test_cliche_check.py` pins parity against the upstream id list — run `uv run --python 3.13 --with pytest pytest tests/` after refreshing it.
+- `cliche-check.py <file ...>` — a port of Simon Willison's [LLM cliché highlighter](https://tools.simonwillison.net/llm-cliche-highlighter), matching its whole pipeline rather than only its patterns:
+
+  1. **38 detectors**, including the five needing run-detection rather than a regex — "no X, no Y" chains, "did not X, did not Y" chains, echoing sentence runs, stacked rhetorical questions, repeated sentence openers — each reporting a count badge.
+  2. **Overlap suppression**, so `pivotal` is not reported separately inside `plays a pivotal role`. This is why the hit count is lower than the sum of the finders.
+  3. **Sentence expansion** (`--context sentence`), the CLI form of the tool tinting the sentence around a highlight.
+  4. **±12-word context windows** (`--windows`), the "show just the highlights" view.
+
+  `--list` prints the inventory, `--only`/`--skip` select ids, `--stats` gives per-pattern counts. Stdlib only: `uv run cliche-check.py <file>`.
+
+  Parity is pinned by fixtures captured from upstream, not by our own guesses — its 182-case corpus for the finders and a golden dump of its pipeline over its own example text. Run `uv run --python 3.13 --with pytest pytest tests/`, and see `tests/fixtures/README.md` to refresh. The pipeline fixture earns its keep: a finder-only corpus passed 182/182 while the port was still missing overlap suppression entirely.
 
 Run all three before the manual editing pass; treat hits as candidates to review, not automatic rewrites.
 
