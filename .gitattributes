@@ -9,6 +9,7 @@ modules/agents/skills/research-meeting-playbook/** filter=glassine diff=glassine
 modules/agents/skills/runpod-ant-cluster/**        filter=glassine diff=glassine merge=glassine
 modules/agents/skills/sage-saint/**                filter=glassine diff=glassine merge=glassine
 modules/agents/skills/saint-chrome/**              filter=glassine diff=glassine merge=glassine
+modules/agents/skills/saint-cli/**                 filter=glassine diff=glassine merge=glassine
 modules/agents/skills/slack/**                     filter=glassine diff=glassine merge=glassine
 modules/agents/skills/tailscale-topology/**        filter=glassine diff=glassine merge=glassine
 modules/agents/skills/uptime-alerts/**             filter=glassine diff=glassine merge=glassine
