@@ -363,15 +363,17 @@ comment and look up that finding's disposition:
 **Post every reply and resolve in ONE GraphQL request** — an aliased
 mutation document, never a per-thread loop. Every `gh api --method
 POST …/pulls/N/comments` reply and every single-thread
-`resolveReviewThread` call is a separate content-creating request,
-and each REST reply also mints an implicit review (one
-`PullRequestReviewEvent` per finding). The whole fleet posts through
-one maintainer account, and GitHub's per-user content-creation
-throttle (about 80 requests/min, 500/hour, independent of the
-5000/hour core quota) counts every one: twenty findings looped this
-way is forty requests in under a minute, and on a busy hour it is
-what turns every worker's `gh pr create` into a 403 "was submitted
-too quickly". One request for the whole set costs one. Write the
+`resolveReviewThread` call is a separate content-creating request.
+The whole fleet posts through one maintainer account, and GitHub's
+per-user content-creation throttle (about 80 requests/min, 500/hour,
+independent of the 5000/hour core quota) counts every one: twenty
+findings looped this way is forty requests in under a minute, and on
+a busy hour it is what turns every worker's `gh pr create` into a
+403 "was submitted too quickly". One request for the whole set costs
+one. The win is requests, not review events: every reply, REST or
+GraphQL, still mints its own empty `COMMENTED` review, so expect one
+`PullRequestReviewEvent` per finding either way (measured on
+dotfiles#143, 2026-09-02). Write the
 document to `/tmp/pr-resolve.graphql`, one alias pair per thread
 (`reply`, then `resolve`), aliases numbered from the finding token.
 Write each `body` as a block string (`"""…"""`): dismissal reasoning
