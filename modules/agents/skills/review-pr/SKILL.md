@@ -345,7 +345,7 @@ gh api graphql -f query='
       pullRequest(number:$pr){
         reviewThreads(first:100){ nodes{
           id isResolved
-          comments(first:1){ nodes{ databaseId body } }
+          comments(first:1){ nodes{ body } }
         }}
       }
     }
@@ -373,36 +373,59 @@ way is forty requests in under a minute, and on a busy hour it is
 what turns every worker's `gh pr create` into a 403 "was submitted
 too quickly". One request for the whole set costs one. Write the
 document to `/tmp/pr-resolve.graphql`, one alias pair per thread
-(`reply`, then `resolve`), aliases numbered from the finding token:
+(`reply`, then `resolve`), aliases numbered from the finding token.
+Write each `body` as a block string (`"""…"""`): dismissal reasoning
+quotes code, and in a plain `"…"` literal one unescaped `"` or `\`
+is a syntax error that fails the whole document, so nothing lands.
+Block strings take newlines, quotes and backslashes as-is; only a
+literal `"""` inside the text needs escaping (`\"""`).
 
 ```graphql
 mutation {
   replyF1: addPullRequestReviewThreadReply(input: {
     pullRequestReviewThreadId: "<thread-node-id>",
-    body: "Fixed in <commit-sha>.\n\n_[via gantry](<GANTRY_URL>)_"
+    body: """
+    Fixed in <commit-sha>.
+
+    _[via gantry](<GANTRY_URL>)_
+    """
   }) { comment { id } }
   resolveF1: resolveReviewThread(input: { threadId: "<thread-node-id>" }) {
     thread { id isResolved }
   }
   replyF2: addPullRequestReviewThreadReply(input: {
     pullRequestReviewThreadId: "<thread-node-id>",
-    body: "Dismissed: <reasoning>.\n\n_[via gantry](<GANTRY_URL>)_"
+    body: """
+    Dismissed: <reasoning, quotes and backslashes fine here>.
+
+    _[via gantry](<GANTRY_URL>)_
+    """
   }) { comment { id } }
 }
 ```
 
 Dismissed findings get a `reply` alias only (no `resolve`). Then send
-it as a single call and check every alias came back non-null:
+it as a single call:
 
 ```bash
 gh api graphql -F query=@/tmp/pr-resolve.graphql
 ```
 
 Aliased mutations run serially in document order, so a reply always
-lands before its thread is resolved. If the request fails with a 403
-"secondary rate limit" or "submitted too quickly", do **not** retry
-in a loop: wait 60 s once, and if it fails again schedule a wake
-(`$GANTRY_WAKE_URL`, 20–30 min) with the file path in the note.
+lands before its thread is resolved. Read the outcome off the
+response, not the exit code — `gh api graphql` exits 1 whenever any
+alias errored, but GraphQL still executes the other aliases and they
+have landed. Two failure shapes, two different responses:
+
+- **HTTP 403** ("secondary rate limit" / "submitted too quickly"):
+  nothing landed. Do **not** retry in a loop: wait 60 s once, and if
+  it fails again schedule a wake (`$GANTRY_WAKE_URL`, 20–30 min)
+  with the file path in the note.
+- **HTTP 200 with `errors`**: every alias that is non-null in `.data`
+  succeeded. Rebuild the document with only the null aliases and
+  send it once — never re-send the whole file, since each duplicate
+  reply is another content-creating request and another webhook
+  echo.
 
 End every reply body with the gantry sign-off when it applies (as
 in the document above) — unsigned replies echo back as
