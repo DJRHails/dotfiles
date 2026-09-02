@@ -63,10 +63,15 @@ Idempotent and convergent:
 
 - every managed unit gets the **self-heal drop-in**
   (`/etc/systemd/system/<unit>.d/restart.conf`: `Restart=always`, rate-limited
-  by `StartLimit*`) (re)written first — `svc.sh` emits a unit with no `Restart=`,
-  so without it the first oom-kill on the memory-overcommitted host parks the
-  runner in `failed` until a human reaches taffy (touchstone lost three of four
-  runners that way overnight on 2026-08-31),
+  by `StartLimit*`, plus `OOMPolicy=continue`) (re)written first — `svc.sh`
+  emits a unit with no `Restart=`, so without it the first oom-kill on the
+  memory-overcommitted host parks the runner in `failed` until a human reaches
+  taffy (touchstone lost three of four runners that way overnight on
+  2026-08-31). `OOMPolicy=continue` is the other half: under systemd's default
+  `stop`, an oom-killed *job step* stops the whole runner and spends one of its
+  rate-limited starts (touchstone taffy-2 reached "restart counter is at 6"
+  on 2026-09-02), and five such bounces inside five minutes latch the runner
+  offline with its registration intact,
 - a unit in `failed` whose registration is still intact (`.runner` on disk
   **and** the name still in GitHub's runner list) is **reset and started**,
   keeping its `_diag` logs; a runner is **(re)installed** only when its unit is
