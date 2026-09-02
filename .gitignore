@@ -8,5 +8,3 @@ __pycache__/
 .pytest_cache/
 # gantry provisions its /goal dispatch command into the worker clone
 modules/agents/commands/goal.md
-# pi-interactive-subagents writes a throwaway layout per spawn
-modules/zellij/config/zellij/layouts/pi-*.kdl
