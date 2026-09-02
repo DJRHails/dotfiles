@@ -78,6 +78,17 @@ RestartSec=20
 # is at 6" on 2026-09-02). With `continue` the killed step fails on its own and
 # the listener reports it; Restart= is left for the listener itself dying.
 OOMPolicy=continue
+# svc.sh's unit template sets KillMode=process, so on a stop — or on the unit
+# failing because runsvc.sh itself died — systemd signals only that wrapper and
+# leaves the Runner.Listener/Runner.Worker tree it spawned alive in the cgroup.
+# The next start (Restart= above, or ensure_restart_policy's revive) then runs a
+# second listener beside the survivor, and every job that runner takes is set up
+# twice in one directory and dies in seconds with `_diag/pages/<run>_<job>_1.log
+# already exists` (touchstone taffy-4 and taffy-2 on 2026-09-02, one minute after
+# the revive). `mixed` keeps the graceful path (SIGTERM to runsvc.sh only) and
+# SIGKILLs whatever is still in the cgroup once the stop timeout expires or the
+# unit dies.
+KillMode=mixed
 UNIT
 }
 

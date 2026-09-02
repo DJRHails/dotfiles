@@ -71,7 +71,12 @@ Idempotent and convergent:
   `stop`, an oom-killed *job step* stops the whole runner and spends one of its
   rate-limited starts (touchstone taffy-2 reached "restart counter is at 6"
   on 2026-09-02), and five such bounces inside five minutes latch the runner
-  offline with its registration intact,
+  offline with its registration intact. `KillMode=mixed` closes the last gap:
+  `svc.sh`'s template uses `KillMode=process`, so a stop or a dead `runsvc.sh`
+  left the listener/worker tree alive and the next start ran a second listener
+  beside it — every job on that runner then set up twice in one directory and
+  died in seconds with `_diag/pages/…_1.log already exists` (touchstone
+  taffy-4 and taffy-2, 2026-09-02, a minute after a revive-in-place),
 - a unit in `failed` whose registration is still intact (`.runner` on disk
   **and** the name still in GitHub's runner list) is **reset and started**,
   keeping its `_diag` logs; a runner is **(re)installed** only when its unit is
