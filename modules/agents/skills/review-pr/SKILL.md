@@ -187,9 +187,11 @@ gh api graphql -f query='query($o:String!,$r:String!,$p:Int!){repository(owner:$
 ```
 
 Match each thread's `<!-- finding:F<n> -->` token to its disposition and
-write `/tmp/review/resolve.graphql` — one `reply` alias per thread, plus a
-`resolve` alias for fixed ones (dismissed and P3 threads stay open for the
-author). Bodies as block strings (`"""…"""`): dismissal reasoning quotes
+write `/tmp/review/resolve.graphql` — one `reply` alias per **fixed or
+dismissed** thread, plus a `resolve` alias for the fixed ones. P3 threads get
+no reply and stay open: their inline comment and the review body already say
+they are the author's call, and every alias is one more content-creating
+mutation against the throttle above. Bodies as block strings (`"""…"""`): dismissal reasoning quotes
 code, and one unescaped `"` in a plain literal fails the whole document. A
 literal `"""` inside a block (a quoted Python docstring) fails it the same
 way — write it as `\"""`.
@@ -205,7 +207,7 @@ mutation {
   resolveF1: resolveReviewThread(input: { threadId: "<thread-id>" }) { thread { isResolved } }
   replyF2: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: "<thread-id>",
     body: """
-    Left for the author: <reasoning>.
+    Dismissed: <reasoning — why this is a false positive>.
 
     _[via gantry](<GANTRY_URL>)_
     """ }) { comment { id } }
