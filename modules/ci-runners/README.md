@@ -56,8 +56,15 @@ cd ~/.files/modules/ci-runners
 
 Idempotent and convergent:
 
-- a runner is **(re)installed** when its unit is missing, dead, or anchored at
-  the wrong directory,
+- every managed unit gets the **self-heal drop-in**
+  (`/etc/systemd/system/<unit>.d/restart.conf`: `Restart=always`, rate-limited
+  by `StartLimit*`) (re)written first — `svc.sh` emits a unit with no `Restart=`,
+  so without it the first oom-kill on the memory-overcommitted host parks the
+  runner in `failed` until a human reaches taffy (touchstone lost three of four
+  runners that way overnight on 2026-08-31),
+- a unit in `failed` whose registration is still on disk is **reset and
+  started**, keeping its `_diag` logs; a runner is **(re)installed** only when
+  its unit is missing, unregistered, or anchored at the wrong directory,
 - runners with an index **above** the configured count are stopped and
   deregistered — so lowering a number in `runners.conf` is how you shrink a
   pool, and count `0` drains it. **Deleting a repo's line does not**: the
