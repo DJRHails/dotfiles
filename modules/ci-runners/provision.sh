@@ -8,10 +8,12 @@
 #     ./provision.sh DJRHails/gauntlet        # just this repo, count from the conf
 #     ./provision.sh DJRHails/gauntlet 6      # just this repo, override the count
 #
-# Idempotent and convergent. A runner is (re)installed when its systemd unit is
-# missing, dead, or pointing at the wrong directory; runners with an index above
-# the configured count are stopped and deregistered, so lowering a number in
-# runners.conf is how you shrink a pool.
+# Idempotent and convergent. Every managed unit gets the self-heal restart
+# drop-in (re)written first; a unit sitting in `failed` with its registration
+# intact is then reset and started, not rebuilt. A runner is (re)installed only
+# when its unit is missing, unregistered, or anchored at the wrong directory;
+# runners with an index above the configured count are stopped and
+# deregistered, so lowering a number in runners.conf is how you shrink a pool.
 #
 # Each runner runs as the non-root `actions` user, in the `docker` group so it
 # drives taffy's shared host daemon (the same one the gantry fleet uses), from
@@ -38,6 +40,71 @@ runner_dir() {
 runner_svc() {
   local repo="$1" idx="$2"
   echo "actions.runner.${repo%%/*}-${repo#*/}.taffy-${idx}.service"
+}
+
+# The systemd drop-in every managed unit carries.
+#
+# svc.sh generates a unit with NO Restart= directive, so systemd's default
+# (Restart=no) applies and the FIRST oom-kill latches the runner into `failed`
+# for good. taffy overcommits memory by design and the runner processes carry
+# oom_score_adj=500, so the kernel sacrifices them first — expected load, not a
+# crash. gantry's provisioner has carried this drop-in since the 2026-08-05
+# window took out both gantry runners and touchstone taffy-3; the pools built
+# here never had it, and on 2026-08-31/09-01 touchstone taffy-1, -3 and -4 died
+# idle between jobs and stayed offline until someone could reach the host,
+# leaving 29 CI runs queued behind the one survivor.
+#
+# StartLimit* keeps a genuine crash-loop (deregistered runner, broken install)
+# from spinning forever: five starts inside five minutes latches the unit, and
+# ensure_restart_policy clears that latch on the next reconcile.
+restart_dropin_content() {
+  cat <<'UNIT'
+# Managed by modules/ci-runners/provision.sh — see restart_dropin_content there.
+# Self-heal after an oom-kill, rate-limited so a genuine crash-loop still gives
+# up rather than spinning forever.
+[Unit]
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Restart=always
+RestartSec=20
+UNIT
+}
+
+# (Re)write the drop-in onto every configured unit that exists, and revive any
+# unit sitting in `failed` whose registration is still on disk.
+#
+# Runs BEFORE the health check so a runner systemd could have restarted itself
+# is repaired in place rather than torn down and re-registered — a rebuild
+# wipes <dir>/_diag, which is the only record of why the runner died. A `failed`
+# unit with no `.runner` file is left alone here: `start` returns 0 the moment a
+# Type=simple unit forks and the runner dies right after, so "repairing" it
+# would report success and latch it out of the reinstall below. Written
+# unconditionally on content change, never only at install: an already-running
+# runner is exactly the one still missing the policy.
+ensure_restart_policy() {
+  local repo="$1" n="$2" i svc dir dropin want state
+  want="$(restart_dropin_content)"
+  for i in $(seq 1 "$n"); do
+    svc="$(runner_svc "$repo" "$i")"
+    dir="$(runner_dir "$repo" "$i")"
+    systemctl cat "$svc" >/dev/null 2>&1 || continue
+    dropin="/etc/systemd/system/${svc}.d/restart.conf"
+    if [ "$(sudo cat "$dropin" 2>/dev/null || true)" != "$want" ]; then
+      echo "  ${repo#*/} runner-${i}: writing restart drop-in"
+      sudo install -d -m 0755 "$(dirname "$dropin")"
+      printf '%s\n' "$want" | sudo tee "$dropin" >/dev/null
+      sudo systemctl daemon-reload
+    fi
+    state="$(systemctl show -p ActiveState --value "$svc" 2>/dev/null || true)"
+    if [ "$state" = "failed" ] && sudo test -f "${dir}/.runner"; then
+      echo "  ${repo#*/} runner-${i}: clearing failed state and restarting"
+      sudo systemctl reset-failed "$svc"
+      sudo systemctl start "$svc" ||
+        echo "  warn: ${svc} start failed — will be reinstalled" >&2
+    fi
+  done
 }
 
 # Per-runner tool and cache homes, written to <dir>/.env (the runner sources it
@@ -129,11 +196,16 @@ write_runner_envs() {
   done
 }
 
-# A runner is healthy only if its unit is active AND anchored at the path we
+# A runner is healthy only if its unit is up AND anchored at the path we
 # expect — a unit left at an old directory is silently the wrong runner.
+# `activating` counts as up: with Restart=always a runner spends RestartSec
+# windows there between an oom-kill and its comeback, and reinstalling one
+# systemd is already restarting would deregister a runner that was about to
+# recover on its own.
 runner_is_healthy() {
-  local svc="$1" want="$2" have
-  systemctl is-active --quiet "$svc" 2>/dev/null || return 1
+  local svc="$1" want="$2" have state
+  state="$(systemctl show -p ActiveState --value "$svc" 2>/dev/null || true)"
+  case "$state" in active | activating | reloading) ;; *) return 1 ;; esac
   have="$(systemctl show -p WorkingDirectory --value "$svc" 2>/dev/null)"
   [ "$have" = "$want" ]
 }
@@ -169,7 +241,8 @@ install_runners() {
   # `sudo env` (not bare `sudo VAR=…`) so the assignments don't depend on a
   # SETENV-shaped sudoers rule.
   sudo env REPO="$repo" INDICES="$indices" VER="$RUNNER_VERSION" LABELS="$LABELS" \
-    RU="$RUNNER_USER" HD="$RUNNER_HOME" TOKFILE="$tokfile" RMTOKFILE="$rmtokfile" bash <<'REMOTE'
+    RU="$RUNNER_USER" HD="$RUNNER_HOME" TOKFILE="$tokfile" RMTOKFILE="$rmtokfile" \
+    RESTART_DROPIN="$(restart_dropin_content)" bash <<'REMOTE'
 set -euo pipefail
 mapfile -t TOKENS <"$TOKFILE"
 RMTOK="$(cat "$RMTOKFILE")"
@@ -200,7 +273,7 @@ for i in $INDICES; do
   k=$((k + 1))
   echo "  ${SHORT} runner-${i}: installing at ${DIR}"
 
-  # Tear down whatever was there (a dead unit, or one anchored elsewhere).
+  # Tear down whatever was there (an unregistered unit, or one anchored elsewhere).
   OLD="actions.runner.${REPO%%/*}-${SHORT}.taffy-${i}.service"
   if systemctl list-unit-files "$OLD" >/dev/null 2>&1 && systemctl cat "$OLD" >/dev/null 2>&1; then
     PREV="$(systemctl show -p WorkingDirectory --value "$OLD" 2>/dev/null || true)"
@@ -237,7 +310,13 @@ for i in $INDICES; do
     'cd "$1" && ./config.sh --url "$2" --token "$RTOK" \
       --name "$3" --labels "$4" --unattended --replace' _ \
     "$DIR" "https://github.com/${REPO}" "taffy-${i}" "$LABELS"
-  (cd "$DIR" && ./svc.sh install "$RU" && ./svc.sh start)
+  (cd "$DIR" && ./svc.sh install "$RU")
+  # The drop-in goes on before the first start so a fresh runner is never
+  # without the self-heal policy, not even for one job.
+  install -d -m 0755 "/etc/systemd/system/${OLD}.d"
+  printf '%s\n' "$RESTART_DROPIN" >"/etc/systemd/system/${OLD}.d/restart.conf"
+  systemctl daemon-reload
+  (cd "$DIR" && ./svc.sh start)
 done
 REMOTE
 
@@ -277,6 +356,9 @@ prune_runners() {
       if sudo test -x "${dir}/svc.sh"; then
         (cd "$dir" && sudo ./svc.sh uninstall) || true
       fi
+      # svc.sh uninstall removes only the unit file; take our drop-in with it.
+      sudo rm -f "/etc/systemd/system/${svc}.d/restart.conf"
+      sudo rmdir "/etc/systemd/system/${svc}.d" 2>/dev/null || true
     fi
     # Deregister first, delete local state only on success — a swallowed
     # failure here (e.g. 422 on a busy runner) would orphan the registration
@@ -307,6 +389,7 @@ reconcile() {
   '' | *[!0-9]*) die "bad count '${n}' for ${repo} — expected an integer (0 drains the pool)" ;;
   esac
   echo ">> ${repo} (pool ${n})"
+  ensure_restart_policy "$repo" "$n"
   indices="$(missing_indices "$repo" "$n" | tr '\n' ' ')"
   if [ -n "${indices// /}" ]; then
     install_runners "$repo" "$indices"
