@@ -353,26 +353,44 @@ gh api graphql -f query='
 ```
 
 For each thread, read the `<!-- finding:F<n> -->` token from its first
-comment and look up that finding's disposition:
+comment and look up that finding's disposition. Every reply is a
+content-creating request against GitHub's **per-account** secondary
+limit (500/hour, 80/minute), which the whole fleet shares by posting
+through the maintainer's token — on 2026-09-02 the per-thread "Fixed
+in …" replies alone were 160 of the ~415 posts in the hour that tripped
+it. So the resolve step spends as few writes as possible:
 
-- **Fixed** — reply with the fix commit, then resolve the thread:
+- **Fixed** — resolve the thread, no reply. The §5 summary table names
+  the fix commit per finding, and a resolved thread already reads as
+  handled. Resolve every fixed thread in **one** aliased GraphQL
+  request (a resolve is not content creation, and aliases make N
+  resolves one request):
+
+  ```bash
+  gh api graphql -f query='
+    mutation($t0:ID!,$t1:ID!){
+      r0: resolveReviewThread(input:{threadId:$t0}){ thread{ id isResolved } }
+      r1: resolveReviewThread(input:{threadId:$t1}){ thread{ id isResolved } }
+    }' -f t0=<thread-node-id> -f t1=<thread-node-id>
+  ```
+
+  One alias per thread; chunk at about 50 per request. Do **not** reply
+  through GraphQL's `addPullRequestReviewThreadReply`: with the
+  maintainer PAT it answers `comment: null` and posts nothing (verified
+  2026-09-02 on gantry-review-smoke#1).
+
+- **Dismissed (false positive)** — reply with the reasoning (REST, one
+  POST per thread) but leave the thread **open** for the author to
+  adjudicate. Only fixes auto-resolve.
 
   ```bash
   gh api --method POST \
     repos/<owner>/<name>/pulls/$ARGUMENTS/comments \
-    -f body='Fixed in <commit-sha>.' -F in_reply_to=<databaseId>
-
-  gh api graphql -f query='
-    mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){
-      thread{ id isResolved } } }' -f id=<thread-node-id>
+    -f body='<why this is not a defect>' -F in_reply_to=<databaseId>
   ```
 
-- **Dismissed (false positive)** — reply with the reasoning but leave
-  the thread **open** for the author to adjudicate. Only fixes
-  auto-resolve.
-
 End every reply body with the gantry sign-off when it applies (e.g.
-`-f body='Fixed in <commit-sha>.
+`-f body='Not a defect: <reasoning>.
 
 _[via gantry](<GANTRY_URL>)_'`) — unsigned replies echo back as
 review-comment webhooks and re-trigger your own run.
@@ -395,7 +413,7 @@ Format the comment body as:
 
 | # | Severity | Finding | Resolution |
 |---|----------|---------|------------|
-| 1 | P1 | [description] | Fixed: [what was done] |
+| 1 | P1 | [description] | Fixed in `<short-sha>`: [what was done] |
 | 2 | P2 | [description] | Dismissed: [reasoning] |
 | ... | ... | ... | ... |
 
@@ -412,3 +430,13 @@ Format the comment body as:
 
 End the summary comment with the gantry sign-off when it applies,
 after any trailing `Verdict:` line your agent contract requires.
+
+If a post answers `403 … exceeded a secondary rate limit … content
+creation` (REST) or `was submitted too quickly` (GraphQL), the
+maintainer account is throttled by fleet-wide posting volume — not by
+this run. Don't retry inside the minute (each rejected write extends
+the block for every worker). Check whether the post landed anyway
+(list the PR's comments and look for your sign-off), keep the body in
+a file under `.data/`, and — as a gantry worker — schedule a wake at
+least 15 minutes out whose note names that file and a check-then-post
+command; interactively, wait a few minutes and retry once.
