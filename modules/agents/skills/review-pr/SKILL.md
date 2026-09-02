@@ -1,414 +1,194 @@
 ---
 name: review-pr
-description: Review an existing GitHub PR with the parallel pr-review-toolkit agents, post inline findings, fix them, run the quality pipeline, push, resolve threads, and post a summary. Right-sizes small / delta PRs to a direct single-pass review with no sub-agents. Use when asked to review and fix a PR, do a thorough multi-agent PR review, or run the review-pr flow on a PR number.
+description: Review an existing GitHub PR — one verified single-pass read of the diff, inline P1–P3 findings, fixes for the P1/P2s pushed to the PR branch, scoped verification, resolved threads, a summary. Escalates to a two-reader second opinion only for large source changes. Use when asked to review and fix a PR, or to run the review-pr flow on a PR number.
 argument-hint: <pr-number>
 ---
 
 # Review and Fix PR
 
-Adapted from [trailofbits/claude-code-config](https://github.com/trailofbits/claude-code-config).
+`$ARGUMENTS` is the PR number (e.g. `/review-pr 42`). Without one, ask which PR.
 
-`$ARGUMENTS` is the GitHub PR number to review and fix (e.g. `/review-pr 42`).
-If invoked without one, ask which PR before proceeding.
+Every finding must be **verified** before it is posted (a code path you read or
+ran), and P1/P2 findings are **fixed** on the PR branch. Those two properties
+are the product. Everything else in this file is about doing them in as few
+API requests and as little context as possible: a review's cost is the number
+of requests times the context each one re-reads, so the rules below are shaped
+as *mechanisms* (what to run, what to read, what to keep out of the transcript),
+not exhortations.
 
-Read PR #$ARGUMENTS thoroughly using `gh pr view`. Understand the
-full context: description, linked issues, commit history, and the
-diff against the base branch.
+## Ground rules
 
-Detect the upstream repository: if a git remote named `upstream`
-exists, use it as the canonical repo. Otherwise, fall back to
-`origin`. Resolve the canonical repo's `owner/name` (e.g. from
-`git remote get-url upstream`) and store it — use
-`--repo <owner/name>` on every `gh` command to ensure they target
-the correct repository. Run `git fetch <upstream-remote>` to
-ensure you are working with up-to-date code.
+- **Canonical repo.** `upstream` remote if present, else `origin`; pass
+  `--repo <owner/name>` on every `gh` call.
+- **Shared-repo guard.** Solo repo = owner `DJRHails` and
+  `gh api repos/<owner>/<repo>/collaborators --jq length` returns 1: act
+  autonomously. Any other repo: summarise what you are about to post/push and
+  wait for an explicit yes before each action that reaches other people
+  (§3 review, §4 push/resolve, §5 summary). As a gantry worker the spawn is
+  the authorization — never block.
+- **Gantry sign-off.** When `$GANTRY_URL` is set, end **every** body you post
+  (review body, each inline comment, each thread reply, the summary) with
+  `_[via gantry](<GANTRY_URL>)_` as its last line. It is the loop guard
+  portcullis keys on to drop your own posts when they echo back as webhooks —
+  an unsigned reply re-triggers your own run (touchstone#2290: 11 unsigned
+  replies, 11 phantom re-reviews).
+- **Context discipline** (these bound cost without touching what you review):
+  - One message per *batch* of independent calls: metadata + diff stat +
+    file list + collaborator count is one message, not five.
+  - Read the diff once, from disk. Read files by **line range around the
+    hunks** (`sed -n 'a,bp'`), not `cat` of whole files; a whole-file read
+    only for files under ~300 lines.
+  - Every command that can print more than ~150 lines writes to a file
+    (`> /tmp/review/<name>.log 2>&1`) and you read a `tail -40` / `rg`
+    of it — never the whole output into the transcript.
+  - Keep any single tool call under ~4 minutes (`timeout 240`, or run in the
+    background and poll at ≤4-minute intervals): the 5-minute prompt cache
+    expires across a longer gap and the next request re-writes the entire
+    context at write rates.
+  - Narration between calls: one line when a decision needs recording.
 
-Check out the PR branch locally.
-
-**Shared-repo guard:** determine whether the canonical repo is a
-solo personal repo — owned by `github.com/DJRHails` with no other
-collaborators. Concretely: solo means the owner is DJRHails and `gh api repos/<owner>/<repo>/collaborators --jq length` returns 1. On solo personal repos, run fully autonomously. On
-any other repo (a shared org, or any repo with other
-collaborators), pause before each action that reaches other people
-— inline review comments (§1), thread replies and resolves (§4),
-and the summary comment (§5) — post a short summary of what you
-are about to send, and wait for explicit user confirmation.
-
-Execute every step below sequentially without pausing for
-confirmation, except where the shared-repo guard requires it.
-
-**Gantry sign-off — every posted body, not just the summary:** when
-running as a gantry worker (`$GANTRY_URL` is set), end **every** body
-you post to the PR — the review body, each inline finding comment
-(§1), each thread reply (§4), and the summary comment (§5) — with
-`_[via gantry](<GANTRY_URL>)_` as the last line. This is a loop
-guard, not attribution polish: workers post through the maintainer's
-token, so the sign-off is the only mark portcullis's echo guard
-(`gantry-signed-feedback-drop`) can key on to drop your own posts
-when they come back as webhooks. An unsigned inline comment or reply
-re-triggers your own run as fake human feedback (the touchstone#2290
-echo loop: 11 unsigned thread replies each requested a fresh
-re-review).
-Skip the sign-off only when `$GANTRY_URL` is empty (interactive use).
-
-## 0. Right-size the review (do this first)
-
-Not every PR earns the full agent battery. The fan-out in §1 (five
-pr-review-toolkit agents) exists for substantial PRs; running it on a
-four-line fix or a docs tweak burns minutes and tokens for no extra signal.
-Classify the PR first and pick the review mode.
-
-Measure the diff against the base (or, for a re-review, against the
-last-reviewed commit — see **Delta re-reviews** below):
+## 1. Orient (one message)
 
 ```bash
-git diff --stat <upstream-remote>/<base-branch>...HEAD
-git diff --name-only <upstream-remote>/<base-branch>...HEAD
+gh pr view $ARGUMENTS --repo <owner/name> --json title,body,baseRefName,headRefOid,commits,additions,deletions,files
+git fetch <remote> <base> -q && git diff --stat <remote>/<base>...HEAD && git diff --name-only <remote>/<base>...HEAD
+gh api repos/<owner>/<repo>/collaborators --jq length
 ```
 
-**Direct review — no sub-agents.** Take this path when ANY holds:
+Then write the diff once: `git diff <remote>/<base>...HEAD > /tmp/review/pr.diff`
+and read it (in ≤3 chunks if it exceeds ~1,500 lines). Check out the PR
+branch if not already on it.
 
-- **Small:** roughly ≤ 80 changed lines across ≤ 5 hand-written files.
-- **Low-risk types only:** the diff touches only docs/markdown, comments,
-  config, fixtures, lockfiles, or generated files — no source logic.
-- **Follow-up delta:** a "resolve review findings"-style PR layered on a
-  parent already reviewed through this skill, where the new changes are
-  themselves small — the parent's battery already covered the substance.
+**Re-entry (a later turn on a PR you already reviewed):** run exactly one
+command first — `gh pr view $ARGUMENTS --json headRefOid -q .headRefOid` —
+and compare with the fix commit you pushed (recorded in your summary
+comment). Equal → this is your own push echoing back: end the turn with one
+line, no re-review, no posts. Otherwise review only the delta
+(`git diff <last-reviewed-sha>...HEAD`) and reuse the existing threads via
+their `finding:F<n>` tokens. If this session did not do the earlier review,
+recover both from GitHub: the newest review whose body starts
+"Automated review" gives `commit_id` (the last-reviewed SHA), and the PR's
+review threads give the findings.
 
-In a direct review, **skip §1's agent fan-out entirely** — launch no Task agents.
-Instead review the diff yourself in a single
-pass: read every changed hunk and judge it against the repo's
-CLAUDE.md/AGENTS.md conventions, looking for the same things the agents would
-(correctness bugs, silent failures, test gaps, comment rot, type/invariant
-issues). Rank findings P1–P4 and post the P1–P3 ones as inline comments
-exactly as §1's "Post inline review comments" describes, then continue with
-§2–§5 unchanged (fix → verify → push → resolve → summary).
+## 2. Review (single verified pass)
 
-**Multi-agent review.** Real source changes beyond the direct-review
-thresholds. Run §1 as written.
+Read every hunk once against the repo's CLAUDE.md/AGENTS.md and judge it
+through all five lenses — this pass replaces a five-agent fan-out, so walk
+them deliberately per hunk rather than reading for a general impression:
 
-**Borderline** (e.g. ~100 lines of straightforward source): prefer a direct
-review; if the change carries real risk despite its size, run the full §1
-fan-out instead.
+1. **Correctness** — wrong logic, broken invariants, off-by-ones, races,
+   unhandled states; **callers and adjacent writers** of anything whose
+   contract changed (`rg` the symbol — a live sibling that still assumes the
+   old contract is a P1, and it is never in the diff).
+2. **Silent failures** — swallowed exceptions, fail-open fallbacks, defaults
+   that mask a missing value, logging that stands in for raising.
+3. **Tests** — does a test pin each claimed behaviour, and would a plausible
+   regression fail it? Stubs that discard their arguments, assertions on
+   shape but not value.
+4. **Claims vs reality** — comments, docstrings, docs, and PR description
+   claims (especially numbers) that the code or data does not bear out.
+   Re-measure a quantitative claim when the data is at hand.
+5. **Types and invariants** — states representable that should not be,
+   flags where an enum belongs, validation that lives in a docstring.
 
-**Delta re-reviews.** When re-running this flow on a PR you already reviewed
-that has since gained commits, review only the *new* delta — diff against the
-previously-reviewed head (`git diff <last-reviewed-sha>...HEAD`), not the whole
-PR — and reuse the existing inline threads (match on the `finding:F<n>`
-tokens) instead of re-posting the full set. A small delta takes a direct review
-even if the original PR had a multi-agent review.
+Verify each candidate before it becomes a finding: read the code path, run
+the command, or reproduce the number. Chase a bug class across the PR's
+changed surface once (`rg` for siblings) and post the class as one finding.
+Reject speculative "what if the caller does X" risks and rewrites.
 
-State which review mode you picked and why in one line before proceeding.
+Rank: **P1** blocks merge (correctness, security, data loss); **P2**
+important (missing error handling, test gaps, logic flaws, false claims);
+**P3** nice-to-have (style, naming, small simplifications); **P4**
+observations — summary only. 3–5 well-chosen findings beat 30 nits.
 
-## 1. Review
+**Second opinion — large source changes only.** When the diff changes more
+than ~400 lines of hand-written source (tests, docs, generated files and
+lockfiles excluded), launch `code-reviewer` and `silent-failure-hunter` in
+one message, in parallel, with a prompt carrying: the repo path, the base
+ref, the path of `/tmp/review/pr.diff`, the changed-file list, the PR's gist,
+and the instruction to report **only P1/P2 candidates** as `path:line — claim
+— how to verify` in ≤300 words written to `/tmp/review/<agent>.md`,
+returning just that path. Verify their candidates yourself like your own.
+Everything smaller is a direct review with no sub-agents.
 
-> Multi-agent review (substantial PRs). For small / delta PRs, §0 replaces this
-> whole section with a direct single-pass review — skip straight to §2.
+## 3. Post the inline review (one message)
 
-Launch the pr-review-toolkit agents in parallel, then merge their findings.
-
-### Review agents (pr-review-toolkit)
-
-Launch these Task tool agents **in parallel** (single message,
-multiple tool calls), each with the matching `subagent_type` below
-(vendored pr-review-toolkit agents). Tell each agent which files
-changed (from `git diff --name-only <base>...HEAD`):
-
-| agent | focus |
-|-------|-------|
-| `code-reviewer` | Code quality, style, project guidelines |
-| `silent-failure-hunter` | Silent failures, swallowed errors, bad fallbacks |
-| `pr-test-analyzer` | Test coverage gaps and missing edge cases |
-| `comment-analyzer` | Comment accuracy, comment rot, doc completeness |
-| `type-design-analyzer` | Type encapsulation, invariants, design quality |
-
-(`code-simplifier` is the sixth toolkit agent — it mutates code rather
-than reporting findings, so it runs as a polish step after fixes, not
-in this read-only pass. See step 2.)
-
-### Merge findings
-
-Collect results from the five toolkit agents. Deduplicate overlapping
-findings — if multiple agents flag the same issue, keep the most specific
-description and note the consensus. Rank every finding by severity:
-
-- **P1** — blocks merge (correctness bugs, security issues)
-- **P2** — important (missing error handling, test gaps, logic flaws)
-- **P3** — nice to have (style, naming, minor simplifications)
-- **P4** — informational (observations, suggestions for future work)
-
-### Post inline review comments
-
-Post every P1–P3 finding as an **inline review comment** anchored to
-the file and line it concerns, so each issue becomes its own
-resolvable thread on the PR. (P4 findings stay in the §5 summary
-only.)
-
-Capture the PR head commit (the inline comments anchor to it):
-
-```bash
-HEAD_SHA=$(gh pr view $ARGUMENTS --repo <owner/name> \
-  --json headRefOid -q .headRefOid)
-```
-
-Build a single review payload so the comments post atomically. Give
-every comment a hidden, stable token (`<!-- finding:F<n> -->`) so the
-resolve step can match threads back to findings even after line
-numbers shift. Write it to a file to avoid shell-escaping issues with
-code in the bodies — `/tmp/pr-inline-review.json`:
+Build one review payload so the comments post atomically. Each comment
+carries a hidden token so §4 can match threads after lines shift:
 
 ```json
-{
-  "commit_id": "<HEAD_SHA>",
-  "event": "COMMENT",
-  "body": "Automated review — findings posted inline. Each thread is resolved as its fix lands.",
-  "comments": [
-    {
-      "path": "src/foo.py",
-      "line": 42,
-      "side": "RIGHT",
-      "body": "**P1 — correctness:** <description and suggested fix>\n\n<!-- finding:F1 -->"
-    }
-  ]
-}
+{"commit_id": "<HEAD_SHA>", "event": "COMMENT",
+ "body": "Automated review — findings posted inline. P1/P2 threads resolve as their fixes land; P3s are left for the author.",
+ "comments": [{"path": "src/foo.py", "line": 42, "side": "RIGHT",
+   "body": "**P1 — correctness:** <what breaks, evidence, suggested fix>\n\n<!-- finding:F1 -->"}]}
 ```
 
-Then create the review:
+Write it to `/tmp/review/inline.json` and
+`gh api --method POST repos/<owner>/<repo>/pulls/$ARGUMENTS/reviews --input /tmp/review/inline.json`.
+
+- Only lines in the `base...HEAD` diff can carry a comment
+  (`start_line`/`start_side` for ranges); a finding elsewhere goes to the §5
+  summary instead.
+- `event: COMMENT` — you cannot request changes on a PR you will push to.
+- Sign-off after the token in each body and at the end of the review body.
+
+## 4. Fix P1/P2, verify, push, resolve
+
+Fix every P1 and P2 with the smallest change at the correct ownership
+boundary; a finding you decide is a false positive gets a reply explaining
+why and stays open. **P3s are posted, not fixed** — they are the author's
+call (fix one only when it is a one-line change in a file you are already
+editing). No polish pass.
+
+Verify what your fixes touch, not the world:
+
+- the tests that cover the changed files (plus any test you wrote), the
+  project's lint/format/type checks **on the changed files**, and any
+  codegen-sync check CI runs whose inputs you touched (read
+  `.github/workflows/` once to learn the commands; CLAUDE.md may name
+  quality gates);
+- the full suite only when the repo has no CI covering it — otherwise the
+  PR's own CI on your pushed head is the backstop, and a red check comes back
+  to you as a follow-up turn;
+- a toolchain that never installed (a failed `uv sync`, mass
+  `unresolved-import`) is a void result, not evidence: repair it or say you
+  could not verify — never post its output as findings.
+
+Commit the fixes as **one** separate commit (never amend or squash the
+author's): subject `fix: resolve code review findings for PR #$ARGUMENTS`,
+body listing each finding as fixed/dismissed with one line of reasoning.
+Regular push to the PR head branch — never to main, never force.
+
+Then close the loop in **one script**: fetch the threads, and for each
+`finding:F<n>` token you own, reply `Fixed in <sha>.` and resolve the thread
+(fixed), or reply with the reasoning and leave it open (dismissed / P3).
 
 ```bash
-gh api --method POST \
-  repos/<owner>/<name>/pulls/$ARGUMENTS/reviews \
-  --input /tmp/pr-inline-review.json
+gh api graphql -f query='query($o:String!,$r:String!,$p:Int!){repository(owner:$o,name:$r){pullRequest(number:$p){
+  reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{databaseId body}}}}}}}' -f o=<owner> -f r=<repo> -F p=$ARGUMENTS
+gh api --method POST repos/<owner>/<repo>/pulls/$ARGUMENTS/comments -f body='Fixed in <sha>.
+
+_[via gantry](<GANTRY_URL>)_' -F in_reply_to=<databaseId>
+gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>
 ```
 
-Rules:
+Threads without a `finding:` token are not yours — leave them.
 
-- Only lines present in the `base...HEAD` diff can carry an inline
-  comment. For a multi-line range add `start_line`/`start_side`. If a
-  finding's line is **not** in the diff, drop it from the payload and
-  record it for the §5 summary instead.
-- Use `event: COMMENT` — you cannot request changes on a PR you are
-  about to push to.
-- Keep the `finding:F<n>` token in every body; the resolve step
-  depends on it.
-- When the gantry sign-off applies, append it after the
-  `finding:F<n>` token in **each** comment body, and at the end of
-  the review `body` — the sign-off must be the last line (the echo
-  guard anchors on the end of the body).
+## 5. Summary comment
 
-## 2. Fix findings
-
-Address all P1–P3 findings. For each finding, either:
-
-- **Fix it** — apply the change, or
-- **Dismiss it** — explain why it's a false positive or not worth
-  the churn (e.g. a stylistic disagreement or an impossible edge
-  case). Document the reasoning inline.
-
-When a fix requires external context — unfamiliar library behavior,
-unclear API semantics, or an error you don't recognize — search
-for solutions rather than guessing.
-
-P4 findings are informational — note them but do not fix unless
-trivial.
-
-### Polish — code-simplifier
-
-Once all findings are addressed, launch the
-`code-simplifier` agent on the files changed by
-this PR (and by your fixes). Apply only simplifications that
-**preserve behavior** — clarity, readability, and project-standard
-adherence. Skip any that alter functionality or conflict with a
-deliberate decision in the PR; note those as P4 instead. This is
-the toolkit's "after passing review" polish step.
-
-After addressing all findings, review your own fixes: read the
-diff of changes made in this step and verify each fix is correct,
-doesn't introduce new issues, and doesn't regress other parts of
-the PR. If you spot a problem, fix it before proceeding.
-
-## 3. Verify
-
-### 3a. Discover project checks (CI is the source of truth)
-
-Before running anything, read the project's CI configuration to
-learn what the project *actually* runs. This takes priority over
-the fallback tables below.
-
-1. **Read CI workflows.** Scan `.github/workflows/` for the main
-   CI workflow (typically `ci.yml`, `test.yml`, or `build.yml`).
-   Extract:
-   - Test commands with feature flags (e.g.
-     `cargo test --features foo,bar`)
-   - Lint/format commands with non-default flags
-   - Any step that runs a command then checks `git diff --exit-code`
-     — these are **codegen sync checks** (schema generation,
-     snapshot updates, help text, etc.). Record the command.
-   - Docs/site build commands (e.g. `make site`, `mkdocs build`)
-2. **Read the Makefile** (if present). Cross-reference targets
-   used in CI — these are the ones that matter.
-3. **Read AGENTS.md or CLAUDE.md** (if present at repo root or `.agents/`/`.claude/`).
-   It may define project-specific quality gates.
-
-Store the discovered commands. They override the fallback table
-for any overlapping step.
-
-### 3b. Run the quality pipeline
-
-Detect the project language from manifest files (`Cargo.toml` →
-Rust, `pyproject.toml`/`setup.py` → Python, `package.json` →
-Node/TypeScript, `go.mod` → Go). A project may use multiple
-languages; run checks for each.
-
-Run checks in this order. For each step, use the CI-discovered
-command if one was found; otherwise fall back to the default.
-
-1. **Build** — compile or bundle
-2. **Test** — run the full test suite with the same feature flags
-   CI uses. Iterate on failures until green.
-3. **Lint and format** — fix any issues
-4. **Extended checks** — per-language extras (see fallback table)
-5. **Codegen sync** — for every codegen check discovered in 3a,
-   run the command and verify `git diff --exit-code`. If the diff
-   is non-empty, the generated files are stale — regenerate and
-   stage them.
-6. **Docs build** — if the PR changes documentation files and a
-   docs build command exists, run it to verify the docs compile.
-
-### Fallback defaults (when CI config is absent or unclear)
-
-**Rust** (detected by `Cargo.toml`):
-
-| step         | command                                        |
-|--------------|------------------------------------------------|
-| build        | `cargo build`                                  |
-| test         | `cargo test`                                   |
-| lint         | `cargo clippy -- --deny warnings`              |
-| format       | `cargo fmt --check`                            |
-| supply chain | `cargo deny check` (if `deny.toml` exists)    |
-| careful      | `cargo careful test` (if `cargo-careful` installed) |
-
-**Python** (detected by `pyproject.toml` or `setup.py`):
-
-| step         | command                                        |
-|--------------|------------------------------------------------|
-| test         | `pytest -q`                                    |
-| lint         | `ruff check`                                   |
-| format       | `ruff format --check`                          |
-| types        | `ty check` (or `mypy` if configured)           |
-| supply chain | `pip-audit`                                    |
-
-**Node/TypeScript** (detected by `package.json`):
-
-| step         | command                                        |
-|--------------|------------------------------------------------|
-| build        | per project (`npm run build`, `tsc`, etc.)     |
-| test         | `vitest` (or project test script)              |
-| lint         | `oxlint` (or project lint script)              |
-| format       | `oxfmt --check` (or project format script)     |
-| types        | `tsc --noEmit`                                 |
-| supply chain | `pnpm audit --audit-level=moderate`            |
-
-**Go** (detected by `go.mod`):
-
-| step         | command                                        |
-|--------------|------------------------------------------------|
-| build        | `go build ./...`                               |
-| test         | `go test ./...`                                |
-| lint         | `golangci-lint run`                            |
-| format       | `gofmt -l .`                                   |
-| vet          | `go vet ./...`                                 |
-
-If a tool is not installed, skip it with a note rather than
-failing the pipeline.
-
-## 4. Commit and push
-
-- Commit the fixes as a separate commit (do not squash into the
-  original — preserve review history)
-- Write a detailed commit message that covers:
-  - Subject: `fix: resolve code review findings for PR #$ARGUMENTS`
-  - Body: list findings by severity, what was fixed vs dismissed
-    (with brief reasoning), and confirmation that the quality
-    pipeline passes
-- Push the branch (regular push, not force-push)
-
-### Resolve fixed comment threads
-
-After the fixes are pushed, close the loop on every inline thread
-from §1. Fetch the threads and their hidden tokens with `gh`:
-
-```bash
-gh api graphql -f query='
-  query($owner:String!,$repo:String!,$pr:Int!){
-    repository(owner:$owner,name:$repo){
-      pullRequest(number:$pr){
-        reviewThreads(first:100){ nodes{
-          id isResolved
-          comments(first:1){ nodes{ databaseId body } }
-        }}
-      }
-    }
-  }' -f owner=<owner> -f repo=<name> -F pr=$ARGUMENTS
-```
-
-For each thread, read the `<!-- finding:F<n> -->` token from its first
-comment and look up that finding's disposition:
-
-- **Fixed** — reply with the fix commit, then resolve the thread:
-
-  ```bash
-  gh api --method POST \
-    repos/<owner>/<name>/pulls/$ARGUMENTS/comments \
-    -f body='Fixed in <commit-sha>.' -F in_reply_to=<databaseId>
-
-  gh api graphql -f query='
-    mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){
-      thread{ id isResolved } } }' -f id=<thread-node-id>
-  ```
-
-- **Dismissed (false positive)** — reply with the reasoning but leave
-  the thread **open** for the author to adjudicate. Only fixes
-  auto-resolve.
-
-End every reply body with the gantry sign-off when it applies (e.g.
-`-f body='Fixed in <commit-sha>.
-
-_[via gantry](<GANTRY_URL>)_'`) — unsigned replies echo back as
-review-comment webhooks and re-trigger your own run.
-
-Leave threads with no `finding:` token untouched — they are not ours.
-
-## 5. PR comment
-
-Post a review summary as a PR comment using
-`gh pr comment $ARGUMENTS --repo <owner/name>`.
-
-Format the comment body as:
+`gh pr comment $ARGUMENTS --repo <owner/name> --body-file /tmp/review/summary.md`:
 
 ```
 ## Review Summary
 
-### Findings
-
-[For each severity level that has findings, list them as a table:]
-
 | # | Severity | Finding | Resolution |
 |---|----------|---------|------------|
-| 1 | P1 | [description] | Fixed: [what was done] |
-| 2 | P2 | [description] | Dismissed: [reasoning] |
-| ... | ... | ... | ... |
+| F1 | P1 | … | Fixed in <sha> |
+| F2 | P3 | … | Left for the author |
 
-### Verification
-
-- **Tests**: [pass/fail count]
-- **Lint**: [clean/issues]
-- **Format**: [clean/issues]
-
-### Commit
-
-[commit SHA and subject line]
+**Verified:** <exactly what ran — tests, lint, types — and what was deferred to CI>
+**Fix commit:** <sha> (or "none pushed")
 ```
 
-End the summary comment with the gantry sign-off when it applies,
-after any trailing `Verdict:` line your agent contract requires.
+Name what you could not verify. If your agent contract requires a
+`Verdict:` line, it goes after the table and before the sign-off.
