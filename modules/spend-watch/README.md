@@ -17,7 +17,7 @@ pools it protects live in [`ci-runners`](../ci-runners/README.md).
 ```
 *GitHub metered spend — 2026-08-18*
 Billed that day: *$2.42* — :red_circle: over the $0.50/day target
-Month to date: $60.90 over 20 days ($3.04/day average)
+Month to date: $60.90 over 18 days ($3.38/day average; billed on 12)
 
 By repo:
   gauntlet  $1.85
@@ -27,7 +27,11 @@ By repo:
 
 Net (post-discount) dollars — what actually gets billed. Repos under a cent are
 folded away, so a fully self-hosted day reads
-`(nothing above a cent — all self-hosted)`.
+`(nothing above a cent — all self-hosted)`. Usage with no repository attached
+(Copilot, storage products) rolls up into an `(account-level)` row. The average
+divides by calendar days elapsed, not billed days, so migrating a repo to
+self-hosted actually pulls the number down; "billed on N" tracks how many days
+charged anything.
 
 ## Running it
 
