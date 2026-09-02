@@ -355,26 +355,57 @@ gh api graphql -f query='
 For each thread, read the `<!-- finding:F<n> -->` token from its first
 comment and look up that finding's disposition:
 
-- **Fixed** — reply with the fix commit, then resolve the thread:
-
-  ```bash
-  gh api --method POST \
-    repos/<owner>/<name>/pulls/$ARGUMENTS/comments \
-    -f body='Fixed in <commit-sha>.' -F in_reply_to=<databaseId>
-
-  gh api graphql -f query='
-    mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){
-      thread{ id isResolved } } }' -f id=<thread-node-id>
-  ```
-
+- **Fixed** — reply with the fix commit, then resolve the thread.
 - **Dismissed (false positive)** — reply with the reasoning but leave
   the thread **open** for the author to adjudicate. Only fixes
   auto-resolve.
 
-End every reply body with the gantry sign-off when it applies (e.g.
-`-f body='Fixed in <commit-sha>.
+**Post every reply and resolve in ONE GraphQL request** — an aliased
+mutation document, never a per-thread loop. Every `gh api --method
+POST …/pulls/N/comments` reply and every single-thread
+`resolveReviewThread` call is a separate content-creating request,
+and each REST reply also mints an implicit review (one
+`PullRequestReviewEvent` per finding). The whole fleet posts through
+one maintainer account, and GitHub's per-user content-creation
+throttle (about 80 requests/min, 500/hour, independent of the
+5000/hour core quota) counts every one: twenty findings looped this
+way is forty requests in under a minute, and on a busy hour it is
+what turns every worker's `gh pr create` into a 403 "was submitted
+too quickly". One request for the whole set costs one. Write the
+document to `/tmp/pr-resolve.graphql`, one alias pair per thread
+(`reply`, then `resolve`), aliases numbered from the finding token:
 
-_[via gantry](<GANTRY_URL>)_'`) — unsigned replies echo back as
+```graphql
+mutation {
+  replyF1: addPullRequestReviewThreadReply(input: {
+    pullRequestReviewThreadId: "<thread-node-id>",
+    body: "Fixed in <commit-sha>.\n\n_[via gantry](<GANTRY_URL>)_"
+  }) { comment { id } }
+  resolveF1: resolveReviewThread(input: { threadId: "<thread-node-id>" }) {
+    thread { id isResolved }
+  }
+  replyF2: addPullRequestReviewThreadReply(input: {
+    pullRequestReviewThreadId: "<thread-node-id>",
+    body: "Dismissed: <reasoning>.\n\n_[via gantry](<GANTRY_URL>)_"
+  }) { comment { id } }
+}
+```
+
+Dismissed findings get a `reply` alias only (no `resolve`). Then send
+it as a single call and check every alias came back non-null:
+
+```bash
+gh api graphql -F query=@/tmp/pr-resolve.graphql
+```
+
+Aliased mutations run serially in document order, so a reply always
+lands before its thread is resolved. If the request fails with a 403
+"secondary rate limit" or "submitted too quickly", do **not** retry
+in a loop: wait 60 s once, and if it fails again schedule a wake
+(`$GANTRY_WAKE_URL`, 20–30 min) with the file path in the note.
+
+End every reply body with the gantry sign-off when it applies (as
+in the document above) — unsigned replies echo back as
 review-comment webhooks and re-trigger your own run.
 
 Leave threads with no `finding:` token untouched — they are not ours.
