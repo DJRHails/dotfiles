@@ -50,6 +50,7 @@ not exhortations.
 ## 1. Orient (one message)
 
 ```bash
+mkdir -p /tmp/review
 gh pr view $ARGUMENTS --repo <owner/name> --json title,body,baseRefName,headRefOid,commits,additions,deletions,files
 git fetch <remote> <base> -q && git diff --stat <remote>/<base>...HEAD && git diff --name-only <remote>/<base>...HEAD
 gh api repos/<owner>/<repo>/collaborators --jq length
@@ -60,15 +61,20 @@ and read it (in ≤3 chunks if it exceeds ~1,500 lines). Check out the PR
 branch if not already on it.
 
 **Re-entry (a later turn on a PR you already reviewed):** run exactly one
-command first — `gh pr view $ARGUMENTS --json headRefOid -q .headRefOid` —
-and compare with the fix commit you pushed (recorded in your summary
-comment). Equal → this is your own push echoing back: end the turn with one
-line, no re-review, no posts. Otherwise review only the delta
-(`git diff <last-reviewed-sha>...HEAD`) and reuse the existing threads via
-their `finding:F<n>` tokens. If this session did not do the earlier review,
-recover both from GitHub: the newest review whose body starts
-"Automated review" gives `commit_id` (the last-reviewed SHA), and the PR's
-review threads give the findings.
+command first —
+`gh pr view $ARGUMENTS --repo <owner/name> --json headRefOid -q .headRefOid` —
+and compare with the **Reviewed head** your last summary comment recorded
+(the branch head as you left it: your fix commit when you pushed one).
+Equal → this is your own push echoing back: end the turn with one line, no
+re-review, no posts. Otherwise fetch the PR branch and check out the new
+head (a persisted session's working tree is still at the head you reviewed
+last turn), then review only the delta (`git diff <reviewed-head>...HEAD` —
+it excludes your own fix commit) and reuse the existing threads via their
+`finding:F<n>` tokens. If this session did not do the earlier review,
+recover both from GitHub in one call each: the newest comment whose body
+starts `## Review Summary` gives the reviewed head
+(`gh api repos/<owner>/<repo>/issues/$ARGUMENTS/comments --jq '[.[] | select(.body | startswith("## Review Summary"))] | last | .body'`),
+and the PR's review threads give the findings.
 
 ## 2. Review (single verified pass)
 
@@ -184,7 +190,9 @@ Match each thread's `<!-- finding:F<n> -->` token to its disposition and
 write `/tmp/review/resolve.graphql` — one `reply` alias per thread, plus a
 `resolve` alias for fixed ones (dismissed and P3 threads stay open for the
 author). Bodies as block strings (`"""…"""`): dismissal reasoning quotes
-code, and one unescaped `"` in a plain literal fails the whole document.
+code, and one unescaped `"` in a plain literal fails the whole document. A
+literal `"""` inside a block (a quoted Python docstring) fails it the same
+way — write it as `\"""`.
 
 ```graphql
 mutation {
@@ -228,7 +236,10 @@ Threads without a `finding:` token are not yours — leave them.
 
 **Verified:** <exactly what ran — tests, lint, types — and what was deferred to CI>
 **Fix commit:** <sha> (or "none pushed")
+**Reviewed head:** <sha>
 ```
 
-Name what you could not verify. If your agent contract requires a
+**Reviewed head** is the branch head as you leave it — your fix commit when
+you pushed one, else the head you reviewed; §1's re-entry check reads it
+from this comment. Name what you could not verify. If your agent contract requires a
 `Verdict:` line, it goes after the table and before the sign-off.
