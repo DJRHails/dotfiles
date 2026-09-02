@@ -90,7 +90,8 @@ UNIT
 # the registration (the 14-day offline auto-removal, a delete from the repo's
 # runners page). An oom-killed runner stays listed (offline) and is revived; a
 # deregistered one is skipped here and falls through to the reinstall. The list
-# is fetched once per repo, and only when a `failed` unit is actually seen.
+# is fetched once per repo, and only once a `failed` unit still holding its
+# `.runner` is actually seen.
 ensure_restart_policy() {
   local repo="$1" n="$2" i svc dir dropin want state registered listed=0
   want="$(restart_dropin_content)"
@@ -107,6 +108,12 @@ ensure_restart_policy() {
     fi
     state="$(systemctl show -p ActiveState --value "$svc" 2>/dev/null || true)"
     [ "$state" = "failed" ] || continue
+    # Local probe first: a missing `.runner` settles the case without paying a
+    # GitHub round trip — or dying on one — for a unit that is skipped anyway.
+    if ! sudo test -f "${dir}/.runner"; then
+      echo "  ${repo#*/} runner-${i}: failed with no .runner on disk — will be reinstalled"
+      continue
+    fi
     if [ "$listed" = 0 ]; then
       # Captured, not piped: a failed listing must die loudly, or every failed
       # unit would silently read as deregistered and be rebuilt.
@@ -116,10 +123,6 @@ ensure_restart_policy() {
     fi
     if ! grep -qx -- "taffy-${i}" <<<"$registered"; then
       echo "  ${repo#*/} runner-${i}: failed and no longer registered — will be reinstalled"
-      continue
-    fi
-    if ! sudo test -f "${dir}/.runner"; then
-      echo "  ${repo#*/} runner-${i}: failed with no .runner on disk — will be reinstalled"
       continue
     fi
     echo "  ${repo#*/} runner-${i}: clearing failed state and restarting"
