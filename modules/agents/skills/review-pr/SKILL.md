@@ -99,7 +99,14 @@ Reject speculative "what if the caller does X" risks and rewrites.
 Rank: **P1** blocks merge (correctness, security, data loss); **P2**
 important (missing error handling, test gaps, logic flaws, false claims);
 **P3** nice-to-have (style, naming, small simplifications); **P4**
-observations — summary only. 3–5 well-chosen findings beat 30 nits.
+observations — summary only. Two calibration rules the shadow runs of this
+procedure got wrong against the reviews they were scored on: a **test gap is
+P2** whenever a plausible regression would pass the suite (a stub that
+discards its arguments, an assertion on shape but not value, an error path
+no test exercises) — not a P3 because the code happens to be right today;
+and a **documented contract the code cannot deliver** (a promised error
+that no input reaches, a docstring guarantee the fail-soft path breaks) is
+P2, not a comment nit. 3–5 well-chosen findings beat 30 nits.
 
 **Second opinion — large source changes only.** When the diff changes more
 than ~400 lines of hand-written source (tests, docs, generated files and
