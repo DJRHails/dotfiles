@@ -69,6 +69,15 @@ StartLimitBurst=5
 [Service]
 Restart=always
 RestartSec=20
+# systemd's default OOMPolicy=stop stops the WHOLE unit when the kernel kills
+# any process in its cgroup — and on a runner that process is almost always a
+# job step (a test worker, a headless chromium), not the listener. Every such
+# kill therefore cancelled the running job, bounced the listener, and spent one
+# of the five starts above; five inside five minutes latches the pool offline
+# with every registration intact (touchstone taffy-2 reached "restart counter
+# is at 6" on 2026-09-02). With `continue` the killed step fails on its own and
+# the listener reports it; Restart= is left for the listener itself dying.
+OOMPolicy=continue
 UNIT
 }
 
