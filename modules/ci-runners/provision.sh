@@ -73,18 +73,27 @@ UNIT
 }
 
 # (Re)write the drop-in onto every configured unit that exists, and revive any
-# unit sitting in `failed` whose registration is still on disk.
+# unit sitting in `failed` whose registration is still intact.
 #
 # Runs BEFORE the health check so a runner systemd could have restarted itself
 # is repaired in place rather than torn down and re-registered — a rebuild
-# wipes <dir>/_diag, which is the only record of why the runner died. A `failed`
-# unit with no `.runner` file is left alone here: `start` returns 0 the moment a
-# Type=simple unit forks and the runner dies right after, so "repairing" it
-# would report success and latch it out of the reinstall below. Written
+# wipes <dir>/_diag, which is the only record of why the runner died. Written
 # unconditionally on content change, never only at install: an already-running
 # runner is exactly the one still missing the policy.
+#
+# "Registration intact" needs BOTH halves: the `.runner` file on disk AND the
+# name still in GitHub's runner list. `start` returns 0 the moment a Type=simple
+# unit forks, so reviving a runner that dies right after reports success, reads
+# as `active` to the health check below, and latches it out of the reinstall —
+# and the local file alone cannot tell the two cases apart. config.sh writes
+# `.runner`; nothing server-side ever removes it, so it survives GitHub dropping
+# the registration (the 14-day offline auto-removal, a delete from the repo's
+# runners page). An oom-killed runner stays listed (offline) and is revived; a
+# deregistered one is skipped here and falls through to the reinstall. The list
+# is fetched once per repo, and only once a `failed` unit still holding its
+# `.runner` is actually seen.
 ensure_restart_policy() {
-  local repo="$1" n="$2" i svc dir dropin want state
+  local repo="$1" n="$2" i svc dir dropin want state registered listed=0
   want="$(restart_dropin_content)"
   for i in $(seq 1 "$n"); do
     svc="$(runner_svc "$repo" "$i")"
@@ -98,12 +107,28 @@ ensure_restart_policy() {
       sudo systemctl daemon-reload
     fi
     state="$(systemctl show -p ActiveState --value "$svc" 2>/dev/null || true)"
-    if [ "$state" = "failed" ] && sudo test -f "${dir}/.runner"; then
-      echo "  ${repo#*/} runner-${i}: clearing failed state and restarting"
-      sudo systemctl reset-failed "$svc"
-      sudo systemctl start "$svc" ||
-        echo "  warn: ${svc} start failed — will be reinstalled" >&2
+    [ "$state" = "failed" ] || continue
+    # Local probe first: a missing `.runner` settles the case without paying a
+    # GitHub round trip — or dying on one — for a unit that is skipped anyway.
+    if ! sudo test -f "${dir}/.runner"; then
+      echo "  ${repo#*/} runner-${i}: failed with no .runner on disk — will be reinstalled"
+      continue
     fi
+    if [ "$listed" = 0 ]; then
+      # Captured, not piped: a failed listing must die loudly, or every failed
+      # unit would silently read as deregistered and be rebuilt.
+      registered="$(gh api --paginate "repos/${repo}/actions/runners" --jq '.runners[].name')" ||
+        die "could not list ${repo} runners — refusing to revive blind"
+      listed=1
+    fi
+    if ! grep -qx -- "taffy-${i}" <<<"$registered"; then
+      echo "  ${repo#*/} runner-${i}: failed and no longer registered — will be reinstalled"
+      continue
+    fi
+    echo "  ${repo#*/} runner-${i}: clearing failed state and restarting"
+    sudo systemctl reset-failed "$svc"
+    sudo systemctl start "$svc" ||
+      echo "  warn: ${svc} start failed — will be reinstalled" >&2
   done
 }
 
