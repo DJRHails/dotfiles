@@ -166,18 +166,51 @@ author's): subject `fix: resolve code review findings for PR #$ARGUMENTS`,
 body listing each finding as fixed/dismissed with one line of reasoning.
 Regular push to the PR head branch — never to main, never force.
 
-Then close the loop in **one script**: fetch the threads, and for each
-`finding:F<n>` token you own, reply `Fixed in <sha>.` and resolve the thread
-(fixed), or reply with the reasoning and leave it open (dismissed / P3).
+Then close the loop in **two requests total**: one query for the threads,
+one aliased mutation document for every reply and resolve. Never a
+per-thread loop — the whole fleet posts through one maintainer account, and
+GitHub's per-user content-creation throttle (~80/min, 500/hour, separate
+from the 5000/hour core quota) counts every REST reply and every
+single-thread resolve; twenty findings looped that way is forty requests,
+which on a busy hour is what turns every worker's `gh pr create` into a
+403 "was submitted too quickly" (2026-09-02).
 
 ```bash
 gh api graphql -f query='query($o:String!,$r:String!,$p:Int!){repository(owner:$o,name:$r){pullRequest(number:$p){
-  reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{databaseId body}}}}}}}' -f o=<owner> -f r=<repo> -F p=$ARGUMENTS
-gh api --method POST repos/<owner>/<repo>/pulls/$ARGUMENTS/comments -f body='Fixed in <sha>.
-
-_[via gantry](<GANTRY_URL>)_' -F in_reply_to=<databaseId>
-gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<threadId>
+  reviewThreads(first:100){nodes{id isResolved comments(first:1){nodes{body}}}}}}}' -f o=<owner> -f r=<repo> -F p=$ARGUMENTS
 ```
+
+Match each thread's `<!-- finding:F<n> -->` token to its disposition and
+write `/tmp/review/resolve.graphql` — one `reply` alias per thread, plus a
+`resolve` alias for fixed ones (dismissed and P3 threads stay open for the
+author). Bodies as block strings (`"""…"""`): dismissal reasoning quotes
+code, and one unescaped `"` in a plain literal fails the whole document.
+
+```graphql
+mutation {
+  replyF1: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: "<thread-id>",
+    body: """
+    Fixed in <sha>.
+
+    _[via gantry](<GANTRY_URL>)_
+    """ }) { comment { id } }
+  resolveF1: resolveReviewThread(input: { threadId: "<thread-id>" }) { thread { isResolved } }
+  replyF2: addPullRequestReviewThreadReply(input: { pullRequestReviewThreadId: "<thread-id>",
+    body: """
+    Left for the author: <reasoning>.
+
+    _[via gantry](<GANTRY_URL>)_
+    """ }) { comment { id } }
+}
+```
+
+`gh api graphql -F query=@/tmp/review/resolve.graphql` — one call. Aliases
+run in document order (reply lands before its resolve). Read the outcome
+off the response, not the exit code: an HTTP 200 with `errors` means every
+non-null alias in `.data` landed, so re-send only the null aliases, once.
+An HTTP 403 (secondary limit) means nothing landed: wait 60 s once, and if
+it repeats schedule a wake (`$GANTRY_WAKE_URL`, 20–30 min) naming the file
+rather than retrying in a loop.
 
 Threads without a `finding:` token are not yours — leave them.
 
