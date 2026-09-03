@@ -122,3 +122,55 @@ No passwordless sudo, and no `uv`, `go`, `pipx`, `cargo`, `bun` or `actionlint`.
 Workflows must provision their own tooling — see the skill. Deliberately not
 fixed by preinstalling: a workflow that leans on host state breaks the moment
 `CI_FALLBACK` sends it to a GitHub-hosted runner.
+
+## GitHub auth on the pool
+
+Every runner shares taffy's egress IP with the gantry fleet, and GitHub's
+anonymous abuse throttle answers a busy IP's git requests with an auth
+challenge. Any step that clones or fetches from github.com without credentials
+then dies with
+
+```
+fatal: could not read Username for 'https://github.com': terminal prompts disabled
+fatal: expected flush after ref listing
+```
+
+even for a **public** repo. gauntlet's CI went red twice on 2026-09-02 fetching
+the public `djrhails-graphs` source while a sibling push six minutes later was
+green ([gauntlet#57](https://github.com/DJRHails/gauntlet/pull/57) has the
+probes). Nothing on the runner had broken: the `actions` user has never held a
+git credential.
+
+So the pool answers the challenge itself. `provision.sh` installs
+[`git-credential-public-read`](./git-credential-public-read) at
+`/usr/local/lib/actions-runner/` and points every runner's own `$HOME`
+gitconfig at it (`credential.https://github.com.helper`, scoped to github.com).
+On a challenge the helper offers the token in
+`/etc/actions-runner/github-public-read-token`; authenticated git is
+rate-limited per token rather than per IP, so the retry goes through. Git only
+consults a helper after a 401, so an unthrottled fetch is unchanged, and
+`actions/checkout`, which sends its own header, never reaches it.
+
+**The token is worth nothing by design.** Every CI job on the host can read the
+file (root:actions, 0640), so it must be able to do nothing a stranger cannot:
+a **fine-grained** PAT with repository access "Public repositories (read-only)"
+and no permissions at all. Mint it at
+<https://github.com/settings/personal-access-tokens/new> and install it with
+one command on taffy:
+
+```sh
+~/.files/modules/ci-runners/set-github-token.sh   # prompts; no restart needed
+```
+
+The installer refuses a classic token (any OAuth scope), a token that can see a
+private repo, and one GitHub's git endpoint does not accept, before it writes
+anything. Rotation is the same command. Expiry is printed at install time; a
+lapsed token fails a *throttled* fetch with "Authentication failed", the same
+red as before under a clearer name.
+
+Without a token file the helper prints nothing and the pool behaves exactly as
+it did: degraded, never broken. A workflow that fetches a **private** git source
+still needs its own credential through `env:` (the job token reads the
+workflow's own repo and public ones; this token reads only public ones), and a
+fetch a workflow wants off the anonymous count entirely can send the job token
+up front, as gauntlet's `ci.yml` does.
