@@ -281,10 +281,16 @@ write_runner_gitconfigs() {
     cfg="${dir}/_home/.gitconfig"
     # No _home means no .env either — write_runner_envs already warned.
     sudo test -d "${dir}/_home" || continue
-    have="$(sudo -u "$RUNNER_USER" git config -f "$cfg" --get credential.https://github.com.helper 2>/dev/null || true)"
+    # `-C` the runner's own home: git stats its cwd on startup, and `sudo -u`
+    # keeps the caller's — this script's checkout lives under /home/d, which the
+    # actions user cannot enter, so run from there the probe read "unset" and
+    # the write died `fatal: failed to stat '…/ci-runners': Permission denied`.
+    have="$(sudo -u "$RUNNER_USER" git -C "${dir}/_home" config -f "$cfg" \
+      --get credential.https://github.com.helper 2>/dev/null || true)"
     [ "$have" = "$GIT_HELPER" ] && continue
     echo "  ${repo#*/} runner-${i}: pointing git at ${GIT_HELPER##*/}"
-    sudo -u "$RUNNER_USER" git config -f "$cfg" credential.https://github.com.helper "$GIT_HELPER"
+    sudo -u "$RUNNER_USER" git -C "${dir}/_home" config -f "$cfg" \
+      credential.https://github.com.helper "$GIT_HELPER"
   done
 }
 
