@@ -34,6 +34,7 @@ cd ~/.files
 | `alwayson`              | Keep a macOS machine awake (pmset, with backup/restore).
 | `askllm`                | Ask an LLM from the terminal (git submodule behind `bin/askllm`).
 | :sparkle: `claude`      | Claude Code setup — settings, guardrail hooks, MCP servers, statusline.
+| `cloudflare`            | Cloudflare's unified `cf` CLI (DNS, zones, R2, …), authenticated by a long-lived API token in the module's gitignored `.env`.
 | `cloudflared`           | Cloudflare Tunnel client via signed apt repo.
 | `code`                  | VS Code settings.
 | `codex`                 | Codex CLI configuration.
