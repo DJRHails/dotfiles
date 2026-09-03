@@ -51,21 +51,34 @@ check "no action is a no-op" $'\nrc=0' "$(run_helper '' "$github_desc")"
 
 # Through git itself, with the key provision.sh writes. `credential fill` runs the
 # configured helpers for the description on stdin and prints the filled result.
-# The machine's own git config is shut out (GIT_CONFIG_GLOBAL/NOSYSTEM), so a
-# developer's gh helper cannot answer in the helper's place, and prompts are off,
-# so a missing answer fails fast instead of hanging on a terminal.
+# The machine's own git config is shut out (GIT_CONFIG_GLOBAL/NOSYSTEM), and git
+# runs from the scratch dir rather than this checkout, whose own .git/config may
+# name a helper too (a gantry clone does): helpers run in config order and the
+# first answer wins, so any other helper in scope answers in this one's place.
+# Repository discovery walks up from the scratch dir, so a TMPDIR under this
+# checkout would find it again; the ceiling stops discovery at the scratch dir's
+# parent (git never excludes the cwd itself from the walk).
+# Prompts are off, so a missing answer fails fast instead of hanging on a terminal.
 git_fill() { # <description> -> filled credential, or git's error
   printf '%s' "$1" |
     ACTIONS_RUNNER_GITHUB_TOKEN_FILE="$work/token" GIT_TERMINAL_PROMPT=0 \
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-      git -c "credential.https://github.com.helper=$helper" credential fill 2>&1 || true
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_CEILING_DIRECTORIES="${work%/*}" \
+      git -C "$work" -c "credential.https://github.com.helper=$helper" credential fill 2>&1 || true
 }
+
+# A stray answer here is some other helper's real credential; report it redacted.
+# git >= 2.44 can also relay an oauth_refresh_token= line from such a helper.
+redact_password() { sed -E 's/^(password|oauth_refresh_token)=.*/\1=<redacted>/'; }
 
 filled="$(git_fill "$github_desc")"
 case "$filled" in
 *$'username=x-access-token\npassword=ghp_example_token'*)
-  check "git credential fill takes the helper's answer for github.com" "answered" "answered" ;;
-*) check "git credential fill takes the helper's answer for github.com" "answered" "$filled" ;;
+  check "git credential fill takes the helper's answer for github.com" "answered" "answered"
+  ;;
+*)
+  check "git credential fill takes the helper's answer for github.com" "answered" \
+    "$(printf '%s' "$filled" | redact_password)"
+  ;;
 esac
 
 filled_other="$(git_fill $'protocol=https\nhost=gitlab.com\n')"
