@@ -49,6 +49,14 @@ repos:
         entry: bash tests/link-symlinks.test.sh
         language: system
         pass_filenames: false
+      # The CI runners' git credential helper answers GitHub's anonymous-throttle
+      # challenge with a host token every job can read; its fail direction (silent
+      # with no token, github.com only, `get` only) is what keeps that harmless.
+      - id: git-credential-public-read-tests
+        name: ci-runners credential helper behaviour suite
+        entry: bash tests/git-credential-public-read.test.sh
+        language: system
+        pass_filenames: false
       # prose-lint's newest rules ban `the gap` only as a summarising predicate, and
       # the guide's own Abstract section depends on the literal sense staying legal.
       # A word-list "simplification" reads as tidier and quietly kills the carve-out.

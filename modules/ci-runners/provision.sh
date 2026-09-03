@@ -14,6 +14,9 @@
 # when its unit is missing, unregistered, or anchored at the wrong directory;
 # runners with an index above the configured count are stopped and
 # deregistered, so lowering a number in runners.conf is how you shrink a pool.
+# Every runner's own $HOME gitconfig is also pointed at the github.com
+# credential helper (install_git_helper below), so a fetch GitHub's anonymous
+# throttle challenges retries with the host's public-read-only token.
 #
 # Each runner runs as the non-root `actions` user, in the `docker` group so it
 # drives taffy's shared host daemon (the same one the gantry fleet uses), from
@@ -25,7 +28,11 @@ RUNNER_VERSION="2.335.1" # bootstrap only — the runner self-updates on first c
 LABELS="self-hosted,linux,x64,taffy"
 RUNNER_USER="actions"
 RUNNER_HOME="/home/${RUNNER_USER}"
-CONF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/runners.conf"
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONF="${MODULE_DIR}/runners.conf"
+GIT_HELPER_SRC="${MODULE_DIR}/git-credential-public-read"
+GIT_HELPER="/usr/local/lib/actions-runner/git-credential-public-read"
+GITHUB_TOKEN_DIR="/etc/actions-runner"
 
 die() {
   echo "error: $*" >&2
@@ -241,6 +248,46 @@ write_runner_envs() {
   done
 }
 
+# GitHub's anonymous abuse throttle answers a busy IP's git requests with an auth
+# challenge, and every runner here shares taffy's egress IP with the gantry
+# fleet: on 2026-09-02 gauntlet's CI died twice in `uv sync` fetching the PUBLIC
+# djrhails-graphs source ("could not read Username for 'https://github.com'")
+# while a sibling push six minutes later was green (DJRHails/gauntlet#57 has the
+# probes). The helper answers that challenge with the public-read-only token
+# set-github-token.sh installs — authenticated git is rate-limited per token,
+# not per IP. Without the token it prints nothing, so a runner behaves exactly
+# as before; a workflow fetching a PRIVATE git source still needs its own
+# credential, because the token reads only what anyone can read, by design:
+# every job on this host can read the file it lives in.
+install_git_helper() {
+  if ! sudo cmp -s "$GIT_HELPER_SRC" "$GIT_HELPER"; then
+    echo ">> installing ${GIT_HELPER}"
+    sudo install -D -m 0755 -o root -g root "$GIT_HELPER_SRC" "$GIT_HELPER"
+  fi
+  # The slot the token goes in, created before any token exists so `ls` on the
+  # host reads "not installed yet" rather than "never wired up".
+  sudo install -d -m 0750 -o root -g "$RUNNER_USER" "$GITHUB_TOKEN_DIR"
+}
+
+# Point every runner's own $HOME gitconfig at the helper, scoped to github.com.
+# Converged per runner rather than seeded into a new HOME only, so pools
+# provisioned before this existed get it too; git reads the file on every
+# invocation, so no restart. Privileged probes, for the reason write_runner_envs
+# gives.
+write_runner_gitconfigs() {
+  local repo="$1" n="$2" i dir cfg have
+  for i in $(seq 1 "$n"); do
+    dir="$(runner_dir "$repo" "$i")"
+    cfg="${dir}/_home/.gitconfig"
+    # No _home means no .env either — write_runner_envs already warned.
+    sudo test -d "${dir}/_home" || continue
+    have="$(sudo -u "$RUNNER_USER" git config -f "$cfg" --get credential.https://github.com.helper 2>/dev/null || true)"
+    [ "$have" = "$GIT_HELPER" ] && continue
+    echo "  ${repo#*/} runner-${i}: pointing git at ${GIT_HELPER##*/}"
+    sudo -u "$RUNNER_USER" git config -f "$cfg" credential.https://github.com.helper "$GIT_HELPER"
+  done
+}
+
 # A runner is healthy only if its unit is up AND anchored at the path we
 # expect — a unit left at an old directory is silently the wrong runner.
 # `activating` counts as up: with Restart=always a runner spends RestartSec
@@ -442,6 +489,7 @@ reconcile() {
     echo "  all ${n} runner(s) healthy"
   fi
   write_runner_envs "$repo" "$n"
+  write_runner_gitconfigs "$repo" "$n"
   prune_runners "$repo" "$n"
 }
 
@@ -449,6 +497,7 @@ main() {
   command -v gh >/dev/null || die "gh not found — run this on taffy with gh authed"
   [ -f "$CONF" ] || die "missing $CONF"
   gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
+  install_git_helper
 
   if [ $# -gt 0 ]; then
     local repo="$1" n="${2:-}"

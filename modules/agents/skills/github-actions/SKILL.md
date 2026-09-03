@@ -159,6 +159,33 @@ rather than interpolating `${{ secrets.X }}` into a script body:
           ssh -i "$key" -o IdentitiesOnly=yes -o UserKnownHostsFile="$known" ...
 ```
 
+## Anonymous git fetches from github.com get throttled on the pool
+
+Every runner shares taffy's egress IP with the gantry fleet, and GitHub's
+anonymous abuse throttle answers a busy IP's git requests with an auth
+challenge. The signature, in any step that clones or fetches without
+credentials (`uv sync` on a git source, `pip install git+…`, a bare `git
+clone`):
+
+```
+fatal: could not read Username for 'https://github.com': terminal prompts disabled
+fatal: expected flush after ref listing
+```
+
+It is time-windowed and host-level — a retry minutes later on a sibling runner
+goes green — and it is **not** a lost credential: the runner user has never held
+one, and the repo being fetched is usually public. gauntlet#57 has the probes.
+
+The pool answers the challenge itself: every runner's `$HOME` gitconfig points
+`credential.https://github.com.helper` at a helper that offers a fine-grained
+token able to read **public repositories only** (`modules/ci-runners/README.md`,
+"GitHub auth on the pool"). Authenticated git is rate-limited per token, not per
+IP, so the retry goes through. Nothing to do in a workflow for a public source —
+but a **private** git source still needs a deliberate credential passed through
+`env:` (the job token reads its own repo and public ones; the pool token reads
+only public ones), and a fetch the workflow wants to keep off the anonymous
+count entirely can send the job token up front, as gauntlet's `ci.yml` does.
+
 ## Runner pools
 
 Pools are declared in
