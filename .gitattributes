@@ -16,4 +16,5 @@ modules/agents/skills/uptime-alerts/**             filter=glassine diff=glassine
 modules/agents/skills/web-animation-design/**      filter=glassine diff=glassine merge=glassine
 modules/agents/commands/archive-book.md            filter=glassine diff=glassine merge=glassine
 modules/claude/safe.zsh                            filter=glassine diff=glassine merge=glassine
+modules/onepassword/ssh/agent.toml                 filter=glassine diff=glassine merge=glassine
 docs/legacy-transcrypt.md                          filter=glassine diff=glassine merge=glassine
