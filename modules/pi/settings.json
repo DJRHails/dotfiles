@@ -9,7 +9,7 @@
     "npm:@narumitw/pi-goal",
     "npm:@tintinweb/pi-tasks"
   ],
-  "lastChangelogVersion": "0.83.0",
+  "lastChangelogVersion": "0.84.2",
   "defaultProvider": "anthropic-api",
   "defaultModel": "claude-opus-5[fast]",
   "defaultThinkingLevel": "xhigh",

@@ -85,5 +85,6 @@
     },
     "git.confirmSync": false,
     "terminal.integrated.scrollback": 10000,
-    "python.languageServer": "Pylance"
+    "python.languageServer": "Pylance",
+    "security.promptForRemoteFileProtocolHandling": false
 }

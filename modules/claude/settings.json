@@ -43,7 +43,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "fable[1m]",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
