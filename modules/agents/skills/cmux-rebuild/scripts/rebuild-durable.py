@@ -23,6 +23,10 @@ and attaches the old session. Bare wrapper husks are never resumed.
 
 Connecting many sessions at once is racy (each remote attach is an async de-nest + mosh handshake):
 expect to run the default pass once, then --retry a couple times, then --retitle. See SKILL.md.
+
+The plan and the live pass both end with judge-agent-sessions.py's inventory: claude sessions
+whose panes died with a reboot have no zellij session left to survey, so without it a rebuild
+reports "everything connected" while unfinished agent work sits dead in the transcript stores.
 """
 from __future__ import annotations
 
@@ -379,6 +383,22 @@ def bind(hosts: list[str]) -> int:
     return 0
 
 
+def judge_report() -> None:
+    """Append judge-agent-sessions.py's inventory of recent claude sessions (live / unfinished /
+    finished). Read-only and local; a failure is printed, never fatal — the zellij rebuild above
+    already happened and its result must not be masked."""
+    script = Path(__file__).with_name("judge-agent-sessions.py")
+    print("\n== agent sessions (judge-and-resume) ==")
+    try:
+        r = sh([sys.executable, str(script)], timeout=300)
+    except subprocess.TimeoutExpired:
+        print(f"{script.name} timed out after 300s — run it by hand")
+        return
+    print(r.stdout.rstrip())
+    if r.returncode:
+        print(f"{script.name} failed (exit {r.returncode}): {r.stderr.strip()}")
+
+
 def main() -> int:
     # Reject mistyped flags up front — the non-dry default pass mutates the live cmux layout,
     # so a typo'd --dry-run must not silently fall through to it.
@@ -409,6 +429,7 @@ def main() -> int:
                 todo.append((host, rp, s))
     if DRY:
         print(f"\n--dry-run: would connect {len(todo)}.")
+        judge_report()
         return 0
 
     wraps = [w for w in sh(["zellij", "list-sessions", "-ns"]).stdout.split() if w.startswith("wrap-")]
@@ -441,6 +462,7 @@ def main() -> int:
         time.sleep(0.3)
     print(f"sent {len(pairs)} attaches — remote mosh handshakes complete asynchronously; "
           "run --retry for stragglers, then --retitle")
+    judge_report()
     return 0
 
 
