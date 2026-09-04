@@ -47,6 +47,7 @@ cd ~/.files
 | `gpu-vm`                | On-demand cloud GPU pods over ssh, with cron-based idle reaping.
 | `keybase`               | Keybase client.
 | `node`                  | Node.js via NodeSource signed repo.
+| `onepassword`           | 1Password app + `op` CLI, and the SSH agent config naming which vaults offer keys.
 | `pentest`               | Aliases useful in penetration tests / deobfuscation.
 | `pi`                    | pi coding agent config.
 | `piknik`                | Cross-machine clipboard.
