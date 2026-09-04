@@ -1,6 +1,6 @@
 ---
 name: cmux-rebuild
-description: "Manage the user's durable dev sessions — zellij sessions on remote hosts (bonbon, taffy) reached over mosh, plus the local host's (trifle) own detached zellij sessions, surfaced as cmux tabs via `ssh::durable` / `zellij::resume`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, resume detached local zellij sessions, reconnect/sort sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, judge dead claude/pi sessions from their transcripts and resume the unfinished ones (claude::resume / pi::resume, local or via a remote zellij layout), or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: 'ssh::durable', 'durable sessions', 'resurrect/rebuild cmux', 'cmux-resurrect', 'resume unfinished claude/pi sessions', 'lost my bonbon connections', 'reap mosh-servers', 'the green dot'."
+description: "Manage the user's durable dev sessions — zellij sessions on remote hosts (bonbon, taffy) reached over mosh, plus the local host's (trifle) own detached zellij sessions, surfaced as cmux tabs via `ssh::durable` / `zellij::resume`. Load when the user wants to rebuild/resurrect lost cmux durable surfaces after a cmux restart or a mass disconnect, resume detached local zellij sessions, reconnect/sort sessions into per-repo cmux workspaces, retitle durable tabs, reap orphaned mosh-servers, judge dead claude/pi sessions from their transcripts and resume the unfinished ones (claude::resume / pi::resume, local or via a remote zellij layout), or understand the `ssh::durable` picker and its green-● connected indicator. Triggers: 'ssh::durable', 'durable sessions', 'resurrect/rebuild cmux', 'cmux-resurrect', 'resume unfinished claude/pi sessions', 'missing claude sessions', 'check recent claude sessions', 'lost my bonbon connections', 'reap mosh-servers', 'the green dot'."
 ---
 
 # cmux durable sessions
@@ -57,6 +57,11 @@ nested and locally-resumed tabs go stale otherwise). Stubborn stragglers:
 `ssh::durable <host> --query <name>` / `zellij::resume <session>` by hand. Under load some
 surfaces stay nested — a local wrapper with the mosh inside; functional, just a messier Ctrl-O.
 
+The plan and the live pass both end with the judge-and-resume inventory (section below). A zellij
+survey only sees sessions that still exist; after a reboot the claude tabs are gone entirely, and
+"everything connected" is true of the survivors while unfinished agent work sits dead in the
+transcript stores. Read that inventory before calling a rebuild done.
+
 ## Clean empty surfaces after a rebuild
 
 ```bash
@@ -92,6 +97,29 @@ geometry, not scrollback), so it reads dead even when the attach worked. Don't c
 recover the WORK: judge each dead claude/pi conversation from its transcript and resume only the
 unfinished ones. Most died at rest on a completed answer.
 
+For claude sessions on the cmux host this is scripted, and the rebuild pass prints the report:
+
+```bash
+python3 scripts/judge-agent-sessions.py [--days 2]          # UNFINISHED / LIVE / FINISHED + resume cmds
+python3 scripts/judge-agent-sessions.py --resume-unfinished # resume every unfinished one, in turn
+python3 scripts/judge-agent-sessions.py --all               # also list one-shot workers and stubs
+```
+
+It walks `~/.claude`, `~/.claude-ant` and `~/.agents` (`projects/*/*.jsonl`, skipping `subagents/`
+and `/tmp` cwds). Liveness comes from `~/.claude*/sessions/<pid>.json` — every running claude
+writes one with its pid, sessionId, cwd and busy/idle status — trusted only when the pid is alive
+AND its start time matches the file's, because a reboot recycles pids and a crash leaves files
+behind. The verdict is read off the last turn: `pending-tool` (tool call, no result), `mid-turn`
+(unanswered result or prompt), `asked` (ends on a question or hands you the next step) and
+`self-flagged` ("not pushed", "still needs", "could not create") are unfinished; the rest are
+`finished` or `stub`. Single-prompt sessions are one-shot workers: hidden when finished, listed
+but never auto-resumed when not (their cron re-runs them). The patterns are deliberately loose —
+a false positive costs one extra tab, a miss loses work — so read the reason column before
+`--resume-unfinished`. A warning names claude processes with no trusted session file (an older
+claude build); a "dead" verdict may then be wrong, so eyeball the tabs first.
+
+pi sessions, and agents on remote hosts, still take the manual path:
+
 1. **Inventory the dead.** Serialized pane titles name the work — `✳ <task>` is claude,
    `π - <task> - <repo>` is pi. zellij cannot dump-layout an EXITED session; read the cache:
 
@@ -107,9 +135,10 @@ unfinished ones. Most died at rest on a completed answer.
    not just the first.
 2. **Establish liveness before judging** — a live session's transcript looks identical to a dead
    one's, and resuming one runs it twice. fd-scans are useless (both agents append-and-close).
-   What works: statusline uuids (`cmux read-screen` each live tab and regex the uuid out — both
-   TUIs print their session id), and pi process etimes (a session file created after every live
-   `pi` process started is dead for certain).
+   What works: for claude, the `sessions/<pid>.json` files above; for pi and remote agents,
+   statusline uuids (`cmux read-screen` each live tab and regex the uuid out — both TUIs print
+   their session id), and pi process etimes (a session file created after every live `pi`
+   process started is dead for certain).
 3. **Judge from the last turns.** FINISHED = the final assistant text is a completion report with
    nothing outstanding. UNFINISHED = pending tool call, unanswered ask or AskUserQuestion, or
    self-flagged undone items ("Not committed"). Fan the reading out to subagents (a few files
