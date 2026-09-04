@@ -5,7 +5,7 @@ description: Writing style conventions for prose, essays, and non-fiction. Apply
 
 # Prose Conventions
 
-Apply these principles when writing or editing prose. The author is British — use British spelling (colour, organise, centre) and idioms.
+Apply these principles when writing or editing prose. The author is British — use British spelling (colour, organise, centre), idioms, pounds and pence, and metric units. A British anecdote priced in dollars (10p fines against a $0.189/kWh tariff) is a draft that pulled its number from an American source; convert it.
 
 ## Orwell's Rules ("Politics and the English Language")
 
@@ -56,7 +56,7 @@ Write like you speak.
 - **Excessive hedging**: "It could potentially possibly be argued that X might have some effect" -> "X may affect Y". Limit "may" and "can" — hedge words should almost always be dropped. Either commit to the claim or cut it. Specific AI hedge phrases to strip: "arguably", "it could be said", "in many ways", "to some extent".
 - **Sycophantic tone**: "Great question!", "You're absolutely right!", "I hope this helps!" -- chatbot residue; delete on sight
 - **Bare comparatives**: "improves performance", "is more efficient" — compared to what? Always specify both sides of a comparison.
-- **Scare quotes**: Do not use quotation marks to smuggle imprecise words in. If a term needs scare quotes, find a precise term instead.
+- **Scare quotes**: Do not use quotation marks to smuggle imprecise words in. If a term needs scare quotes, find a precise term instead. Quoting a word someone actually said is reported speech, not a scare quote: `He called it "wasteful", I called it "cheap"` stays.
 - **Unnecessary sentences**: Ask of every sentence: "Is this necessary? Can I phrase this more simply?" Cut sentences that add no information.
 - **"Etc." and "and so on"**: Be exhaustive or pick representative examples. Trailing off signals lazy thinking.
 - **Number threshold**: Write whole numbers below ten as words; use numerals for 10 and above. Be consistent throughout the document.
@@ -68,7 +68,7 @@ These patterns signal machine-generated text. Never use them.
 
 ### Banned Punctuation & Syntax
 
-- **Excessive em dashes** — zero to two in the whole piece. A paired parenthetical (`-- like this --`) counts as one use, and `--` in markdown source counts the same as a typeset `—`. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`. This is a house style rule, not a detection signal: em dashes are now a weak tell, since OpenAI suppressed them in GPT-5.1 and a July 2026 study found Claude the only current model using them more than professional writers. Since drafting happens in Claude, the rule matters *more* here, not less.
+- **Excessive em dashes** — zero to two in the whole piece. A paired parenthetical (`-- like this --`) counts as one use, and `--` in markdown source counts the same as a typeset `—`. Replace with periods, commas, parentheses, or cut entirely. Not a rhythm tool. Prefer `;`. This is a house style rule, not a detection signal: em dashes are now a weak tell, since OpenAI suppressed them in GPT-5.1 and a July 2026 study found Claude the only current model using them more than professional writers. Since drafting happens in Claude, the rule matters *more* here, not less. The author's own dash is a spaced hyphen (` - `): the first-person blog pieces use it four to nine times each and contain no em dashes at all. It does not count toward the limit and is never upgraded to `—` or `--`.
 - **Negative parallelisms** — the whole family, not just the famous one. "Not only X, but also Y"; "It's not X, it's Y"; "You're not X, you're Y"; "No X. No Y. Just Z."; "X isn't A — it's B"; and the quieter variant **"X rather than Y"** / "Rather than A, it constitutes B". The move fakes a correction to a misconception nobody held. State what the thing is.
 - **"An X with Y and Z"** — dismissive constructions
 - **Mid-sentence self-questioning** — "And honestly? That's amazing."
@@ -183,13 +183,15 @@ Over-correction has a cost: stripping these makes prose *more* machine-like, and
 - **Mixed casual/formal register** — normal for technical writers, for the young, and for the playful.
 - **Transition words in isolation** — only a handful are overused; essayists have always used them.
 - **An em dash or a curly quote on its own.** Weak signals; they count only in combination.
+- **Mock-formal diction on a trivial subject** — "railed against the sheer injustice", "parental strife, I salute you", "the offending bulb", "set that story straight". The joke is the gap between the register and the stakes. The stuffiness rule and the vocabulary list are about earnest prose; leave bathos alone.
+- **Questions that are someone's actual thoughts** — "How much could a light bulb really cost? Could I just pay a lump sum?" is the author at ten thinking, not the essayist stacking rhetorical questions at the reader. `cliche-check.py` flags both as `stacked-questions`; keep the first kind.
 
 ### Human Signals — sprinkle these in
 
 Small imperfections that make prose sound like a person. From the Pangram reflection convergence.
 
 - **Real asides** — "give or take", "or whatever", "I forget the exact number", "this took me longer than I'd like to admit"
-- **Concrete specifics** — brand names, dollar amounts, street names, weather, times ("8 a.m."), named objects. Replaces vague abstract nouns.
+- **Concrete specifics** — brand names, dollar amounts, street names, weather, times ("8 a.m."), named objects, a bulb's part number with a link to the archived catalogue. Replaces vague abstract nouns.
 - **Vary list/step openings** — in numbered or stepped content, don't make every item start with an imperative verb. Alternate structures.
 
 Constructions measured as more common in human writing than in LLM output over 25 years of Wikipedia — LLMs avoid them while reaching for "formal, neutral" tone:
@@ -271,11 +273,14 @@ Every caption should answer three questions in order: *what am I looking at*, *h
 - Use well-chosen concrete examples. Illustrate a point about the anxiety of status by describing the experience of walking through an airport or attending a dinner party. This grounds abstract ideas in recognisable emotional moments.
     - Do not ask readers to accept an abstract principle on its own terms.
 - Write the way a brilliant after-dinner speaker talks: digressive and funny, happy to make a bold claim and then back it up with a surprising example rather than a footnote.
+- Write in the first person, and when the piece needs a fool, be the fool. The warmth-towards-fallibility rule points inward first: the person who never looked up the price because facts might prove him wrong is the author, and a reader forgives a lesson from someone who has already confessed to the crime.
+- Open on a scene you were in, not on the topic. A bathroom light seen from the stairs; a Californian bin labelled LANDFILL. The scene carries the emotional weight of the argument, and the numbers come after it.
+- Show the arithmetic. Put the inputs, the formula and the result on the page as plain lines (`10p × 0.25 × 365`; `4 W × 8760 h / 1000 = 35 kWh`), link the source of every input, then land the answer in one short sentence ("A far cry from the fines."). A reader who can check the sum trusts the claim built on it; a reader handed only the result is being asked for faith. The two-calculation shape works well: the wrong sum as it was done at the time, then the honest one.
 - Reframe — take a familiar experience and make the reader see it differently. The reader should take pleasure in the shift in perspective.
 - Write with genuine warmth towards human fallibility. Do not be cynical. Find contradictions and confusion endearing rather than contemptible. Make the reader feel understood rather than judged.
-- Prefer unfolding cadence to drumbeat cadence. Let a paragraph develop an idea, turn it once, then land it. Avoid stacks of short verdict sentences unless you need a deliberate jolt.
+- Prefer unfolding cadence to drumbeat cadence. Let a paragraph develop an idea, turn it once, then land it. Avoid stacks of short verdict sentences unless you need a deliberate jolt. In blog pieces a paragraph is one to three sentences; the three-sentence minimum belongs to papers.
 - Do not make every insight sound like a slogan. A line can be neat; it should not feel pre-fabricated. If a sentence reads like a maxim dropped in from above, soften it with explanation, example, or a human observation.
-- Let conclusions feel discovered, not announced. The final instruction or claim should sound like the natural end of the argument, not a poster slogan pasted on top.
+- Let conclusions feel discovered, not announced. The final instruction or claim should sound like the natural end of the argument, not a poster slogan pasted on top. One plain sentence of moral is fine once the piece has argued its way there, and a P.S. or footnote at the author's expense after it stops the piece ending on the maxim.
 - Mix sentence lengths. A short sentence works best after a longer one has set it up. Too many short declarative sentences in a row make the prose sound abrupt and prosecutorial.
 - Preserve warmth in analytical writing. When describing confusion, ambiguity, or disagreement, sound interested rather than exasperated.
 
@@ -298,6 +303,10 @@ These show the target register — witty, concrete, self-aware:
 - "It is better to be vaguely right than precisely wrong."
 - "Most of our childhood is stored not in photos, but in certain biscuits, lights of day, smells, textures of carpet."
 
+Reference samples of the author's own voice, for calibration before editing their drafts:
+
+- `writing/blog/sorry-dad-lights-are-expensive.md` in the kb repo. A childhood dispute settled by arithmetic and then reframed as a question of etiquette. First person, spaced-hyphen dashes, mock-formal diction for comedy, the working shown on the page, a moral in one sentence and a self-deprecating P.S. after it. About 440 words, average 17 words a sentence, range 4 to 42.
+
 ## A Note on Rules
 
 This guide contains internal tensions. "Theme or rheme" is jargon in a guide that bans jargon.
@@ -310,8 +319,11 @@ When editing, protect informality and personality — but nothing else. Do not:
 
 - **Standardise punctuation that carries tone** — a casual hyphen-dash or exclamation mark often signals self-aware humour. "even if I know a few!" is wry; "even if I know a few." is flat.
 - **Remove personality for consistency** — mechanical uniformity kills voice. A deliberate exclamation or informal dash is not an error.
+- **Resolve the author's draft markers** — `(editable)`, `TODO:`, an empty `P.S.`, a `^1` with no footnote yet. They are notes for a later version. Leave them in place and ask before filling or deleting one.
 
-The author has a penchant for semi-colons; leave them be.
+The author has a penchant for semi-colons; leave them be, including the odd one that splits a clause where a comma would ("what benefit would facts have; when they could prove me wrong").
+
+Spelling, malapropisms ("hierocracy" for "hypocrisy", "urked" for "irked") and unit slips ("4Wh" for "4W") are never voice. Fix them without comment.
 
 This protection is never an exemption from the content rules. A slogan, an unglossed metaphor pair, or a having-it-both-ways verdict fails this guide whether it is new text or carried over verbatim from an earlier draft — "it was already there" and "that's the author's framing" are not defences. Pre-existing prose gets the same pass as new prose. (This clause exists because a carried-over maxim — "survived as structure, failed as arithmetic" — was once waved through as voice; it was spin.)
 
