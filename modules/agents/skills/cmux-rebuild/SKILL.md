@@ -68,10 +68,14 @@ dir, so servers in the other read as EXITED, and a plain `zellij attach` then re
 skeleton next to the live server. On taffy (2026-09-07) logind sat at `SessionsMax` and stopped
 handing logins an `XDG_RUNTIME_DIR` (`.zshenv` now fills it in), and the survey found 2 live
 sessions of 12. When a host's live count drops without a reboot, compare it with
-`ps -eo args | grep -c '[z]ellij --server'` over ssh. A gap means a split: read each server's dir
-off its cmdline and attach the odd ones with `env ZELLIJ_SOCKET_DIR=<dir> zellij attach <session>`
-(also as their resume binding). Symlinking sockets between the dirs does not work — only real
-socket entries are listed.
+`ps -eo args | grep -c '[z]ellij --server'` over ssh. A gap means a split: each server's cmdline
+ends in its socket path, `<base>/<version-subdir>/<session>` (e.g.
+`/run/user/1000/zellij/contract_version_1/cmux-taffy-a1b2`). Attach the odd ones with
+`env ZELLIJ_SOCKET_DIR=<base> zellij attach <session>` (also as their resume binding). `<base>`
+is the dir **above** the version subdir (`/run/user/<uid>/zellij` or `/tmp/zellij-<uid>`): zellij
+appends the version subdir itself, so passing the cmdline's dirname makes it look in
+`…/contract_version_1/contract_version_1/` and see nothing. Symlinking sockets between the dirs
+does not work — only real socket entries are listed.
 
 ## Clean empty surfaces after a rebuild
 
