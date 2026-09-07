@@ -62,6 +62,17 @@ survey only sees sessions that still exist; after a reboot the claude tabs are g
 "everything connected" is true of the survivors while unfinished agent work sits dead in the
 transcript stores. Read that inventory before calling a rebuild done.
 
+**The live survey can also under-count.** zellij keeps its sockets under `$XDG_RUNTIME_DIR/zellij`
+when logind set that (Linux logins), else under `$TMPDIR/zellij-<uid>`; `list-sessions` reads one
+dir, so servers in the other read as EXITED, and a plain `zellij attach` then resurrects a duplicate
+skeleton next to the live server. On taffy (2026-09-07) logind sat at `SessionsMax` and stopped
+handing logins an `XDG_RUNTIME_DIR` (`.zshenv` now fills it in), and the survey found 2 live
+sessions of 12. When a host's live count drops without a reboot, compare it with
+`ps -eo args | grep -c '[z]ellij --server'` over ssh. A gap means a split: read each server's dir
+off its cmdline and attach the odd ones with `env ZELLIJ_SOCKET_DIR=<dir> zellij attach <session>`
+(also as their resume binding). Symlinking sockets between the dirs does not work — only real
+socket entries are listed.
+
 ## Clean empty surfaces after a rebuild
 
 ```bash
