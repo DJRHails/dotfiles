@@ -10,6 +10,16 @@ _dotfiles_bin="${DOTFILES:-$HOME/.files}/bin"
 [[ ":$PATH:" != *":$_dotfiles_bin:"* ]] && export PATH="${PATH:+$PATH:}$_dotfiles_bin"
 unset _dotfiles_bin
 
+# Linux: logind gives every PAM login a per-user runtime dir. When it can't — its SessionsMax
+# (8192) fills up when a client opens a fresh ssh connection per call and each leaves a session
+# stuck in "closing" — pam_systemd is `optional`, so the login succeeds with no XDG_RUNTIME_DIR
+# and zellij silently falls back to $TMPDIR/zellij-<uid>: every session under
+# /run/user/<uid>/zellij reads as EXITED, and an attach resurrects a duplicate instead of joining
+# it. The dir itself survives (linger, or any earlier login), so name it ourselves.
+if [[ -z ${XDG_RUNTIME_DIR-} && -d /run/user/$UID && -O /run/user/$UID ]]; then
+    export XDG_RUNTIME_DIR="/run/user/$UID"
+fi
+
 # Remove fpath elements with .files in, this will be loaded selectively later
 for i in ${fpath[@]}; do
     if [[ $i =~ $HOME/.files* ]]; then
