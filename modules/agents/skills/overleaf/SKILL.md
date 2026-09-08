@@ -185,7 +185,7 @@ workflow actually needs.
 ## Local files
 
 - `overleaf.py` — the CLI (PEP 723 inline deps, runs via `uv run`)
-- `test_overleaf.py` — 52 offline tests; every HTTP call is intercepted with `responses`
+- `test_overleaf.py` — 54 offline tests; every HTTP call is intercepted with `responses`
   and the socket frames come from a fixture, so the suite needs no session:
 
 ```bash
