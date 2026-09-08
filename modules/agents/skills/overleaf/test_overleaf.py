@@ -24,11 +24,14 @@ ROOT_FOLDER_ID = "6aa025104d6398f6e0903690"
 
 @pytest.fixture(autouse=True)
 def _isolate_session(monkeypatch, tmp_path):
-    """Give every test a configured session, never the host's real one."""
+    """Give every test a configured session and an empty CSRF memo, never the host's."""
     monkeypatch.setenv("OVERLEAF_SESSION_COOKIE", "s%3Atest-session")
     monkeypatch.delenv("OVERLEAF_GCLB_COOKIE", raising=False)
     monkeypatch.delenv("OVERLEAF_HOST", raising=False)
     monkeypatch.setattr(overleaf, "_CONFIG_DIR", tmp_path / "absent")
+    # The memo is process-global, so without this one test's token would answer another's
+    # page fetch — which is exactly how a stale-credential bug hides.
+    monkeypatch.setattr(overleaf, "_CSRF_TOKENS", {})
 
 
 @pytest.fixture
@@ -463,6 +466,37 @@ def test_upload_refusal_is_reported(tree, jar, capsys):
     with pytest.raises(typer.Exit):
         overleaf.upload_file(jar, PROJECT_ID, tree, "bad<name>.tex", b"x")
     assert "invalid_filename" in capsys.readouterr().err
+
+
+@responses.activate
+def test_many_writes_load_the_csrf_page_once(tree, jar):
+    """A push of N files must not load the editor page N times to re-read one token."""
+    page = responses.get(_url(f"/project/{PROJECT_ID}"), body=_csrf_page())
+    responses.post(
+        _url(f"/project/{PROJECT_ID}/upload"),
+        json={"success": True, "entity_id": "f9", "entity_type": "file"},
+    )
+    responses.delete(_url(f"/project/{PROJECT_ID}/file/f1"), status=204)
+    for name in ("one.tex", "two.tex", "three.tex"):
+        overleaf.upload_file(jar, PROJECT_ID, tree, name, b"x")
+    overleaf.delete_entity(
+        jar, PROJECT_ID, overleaf.RemoteEntity(path="logo.png", id="f1", kind="file")
+    )
+    assert page.call_count == 1
+
+
+@responses.activate
+def test_the_csrf_memo_does_not_outlive_the_process(tree, jar):
+    """The memo is in-process only: a fresh one re-reads the token rather than reusing it."""
+    page = responses.get(_url(f"/project/{PROJECT_ID}"), body=_csrf_page())
+    responses.post(
+        _url(f"/project/{PROJECT_ID}/upload"),
+        json={"success": True, "entity_id": "f9", "entity_type": "file"},
+    )
+    overleaf.upload_file(jar, PROJECT_ID, tree, "one.tex", b"x")
+    overleaf._CSRF_TOKENS.clear()
+    overleaf.upload_file(jar, PROJECT_ID, tree, "two.tex", b"x")
+    assert page.call_count == 2
 
 
 @responses.activate

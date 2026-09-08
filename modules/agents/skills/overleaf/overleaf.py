@@ -44,7 +44,9 @@ from rich.console import Console
 # token probing and hundred-page user pagination; here every call is a single cheap
 # request whose whole value is being current. A cached project list hides a project
 # created a minute ago, and a cached file body would make `push` skip a real edit — both
-# wrong rather than merely stale.
+# wrong rather than merely stale. The one thing held is the CSRF token: a session
+# credential rather than content, and only for the life of the process.
+_CSRF_TOKENS: dict[str, str] = {}  # allow-dict: a page-path → token memo
 
 DEFAULT_HOST = "www.overleaf.com"
 SESSION_COOKIE = "overleaf_session2"
@@ -481,14 +483,18 @@ def project_list(jar: http.cookiejar.CookieJar) -> ProjectsBlob:
 def _csrf_token(jar: http.cookiejar.CookieJar, path: str) -> str:
     """The CSRF token minted for this session, read off a page that carries one.
 
-    Every mutating endpoint requires it echoed in `x-csrf-token`. Deliberately not
-    cached between runs: a stale token fails the write, and the page fetch is one request.
+    Every mutating endpoint requires it echoed in `x-csrf-token`. Held for the life of the
+    process, because Overleaf mints one per session and the page carrying it is a whole
+    editor page: a `push` of two dozen files would otherwise load that page two dozen extra
+    times. Never persisted between runs — a token outliving its session fails the write.
     """
-    metas = _get_page(jar, path)
-    token = metas.get("csrfToken")
+    if (held := _CSRF_TOKENS.get(path)) is not None:
+        return held
+    token = _get_page(jar, path).get("csrfToken")
     if not token:
         err.print(f"[red]{path} carried no CSRF token[/red]")
         raise typer.Exit(2)
+    _CSRF_TOKENS[path] = token
     return token
 
 

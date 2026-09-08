@@ -155,12 +155,20 @@ reads as "the project is empty".
 - **No response cache, deliberately** — unlike the slack CLI, whose cache pays for token
   probing and hundred-page pagination. Here every call is one cheap request whose whole
   value is being current: a cached project list would hide a project created a minute ago,
-  and a cached file body would make `push` skip a real edit.
+  and a cached file body would make `push` skip a real edit. The one held value is the
+  CSRF token, for the life of the process, so a push of two dozen files does not load the
+  editor page two dozen extra times to re-read it.
 - **Page shape is Overleaf's, and it can change.** Project and CSRF state is read from the
   `ol-*` meta tags the editor bootstraps itself from. A missing meta fails loudly, naming
   what it found, rather than returning something empty.
 - **`push` is one-way.** There is no pull-and-merge; to bring Overleaf-side edits back,
-  `files read` them (or `download` the zip) and port them by hand.
+  `files read` them (or `download` the zip) and port them by hand. The diff reads each
+  doc's *persisted* content, so a co-author's still-unsaved editor changes can read as
+  unchanged and then be overwritten — push when nobody is mid-edit.
+- **`--prune` deletes files, not folders.** A folder whose contents were all pruned stays
+  in the project, empty. That is cosmetic and deliberate: deleting a folder in Overleaf
+  takes everything under it, which is the wrong instrument for a diff computed over files.
+  Remove one with `files rm <project> <folder>`.
 - **Rate limits are per project and generous but real** — Overleaf allows 500 file uploads
   per 15 minutes and 20 project creations per minute. A very large mirror can trip the
   first; `push` uploads only what changed, which is usually enough to stay under it.
