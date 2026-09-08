@@ -9,6 +9,7 @@ websocket-client pytest test_overleaf.py -q
 
 import http.cookiejar
 import json
+from pathlib import Path
 
 import pytest
 import responses
@@ -29,9 +30,18 @@ def _isolate_session(monkeypatch, tmp_path):
     monkeypatch.delenv("OVERLEAF_GCLB_COOKIE", raising=False)
     monkeypatch.delenv("OVERLEAF_HOST", raising=False)
     monkeypatch.setattr(overleaf, "_CONFIG_DIR", tmp_path / "absent")
+    monkeypatch.setattr(overleaf, "_BROWSER", overleaf.Browser.chrome)
     # The memo is process-global, so without this one test's token would answer another's
     # page fetch — which is exactly how a stale-credential bug hides.
     monkeypatch.setattr(overleaf, "_CSRF_TOKENS", {})
+    # No test may reach a real browser store: it would depend on the host's login state,
+    # and on a machine with a browser it would read the operator's actual session.
+    monkeypatch.setattr(
+        overleaf.browser_cookie3,
+        "chrome",
+        lambda **_kwargs: http.cookiejar.CookieJar(),
+        raising=False,
+    )
 
 
 @pytest.fixture
@@ -85,12 +95,143 @@ def test_sticky_cookie_travels_when_set(monkeypatch):
     assert names[overleaf.STICKY_COOKIE] == "lb-pin"
 
 
-def test_missing_session_refuses_with_guidance(monkeypatch, capsys):
+def test_no_session_anywhere_refuses_with_guidance(monkeypatch, capsys):
     monkeypatch.delenv("OVERLEAF_SESSION_COOKIE")
     with pytest.raises(typer.Exit) as caught:
         overleaf.cookies()
     assert caught.value.exit_code == 2
-    assert overleaf.SESSION_COOKIE in capsys.readouterr().err
+    captured = capsys.readouterr().err
+    assert overleaf.SESSION_COOKIE in captured
+    assert "export-env" in captured
+
+
+def flat(text: str) -> str:
+    """Console output with its line wrapping removed, so an assertion can span a wrap."""
+    return " ".join(text.split())
+
+
+def browser_jar(*names: str) -> http.cookiejar.CookieJar:
+    """A stand-in browser store holding the named overleaf.com cookies."""
+    jar = http.cookiejar.CookieJar()
+    for name in names:
+        jar.set_cookie(overleaf._mk_cookie(name, f"{name}-from-browser", ".overleaf.com"))
+    return jar
+
+
+def test_the_browser_session_is_used_when_nothing_is_configured(monkeypatch):
+    monkeypatch.delenv("OVERLEAF_SESSION_COOKIE")
+    monkeypatch.setattr(
+        overleaf,
+        "browser_cookies",
+        lambda _browser: browser_jar(overleaf.SESSION_COOKIE, overleaf.STICKY_COOKIE),
+    )
+    values = {cookie.name: cookie.value for cookie in overleaf.cookies()}
+    assert values[overleaf.SESSION_COOKIE] == f"{overleaf.SESSION_COOKIE}-from-browser"
+    assert values[overleaf.STICKY_COOKIE] == f"{overleaf.STICKY_COOKIE}-from-browser"
+
+
+def test_a_configured_session_outranks_the_browser(monkeypatch):
+    """An explicitly supplied cookie is what the caller meant; never second-guess it."""
+    monkeypatch.setattr(
+        overleaf, "browser_cookies", lambda _browser: browser_jar(overleaf.SESSION_COOKIE)
+    )
+    values = {cookie.name: cookie.value for cookie in overleaf.cookies()}
+    assert values[overleaf.SESSION_COOKIE] == "s%3Atest-session"
+
+
+def test_a_browser_without_an_overleaf_login_refuses(monkeypatch, capsys):
+    monkeypatch.delenv("OVERLEAF_SESSION_COOKIE")
+    monkeypatch.setattr(overleaf, "browser_cookies", lambda _browser: browser_jar("other_cookie"))
+    with pytest.raises(typer.Exit):
+        overleaf.cookies()
+    assert "no `overleaf_session2` cookie" in capsys.readouterr().err
+
+
+def test_an_unreadable_browser_store_is_reported_not_swallowed(monkeypatch, capsys):
+    """A locked keyring must say so, not look like "you are not logged in"."""
+    monkeypatch.delenv("OVERLEAF_SESSION_COOKIE")
+
+    def explode(**_kwargs):
+        raise RuntimeError("could not decrypt: keyring locked")
+
+    monkeypatch.setattr(overleaf.browser_cookie3, "firefox", explode, raising=False)
+    monkeypatch.setattr(overleaf, "_BROWSER", overleaf.Browser.firefox)
+    with pytest.raises(typer.Exit):
+        overleaf.cookies()
+    assert "keyring locked" in flat(capsys.readouterr().err)
+
+
+def test_an_unknown_browser_backend_refuses(monkeypatch, capsys):
+    monkeypatch.delenv("OVERLEAF_SESSION_COOKIE")
+    monkeypatch.delattr(overleaf.browser_cookie3, "safari", raising=False)
+    with pytest.raises(typer.Exit):
+        overleaf.browser_cookies(overleaf.Browser.safari)
+    assert "no reader for safari" in capsys.readouterr().err
+
+
+def test_every_profile_is_tried_until_one_is_signed_in(monkeypatch, tmp_path):
+    """A person with eight Chrome profiles is signed into Overleaf in exactly one."""
+    for name in ("Default", "Profile 1", "Profile 7"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "Cookies").write_bytes(b"sqlite")
+    monkeypatch.setattr(
+        overleaf,
+        "_CHROMIUM_PROFILE_GLOBS",
+        {overleaf.Browser.chrome: (f"{tmp_path}/{{Default,Profile *}}/Cookies",)},
+    )
+    tried: list[str] = []
+
+    def loader(cookie_file: str, **_kwargs):
+        tried.append(Path(cookie_file).parent.name)
+        # Only the last profile holds the session, so the scan must reach it.
+        return browser_jar(overleaf.SESSION_COOKIE) if "Profile 7" in cookie_file else browser_jar()
+
+    monkeypatch.setattr(overleaf.browser_cookie3, "chrome", loader, raising=False)
+    jar = overleaf.browser_cookies(overleaf.Browser.chrome)
+    assert tried == ["Default", "Profile 1", "Profile 7"]
+    assert any(cookie.name == overleaf.SESSION_COOKIE for cookie in jar)
+
+
+def test_an_unreadable_profile_does_not_stop_the_scan(monkeypatch, tmp_path):
+    for name in ("Default", "Profile 1"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "Cookies").write_bytes(b"sqlite")
+    monkeypatch.setattr(
+        overleaf,
+        "_CHROMIUM_PROFILE_GLOBS",
+        {overleaf.Browser.chrome: (f"{tmp_path}/{{Default,Profile *}}/Cookies",)},
+    )
+
+    def loader(cookie_file: str, **_kwargs):
+        if "Default" in cookie_file:
+            raise RuntimeError("profile locked")
+        return browser_jar(overleaf.SESSION_COOKIE)
+
+    monkeypatch.setattr(overleaf.browser_cookie3, "chrome", loader, raising=False)
+    jar = overleaf.browser_cookies(overleaf.Browser.chrome)
+    assert any(cookie.name == overleaf.SESSION_COOKIE for cookie in jar)
+
+
+def test_brace_globs_expand_to_every_profile(tmp_path):
+    for name in ("Default", "Profile 1", "Profile 10"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "Cookies").write_bytes(b"sqlite")
+    found = overleaf._expand_brace_glob(f"{tmp_path}/{{Default,Profile *}}/Cookies")
+    assert [Path(path).parent.name for path in found] == ["Default", "Profile 1", "Profile 10"]
+
+
+def test_the_browser_store_is_read_for_the_configured_host(monkeypatch):
+    """A self-hosted instance must not be asked for overleaf.com's cookies."""
+    monkeypatch.setenv("OVERLEAF_HOST", "latex.example.org")
+    seen: list[str] = []
+    monkeypatch.setattr(
+        overleaf.browser_cookie3,
+        "chrome",
+        lambda domain_name: seen.append(domain_name) or http.cookiejar.CookieJar(),
+        raising=False,
+    )
+    overleaf.browser_cookies(overleaf.Browser.chrome)
+    assert seen == ["latex.example.org"]
 
 
 def test_cookie_domain_drops_the_www():
