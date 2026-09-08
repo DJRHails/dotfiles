@@ -135,6 +135,10 @@ class CompileResult(_AliasedModel):
     """`POST /project/<id>/compile` response, minus the fields we do not read."""
 
     status: str = "unknown"
+    # The CLSI backend that ran the build; artefact downloads must be pinned to it, as the
+    # editor pins them, or on a multi-backend deployment they can land on a backend that
+    # never saw the build.
+    clsi_server_id: str | None = Field(default=None, alias="clsiServerId")
     output_files: list[CompileOutputFile] = Field(default_factory=list, alias="outputFiles")
 
     def artefact(self, suffix: str) -> CompileOutputFile | None:
@@ -399,6 +403,27 @@ def _session_expired(what: str) -> typer.Exit:
     return typer.Exit(2)
 
 
+def _refused(what: str, status: int) -> typer.Exit:
+    """The error for an outright refusal (401/403), which Overleaf's project routes answer
+    an expired session with rather than a redirect — it has two causes, so name both."""
+    err.print(
+        f"[red]{what}: HTTP {status} — Overleaf refused the request.[/red]\n"
+        f"Either the session cookie has expired (check with [bold]overleaf.py session[/bold], "
+        f"then re-capture `{SESSION_COOKIE}`), or this account has no access to the project."
+    )
+    return typer.Exit(2)
+
+
+def _require_ok(resp: requests.Response, what: str) -> None:
+    """Exit on any non-200, routing a refusal through the session message."""
+    if resp.status_code == 200:
+        return
+    if resp.status_code in (401, 403):
+        raise _refused(what, resp.status_code)
+    err.print(f"[red]{what}: HTTP {resp.status_code}[/red] {resp.text[:200]}")
+    raise typer.Exit(2)
+
+
 def _get_page(jar: http.cookiejar.CookieJar, path: str) -> dict[str, str]:  # allow-dict: meta index
     """Fetch an Overleaf HTML page and return its `ol-*` metas.
 
@@ -408,9 +433,7 @@ def _get_page(jar: http.cookiejar.CookieJar, path: str) -> dict[str, str]:  # al
     resp = _session(jar).get(_url(path), timeout=30, allow_redirects=False)
     if resp.status_code in (301, 302, 303, 307, 308):
         raise _session_expired(f"{path} redirected to {resp.headers.get('location', '?')}")
-    if resp.status_code != 200:
-        err.print(f"[red]{path}: HTTP {resp.status_code}[/red]")
-        raise typer.Exit(2)
+    _require_ok(resp, path)
     return page_metas(resp.text)
 
 
@@ -520,7 +543,7 @@ def _socket_frames(jar: http.cookiejar.CookieJar, project_id: str) -> Iterator[s
     server pushes on connect. The framing is socket.io 0.9 text — `<type>:<ack>:<endpoint>:
     <payload>`, where type 5 is an event and 7 is an error.
     """
-    from websocket import create_connection
+    from websocket import WebSocketConnectionClosedException, create_connection
 
     handshake = _session(jar).get(
         _url(f"/socket.io/1/?projectId={project_id}&t={int(time.time() * 1000)}"), timeout=30
@@ -539,7 +562,12 @@ def _socket_frames(jar: http.cookiejar.CookieJar, project_id: str) -> Iterator[s
         while True:
             # socket.io 0.9 frames are text, but the transport may hand back a binary
             # frame; decoding here keeps every consumer dealing in strings.
-            frame = connection.recv()
+            try:
+                frame = connection.recv()
+            except WebSocketConnectionClosedException:
+                # The server hung up — how it ends a rejected connection. The stream simply
+                # ends; the consumer decides what an early end means.
+                return
             yield frame if isinstance(frame, str) else frame.decode("utf-8", errors="replace")
     finally:
         connection.close()
@@ -557,6 +585,16 @@ def project_tree(jar: http.cookiejar.CookieJar, project_id: str) -> ProjectTree:
         if not frame.startswith("5:"):
             continue
         payload = json.loads(frame[len("5:") :].lstrip(":"))
+        if payload.get("name") == "connectionRejected":
+            # How Overleaf's real-time router refuses a join — an invalid session or a
+            # project this account cannot read — before it hangs up.
+            args = payload.get("args") or [{}]
+            reason = args[0].get("message", "?") if isinstance(args[0], dict) else "?"
+            err.print(
+                f"[red]socket rejected project {project_id} ({reason}) — the session cookie "
+                "has expired, or this account has no access to the project.[/red]"
+            )
+            raise typer.Exit(2)
         if payload.get("name") != "joinProjectResponse":
             continue
         root = payload["args"][0]["project"]["rootFolder"][0]
@@ -596,9 +634,7 @@ def read_entity(jar: http.cookiejar.CookieJar, project_id: str, entity: RemoteEn
         else f"/project/{project_id}/file/{entity.id}"
     )
     resp = _session(jar).get(_url(path), timeout=60)
-    if resp.status_code != 200:
-        err.print(f"[red]reading {entity.path}: HTTP {resp.status_code}[/red]")
-        raise typer.Exit(2)
+    _require_ok(resp, f"reading {entity.path}")
     return resp.content
 
 
@@ -844,7 +880,8 @@ def files_write(
     if not yes:
         typer.confirm("Push it?", abort=True)
     upload_file(jar, resolved.id, tree, path, source.read_bytes())
-    err.print(f"[green]{verb}d {path}[/green] {resolved.url}")
+    done = "replaced" if verb == "replace" else "added"
+    err.print(f"[green]{done} {path}[/green] {resolved.url}")
 
 
 @files_app.command("rm")
@@ -951,12 +988,17 @@ def compile_project(
         raise typer.Exit(1)
 
 
-def _artefact_bytes(jar: http.cookiejar.CookieJar, artefact: CompileOutputFile) -> bytes:
-    """Download one compile artefact from the URL the compile response gave for it."""
-    resp = _session(jar).get(_url(artefact.url or ""), timeout=120)
-    if resp.status_code != 200:
-        err.print(f"[red]{artefact.path}: HTTP {resp.status_code}[/red]")
-        raise typer.Exit(2)
+def _artefact_bytes(
+    jar: http.cookiejar.CookieJar, result: CompileResult, artefact: CompileOutputFile
+) -> bytes:
+    """Download one compile artefact from the URL the compile response gave for it.
+
+    The URL is a bare path; the backend pin travels as `clsiserverid`, exactly as the
+    editor sends it, because the web tier forwards only that query value to the CLSI.
+    """
+    params = {"clsiserverid": result.clsi_server_id} if result.clsi_server_id else None
+    resp = _session(jar).get(_url(artefact.url or ""), params=params, timeout=120)
+    _require_ok(resp, artefact.path)
     return resp.content
 
 
@@ -966,7 +1008,7 @@ def _print_log(console: Console, jar: http.cookiejar.CookieJar, result: CompileR
     if artefact is None or not artefact.url:
         console.print("[yellow]no log among the output files[/yellow]")
         return
-    console.print(_artefact_bytes(jar, artefact).decode("utf-8", errors="replace"))
+    console.print(_artefact_bytes(jar, result, artefact).decode("utf-8", errors="replace"))
 
 
 def _save_pdf(jar: http.cookiejar.CookieJar, result: CompileResult, dest: Path) -> None:
@@ -975,7 +1017,7 @@ def _save_pdf(jar: http.cookiejar.CookieJar, result: CompileResult, dest: Path) 
     if artefact is None or not artefact.url:
         err.print("[red]compile produced no PDF — rerun with --logs to see why[/red]")
         raise typer.Exit(1)
-    content = _artefact_bytes(jar, artefact)
+    content = _artefact_bytes(jar, result, artefact)
     dest.write_bytes(content)
     err.print(f"[green]wrote {len(content):,} bytes to {dest}[/green]")
 
@@ -989,9 +1031,7 @@ def download(
     jar = cookies()
     resolved = resolve_project(jar, project)
     resp = _session(jar).get(_url(f"/project/{resolved.id}/download/zip"), timeout=300)
-    if resp.status_code != 200:
-        err.print(f"[red]download: HTTP {resp.status_code}[/red]")
-        raise typer.Exit(2)
+    _require_ok(resp, "download")
     dest = out or Path(f"{resolved.label}.zip")
     dest.write_bytes(resp.content)
     err.print(f"[green]wrote {len(resp.content):,} bytes to {dest}[/green]")

@@ -13,6 +13,7 @@ import json
 import pytest
 import responses
 import typer
+import websocket
 
 import overleaf
 
@@ -285,6 +286,45 @@ def test_socket_closing_early_refuses(monkeypatch, jar, capsys):
     assert "closed before" in capsys.readouterr().err
 
 
+def test_socket_rejection_names_the_reason(monkeypatch, jar, capsys):
+    rejected = "5:::" + json.dumps(
+        {"name": "connectionRejected", "args": [{"message": "invalid session"}]}
+    )
+    monkeypatch.setattr(overleaf, "_socket_frames", lambda _jar, _pid: iter(["1::", rejected]))
+    with pytest.raises(typer.Exit) as caught:
+        overleaf.project_tree(jar, PROJECT_ID)
+    assert caught.value.exit_code == 2
+    assert "invalid session" in capsys.readouterr().err
+
+
+class _HangingUpSocket:
+    """A websocket the server closes after one frame, as Overleaf does on a rejected join."""
+
+    def __init__(self):
+        self.closed = False
+        self._frames = iter(["1::"])
+
+    def recv(self):
+        try:
+            return next(self._frames)
+        except StopIteration:
+            raise websocket.WebSocketConnectionClosedException(
+                "Connection to remote host was lost."
+            ) from None
+
+    def close(self):
+        self.closed = True
+
+
+@responses.activate
+def test_socket_frames_end_when_the_server_hangs_up(monkeypatch, jar):
+    responses.get(_url("/socket.io/1/"), body="sid-1:60:60:websocket")
+    fake = _HangingUpSocket()
+    monkeypatch.setattr(websocket, "create_connection", lambda *_args, **_kwargs: fake)
+    assert list(overleaf._socket_frames(jar, PROJECT_ID)) == ["1::"]
+    assert fake.closed
+
+
 def test_walk_folder_handles_an_empty_project():
     root = {"_id": ROOT_FOLDER_ID, "name": "rootFolder", "docs": [], "fileRefs": [], "folders": []}
     assert list(overleaf.walk_folder(root, prefix="")) == []
@@ -303,6 +343,17 @@ def test_read_file_uses_the_file_route(jar):
     responses.get(_url(f"/project/{PROJECT_ID}/file/f1"), body=b"\x89PNG")
     entity = overleaf.RemoteEntity(path="logo.png", id="f1", kind="file")
     assert overleaf.read_entity(jar, PROJECT_ID, entity) == b"\x89PNG"
+
+
+@responses.activate
+def test_forbidden_read_names_the_session(jar, capsys):
+    # Overleaf's project routes answer an expired cookie with a 403, not a login redirect.
+    responses.get(_url(f"/project/{PROJECT_ID}/file/f1"), status=403, body="restricted")
+    entity = overleaf.RemoteEntity(path="logo.png", id="f1", kind="file")
+    with pytest.raises(typer.Exit) as caught:
+        overleaf.read_entity(jar, PROJECT_ID, entity)
+    assert caught.value.exit_code == 2
+    assert "session" in capsys.readouterr().err
 
 
 # --- the push diff ----------------------------------------------------------------------------
@@ -429,6 +480,7 @@ def _compile_result(status: str = "success") -> overleaf.CompileResult:
     return overleaf.CompileResult.model_validate(
         {
             "status": status,
+            "clsiServerId": "clsi-7",
             "outputFiles": [
                 {"path": "output.pdf", "url": "/build/output.pdf", "build": "b1"},
                 {"path": "output.log", "url": "/build/output.log", "build": "b1"},
@@ -448,10 +500,12 @@ def test_compile_result_picks_artefacts_by_suffix():
 
 @responses.activate
 def test_save_pdf_writes_the_artefact(jar, tmp_path):
-    responses.get(_url("/build/output.pdf"), body=b"%PDF-1.5")
+    fetch = responses.get(_url("/build/output.pdf"), body=b"%PDF-1.5")
     dest = tmp_path / "paper.pdf"
     overleaf._save_pdf(jar, _compile_result(), dest)
     assert dest.read_bytes() == b"%PDF-1.5"
+    # The backend pin the editor sends with every artefact fetch.
+    assert "clsiserverid=clsi-7" in (fetch.calls[0].request.url or "")
 
 
 def test_save_pdf_refuses_when_the_compile_made_none(jar, tmp_path, capsys):
