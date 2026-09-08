@@ -85,18 +85,20 @@ The session comes from, in order:
 
 1. `$OVERLEAF_SESSION_COOKIE`
 2. `~/.config/overleaf/session`
-3. **the browser's own cookie store** — every profile of `-b chrome` (the default), or
-   `arc|brave|edge|chromium|vivaldi|firefox|safari`
+3. **the browser's own cookie store** — `-b chrome` (the default), `arc`, `brave`, `edge`,
+   `chromium`, `vivaldi`, `opera`, `firefox`, `safari`, or `librewolf`
 
 plus `$OVERLEAF_GCLB_COOKIE` / `~/.config/overleaf/gclb` for the optional load-balancer
 pin, and `~/.config/overleaf/env` (`export VAR=value` lines) which is pre-loaded into the
 environment so a headless host needs no wrapper. A supplied cookie always wins: it is what
 the caller meant, and it is the only path where no browser exists.
 
-Discovery walks **every profile** of the chosen browser and takes the first signed in —
-someone with eight Chrome profiles is typically logged into Overleaf in exactly one, and
-cookies are never mixed across profiles, since the load-balancer pin must belong to the
-same session. `-v` names the profile it used.
+For the **Chromium** browsers (chrome, arc, brave, edge, chromium, vivaldi), discovery
+walks every profile and takes the first signed in — someone with eight Chrome profiles is
+typically logged into Overleaf in exactly one — and cookies are never mixed across
+profiles, since the load-balancer pin must belong to the same session. Firefox, Safari,
+Opera, and LibreWolf have one store, which `browser_cookie3` locates itself. `-v` names
+whichever it used.
 
 ### When the browser store does not work
 

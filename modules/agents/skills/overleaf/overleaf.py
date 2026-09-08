@@ -463,7 +463,11 @@ def _load_cookies(
         if cookie_file is None:
             return loader(domain_name=domain), None
         return loader(cookie_file=cookie_file, domain_name=domain), None
-    except Exception as exc:  # each browser backend raises its own error type
+    except Exception as exc:  # noqa: BLE001 — see below
+        # Deliberately blind: browser_cookie3 raises its own BrowserCookieError, but also
+        # whatever sqlite3, the keyring backend, or a half-written profile throws, and a
+        # new browser version can add to that set. One unreadable profile out of eight
+        # must never end the scan, and the reason is returned rather than swallowed.
         reason = f"{type(exc).__name__}: {exc}"
         _vprint(f"[dim]skipping {cookie_file or 'default store'}: {reason}[/dim]")
         return None, reason
