@@ -17,20 +17,23 @@ preload, and the same "runs headless off-box" session path.
 
 ## Prerequisites
 
-- Signed into `https://www.overleaf.com/` in a browser, and its session cookie put where
-  the CLI can read it (see [Auth](#auth)). Nothing else — no premium plan, no token, no
-  OAuth app.
-- `uv` installed. Dependencies are inline: `pydantic`, `requests`, `rich`, `typer`,
-  `websocket-client`.
+- Signed into `https://www.overleaf.com/` in a browser. Nothing else — no premium plan,
+  no token, no OAuth app. The session is read from the browser's own cookie store, or
+  supplied directly where that is not possible (see [Auth](#auth)).
+- `uv` installed. Dependencies are inline: `browser-cookie3`, `pydantic`, `requests`,
+  `rich`, `typer`, `websocket-client`.
 
 ## Commands
 
 All commands take `PROJECT` as **a project id, a project URL, or a name** (matched
 exactly, then case-insensitively, then by substring; an ambiguous name lists the
-candidates instead of guessing). Top-level `-v` prints session details to stderr.
+candidates instead of guessing). `-v` prints session details to stderr and `-b` picks the
+browser; both are **top-level** options, so they come before the subcommand
+(`overleaf.py -b firefox files ls <project>`).
 
 ```bash
 ./overleaf.py session                         # who the session belongs to (the quickest check)
+./overleaf.py export-env                      # print this browser's session for another host
 
 ./overleaf.py projects list [--json] [--archived]
 ./overleaf.py projects new "Paper title"      # prints the new project's id and URL
@@ -82,17 +85,49 @@ The session comes from, in order:
 
 1. `$OVERLEAF_SESSION_COOKIE`
 2. `~/.config/overleaf/session`
+3. **the browser's own cookie store** — `-b chrome` (the default), `arc`, `brave`, `edge`,
+   `chromium`, `vivaldi`, `opera`, `firefox`, `safari`, or `librewolf`
 
 plus `$OVERLEAF_GCLB_COOKIE` / `~/.config/overleaf/gclb` for the optional load-balancer
 pin, and `~/.config/overleaf/env` (`export VAR=value` lines) which is pre-loaded into the
-environment so a headless host needs no wrapper. Existing variables always win.
+environment so a headless host needs no wrapper. A supplied cookie always wins: it is what
+the caller meant, and it is the only path where no browser exists.
 
-Because the credential is supplied rather than scraped, **the CLI runs anywhere** — a
-server, a container, an ssh session whose macOS Keychain is unreachable — not only on the
-machine holding the browser.
+For the **Chromium** browsers (chrome, arc, brave, edge, chromium, vivaldi), discovery
+walks every profile and takes the first signed in — someone with eight Chrome profiles is
+typically logged into Overleaf in exactly one — and cookies are never mixed across
+profiles, since the load-balancer pin must belong to the same session. Firefox, Safari,
+Opera, and LibreWolf have one store, which `browser_cookie3` locates itself. `-v` names
+whichever it used.
 
-**Capturing the cookie.** In the browser: DevTools → Application → Cookies →
-`https://www.overleaf.com` → copy `overleaf_session2`. Then one command on the host that
+### When the browser store does not work
+
+Reading another process's cookie jar is best-effort, and two failure modes are common
+enough to plan around. Both were hit on the author's own Mac:
+
+- **macOS over ssh.** Chromium cookies are encrypted with a key in the login Keychain,
+  which a non-interactive ssh session cannot unlock; `browser_cookie3` raises and the CLI
+  reports the reason. Run it in a desktop terminal, or use `export-env`.
+- **A cookie Chrome has not flushed.** Chrome writes cookies to its SQLite store lazily,
+  so a recent login can be live in the browser and absent from disk — the store reads
+  clean and simply has no Overleaf row in any profile. Nothing can be done from outside
+  the browser; supply the cookie instead.
+
+**`export-env` bridges both**, and any browserless host. Run it where the login lives, eval
+it where the CLI runs. It validates the session before printing, so a dead cookie is never
+shipped onward:
+
+```bash
+# on the machine with the browser
+eval "$(./overleaf.py export-env)"                  # this shell
+./overleaf.py export-env >> ~/.config/overleaf/env  # or persist it
+
+# for another host
+ssh laptop 'overleaf.py export-env' > /tmp/ol.env && . /tmp/ol.env
+```
+
+**Capturing it by hand** is the last resort: DevTools → Application → Cookies →
+`https://www.overleaf.com` → copy `overleaf_session2`, then one command on the host that
 will run the CLI (it echoes nothing and keeps the file private):
 
 ```bash
@@ -185,10 +220,10 @@ workflow actually needs.
 ## Local files
 
 - `overleaf.py` — the CLI (PEP 723 inline deps, runs via `uv run`)
-- `test_overleaf.py` — 54 offline tests; every HTTP call is intercepted with `responses`
+- `test_overleaf.py` — 65 offline tests; every HTTP call is intercepted with `responses`
   and the socket frames come from a fixture, so the suite needs no session:
 
 ```bash
-uv run --no-project --with pytest,responses,pydantic,requests,rich,typer,websocket-client \
-  pytest test_overleaf.py -q
+uv run --no-project --with pytest,responses,browser-cookie3,pydantic,requests,rich,typer,\
+websocket-client pytest test_overleaf.py -q
 ```

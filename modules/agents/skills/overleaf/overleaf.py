@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["pydantic", "requests", "rich", "typer", "websocket-client"]
+# dependencies = ["browser-cookie3", "pydantic", "requests", "rich", "typer", "websocket-client"]
 # ///
 
 # ruff: noqa: B008
@@ -19,22 +19,27 @@ logged-in browser — so it works on a free account.
     overleaf.py push <project> ./staged --prune
     overleaf.py compile <project> --pdf paper.pdf
 
-The session comes from `$OVERLEAF_SESSION_COOKIE` (or `~/.config/overleaf/session`), so
-the CLI runs anywhere — a server, a container, an ssh session — not only on the machine
-holding the browser. `overleaf.py session` says whether the one it has still works.
+On a machine with the browser, that needs no setup: the session is read from its cookie
+store (`-b chrome|firefox|arc|…`). Elsewhere — a server, a container, an ssh session whose
+keyring is unreachable — supply it through `$OVERLEAF_SESSION_COOKIE` or
+`~/.config/overleaf/session`, which `export-env` prints for you, and which wins over the
+browser when set. `overleaf.py session` says whether the one it found still works.
 """
 
 import http.cookiejar
 import json
 import os
 import re
+import shlex
 import sys
 import time
 from collections.abc import Iterator
+from enum import Enum
 from mimetypes import guess_type
 from pathlib import Path
 from typing import Literal, TypeVar
 
+import browser_cookie3
 import requests
 import typer
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -261,6 +266,13 @@ _PROJECT_ID_RE = re.compile(
     \Z
     """
 )
+_BRACE_ALTERNATION = re.compile(
+    r"""(?x)                    # verbose
+    ^(?P<prefix> .* )           # everything before the brace
+    \{ (?P<alts> .+ ) \}        # the comma-separated alternatives
+    (?P<suffix> .* )$           # everything after it
+    """
+)
 _META_CONTENT_RE = re.compile(
     r"""(?xs)                                  # verbose, dot matches newline
     <meta \s+                                  # the tag Overleaf bootstraps the page with
@@ -275,12 +287,63 @@ def overleaf_host() -> str:
     return os.environ.get("OVERLEAF_HOST", DEFAULT_HOST)
 
 
+class Browser(str, Enum):
+    """A browser whose cookie store the session can be read from."""
+
+    chrome = "chrome"
+    arc = "arc"
+    brave = "brave"
+    edge = "edge"
+    chromium = "chromium"
+    firefox = "firefox"
+    safari = "safari"
+    opera = "opera"
+    vivaldi = "vivaldi"
+    librewolf = "librewolf"
+
+
+# Per-profile cookie stores, macOS and Linux. Firefox and Safari are absent deliberately:
+# browser_cookie3 finds their single store itself.
+_CHROMIUM_PROFILE_GLOBS = {
+    Browser.chrome: (
+        "~/Library/Application Support/Google/Chrome/{Default,Profile *}/Cookies",
+        "~/.config/google-chrome/{Default,Profile *}/Cookies",
+    ),
+    Browser.arc: ("~/Library/Application Support/Arc/User Data/{Default,Profile *}/Cookies",),
+    Browser.brave: (
+        "~/Library/Application Support/BraveSoftware/Brave-Browser/{Default,Profile *}/Cookies",
+        "~/.config/BraveSoftware/Brave-Browser/{Default,Profile *}/Cookies",
+    ),
+    Browser.edge: (
+        "~/Library/Application Support/Microsoft Edge/{Default,Profile *}/Cookies",
+        "~/.config/microsoft-edge/{Default,Profile *}/Cookies",
+    ),
+    Browser.chromium: (
+        "~/Library/Application Support/Chromium/{Default,Profile *}/Cookies",
+        "~/.config/chromium/{Default,Profile *}/Cookies",
+    ),
+    Browser.vivaldi: (
+        "~/Library/Application Support/Vivaldi/{Default,Profile *}/Cookies",
+        "~/.config/vivaldi/{Default,Profile *}/Cookies",
+    ),
+}
+
+
+# The browser discovery reads from, set once by the root callback. A global rather than an
+# option repeated on all ten commands: it applies to every one of them identically.
+_BROWSER = Browser.chrome
+
+
 @app.callback()
 def _root(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Print session details to stderr."),
+    browser: Browser = typer.Option(
+        Browser.chrome, "--browser", "-b", help="Browser whose Overleaf session to use."
+    ),
 ) -> None:
-    global _VERBOSE
+    global _VERBOSE, _BROWSER
     _VERBOSE = _VERBOSE or verbose
+    _BROWSER = browser
 
 
 def _vprint(message: str) -> None:
@@ -322,25 +385,18 @@ def _slurp(path: Path) -> str:
 
 _CONFIG_DIR = Path.home() / ".config" / "overleaf"
 
-_NO_SESSION_HELP = (
-    f"[red]no Overleaf session configured.[/red] Put the `{SESSION_COOKIE}` cookie of a "
-    f"logged-in browser in [bold]$OVERLEAF_SESSION_COOKIE[/bold] or "
-    f"[bold]~/.config/overleaf/session[/bold].\n"
-    "In Chrome: DevTools → Application → Cookies → https://www.overleaf.com → copy "
-    f"`{SESSION_COOKIE}`. See the skill's SKILL.md for a one-command way to capture it."
-)
 
+def _configured_cookies() -> http.cookiejar.CookieJar | None:
+    """A jar from the environment or `~/.config/overleaf/`, or None when nothing is set.
 
-def cookies() -> http.cookiejar.CookieJar:
-    """The session jar, from the environment or `~/.config/overleaf/`.
-
-    The load-balancer cookie is optional but carried when present: without it a
-    socket.io upgrade can land on a backend that does not know the session.
+    Checked before the browser, because an explicitly supplied session is always what the
+    caller meant, and it is the only path where no browser exists. The load-balancer
+    cookie is optional but carried when present: without it a socket.io upgrade can land
+    on a backend that does not know the session.
     """
     session = os.environ.get("OVERLEAF_SESSION_COOKIE") or _slurp(_CONFIG_DIR / "session")
     if not session:
-        err.print(_NO_SESSION_HELP)
-        raise typer.Exit(2)
+        return None
     jar = http.cookiejar.CookieJar()
     domain = _cookie_domain()
     jar.set_cookie(_mk_cookie(SESSION_COOKIE, session, domain))
@@ -349,6 +405,120 @@ def cookies() -> http.cookiejar.CookieJar:
         _vprint("[dim]session: configured cookie + load-balancer pin[/dim]")
     else:
         _vprint("[dim]session: configured cookie[/dim]")
+    return jar
+
+
+def _unreadable_browser(browser: Browser, why: str) -> typer.Exit:
+    """The error for a browser whose session could not be read, naming both ways out."""
+    err.print(
+        f"[red]no Overleaf session from {browser.value}: {why}[/red]\n"
+        f"Sign into https://{overleaf_host()}/ there, try another browser with "
+        "[bold]-b chrome|firefox|arc|brave|edge[/bold], or supply the cookie directly — "
+        "[bold]overleaf.py export-env[/bold] prints the `export` lines for a host that has "
+        "no browser of its own."
+    )
+    return typer.Exit(2)
+
+
+def _glob(pattern: str) -> list[str]:
+    """Every path matching an absolute `~`-relative glob, sorted."""
+    expanded = Path(pattern).expanduser()
+    root = Path(expanded.anchor)
+    return sorted(str(path) for path in root.glob(str(expanded.relative_to(root))))
+
+
+def _expand_brace_glob(pattern: str) -> list[str]:
+    """Expand a one-brace glob like `{Default,Profile *}` into sorted matching paths.
+
+    `Path.glob` has no brace alternation, and the browser stores need it: the default
+    profile is `Default` while the rest are `Profile <n>`.
+    """
+    parts = _BRACE_ALTERNATION.match(pattern)
+    if not parts:
+        return _glob(pattern)
+    prefix, suffix = parts["prefix"], parts["suffix"]
+    return sorted(
+        path for alt in parts["alts"].split(",") for path in _glob(f"{prefix}{alt}{suffix}")
+    )
+
+
+def _profile_cookie_files(browser: Browser) -> list[str]:
+    """Every per-profile cookie database this browser has on this host."""
+    return [
+        path
+        for pattern in _CHROMIUM_PROFILE_GLOBS.get(browser, ())
+        for path in _expand_brace_glob(pattern)
+    ]
+
+
+def _load_cookies(
+    loader, cookie_file: str | None, domain: str
+) -> tuple[http.cookiejar.CookieJar | None, str | None]:
+    """One profile's cookies for the domain, or the reason that profile could not be read.
+
+    The reason is carried back rather than logged and dropped: when no profile is
+    readable at all, a locked keyring must be distinguishable from "not signed in".
+    """
+    try:
+        if cookie_file is None:
+            return loader(domain_name=domain), None
+        return loader(cookie_file=cookie_file, domain_name=domain), None
+    except Exception as exc:  # noqa: BLE001 — see below
+        # Deliberately blind: browser_cookie3 raises its own BrowserCookieError, but also
+        # whatever sqlite3, the keyring backend, or a half-written profile throws, and a
+        # new browser version can add to that set. One unreadable profile out of eight
+        # must never end the scan, and the reason is returned rather than swallowed.
+        reason = f"{type(exc).__name__}: {exc}"
+        _vprint(f"[dim]skipping {cookie_file or 'default store'}: {reason}[/dim]")
+        return None, reason
+
+
+def browser_cookies(browser: Browser) -> http.cookiejar.CookieJar:
+    """The Overleaf cookies of the first browser profile that is signed in.
+
+    A Chromium browser keeps one cookie store per profile, and a person with several
+    profiles is typically signed into Overleaf in exactly one of them — so every profile
+    is tried and the first holding a session wins, rather than only the default one.
+    Cookies are never mixed across profiles: the load-balancer pin has to belong to the
+    same session as the cookie it accompanies.
+    """
+    loader = getattr(browser_cookie3, browser.value, None)
+    if loader is None:
+        err.print(f"[red]browser_cookie3 has no reader for {browser.value}[/red]")
+        raise typer.Exit(2)
+    domain = overleaf_host().removeprefix("www.")
+    profiles = _profile_cookie_files(browser)
+    _vprint(f"[dim]{browser.value}: {len(profiles) or 'no'} profile store(s) to try[/dim]")
+    last: http.cookiejar.CookieJar | None = None
+    failure: str | None = None
+    # `None` covers Firefox and Safari, whose stores browser_cookie3 locates itself.
+    for cookie_file in profiles or [None]:
+        jar, reason = _load_cookies(loader, cookie_file, domain)
+        if jar is None:
+            failure = reason
+            continue
+        last = jar
+        if any(cookie.name == SESSION_COOKIE for cookie in jar):
+            _vprint(f"[dim]signed in on {cookie_file or 'the default store'}[/dim]")
+            return jar
+    if last is None:
+        raise _unreadable_browser(browser, failure or "no readable cookie store on this host")
+    return last
+
+
+def cookies() -> http.cookiejar.CookieJar:
+    """The session jar: an explicitly configured cookie, else the browser's own store.
+
+    The everyday case is "I am signed into Overleaf in my browser", so that works with no
+    setup at all, the way the sibling slack CLI discovers its token. A supplied cookie
+    still wins, since that is the only path on a machine with no browser.
+    """
+    if (jar := _configured_cookies()) is not None:
+        return jar
+    jar = browser_cookies(_BROWSER)
+    if not any(cookie.name == SESSION_COOKIE for cookie in jar):
+        raise _unreadable_browser(_BROWSER, f"its store holds no `{SESSION_COOKIE}` cookie")
+    _vprint(f"[dim]session: {_BROWSER.value} cookie store[/dim]")
     return jar
 
 
@@ -1041,6 +1211,27 @@ def download(
     dest = out or Path(f"{resolved.label}.zip")
     dest.write_bytes(resp.content)
     err.print(f"[green]wrote {len(resp.content):,} bytes to {dest}[/green]")
+
+
+@app.command("export-env")
+def export_env() -> None:
+    """Print `export` lines carrying this browser's session, for a host that has none.
+
+    Run on the machine holding the Overleaf login and eval the output where the CLI needs
+    to run — a server, a container, an ssh session whose keyring is unreachable. The
+    session is validated before it is printed, so a dead cookie is never shipped onward.
+    """
+    jar = browser_cookies(_BROWSER)
+    session = next((c.value for c in jar if c.name == SESSION_COOKIE), "")
+    if not session:
+        raise _unreadable_browser(_BROWSER, f"its store holds no `{SESSION_COOKIE}` cookie")
+    user = whoami_record(jar)
+    err.print(f"[dim]session for {user.label} on {overleaf_host()} (from {_BROWSER.value})[/dim]")
+    print(f"export OVERLEAF_SESSION_COOKIE={shlex.quote(session)}")
+    if sticky := next((c.value for c in jar if c.name == STICKY_COOKIE), ""):
+        print(f"export OVERLEAF_GCLB_COOKIE={shlex.quote(sticky)}")
+    if overleaf_host() != DEFAULT_HOST:
+        print(f"export OVERLEAF_HOST={shlex.quote(overleaf_host())}")
 
 
 if __name__ == "__main__":
