@@ -35,7 +35,10 @@ def _isolate_session(monkeypatch, tmp_path):
     # page fetch — which is exactly how a stale-credential bug hides.
     monkeypatch.setattr(overleaf, "_CSRF_TOKENS", {})
     # No test may reach a real browser store: it would depend on the host's login state,
-    # and on a machine with a browser it would read the operator's actual session.
+    # and on a machine with a browser it would read the operator's actual session. That
+    # covers the profile scan too — on a host with Chrome profiles the loader would
+    # otherwise be called once per real profile directory.
+    monkeypatch.setattr(overleaf, "_CHROMIUM_PROFILE_GLOBS", {})
     monkeypatch.setattr(
         overleaf.browser_cookie3,
         "chrome",
@@ -232,6 +235,36 @@ def test_the_browser_store_is_read_for_the_configured_host(monkeypatch):
     )
     overleaf.browser_cookies(overleaf.Browser.chrome)
     assert seen == ["latex.example.org"]
+
+
+@responses.activate
+def test_export_env_prints_the_validated_browser_session(monkeypatch, capsys):
+    """Both cookies go out as shell-safe `export` lines, and only after the session is checked."""
+    monkeypatch.setattr(
+        overleaf,
+        "browser_cookies",
+        lambda _browser: browser_jar(overleaf.SESSION_COOKIE, overleaf.STICKY_COOKIE),
+    )
+    responses.get(_url("/user/personal_info"), json={"id": "u1", "email": "daniel@hails.info"})
+    overleaf.export_env()
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [
+        f"export OVERLEAF_SESSION_COOKIE={overleaf.SESSION_COOKIE}-from-browser",
+        f"export OVERLEAF_GCLB_COOKIE={overleaf.STICKY_COOKIE}-from-browser",
+    ]
+    assert "daniel@hails.info" in flat(captured.err)
+
+
+@responses.activate
+def test_export_env_never_ships_a_dead_session(monkeypatch, capsys):
+    monkeypatch.setattr(
+        overleaf, "browser_cookies", lambda _browser: browser_jar(overleaf.SESSION_COOKIE)
+    )
+    responses.get(_url("/user/personal_info"), status=401, json={})
+    with pytest.raises(typer.Exit) as caught:
+        overleaf.export_env()
+    assert caught.value.exit_code == 2
+    assert capsys.readouterr().out == ""
 
 
 def test_cookie_domain_drops_the_www():
