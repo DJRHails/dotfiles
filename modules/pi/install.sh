@@ -29,6 +29,10 @@ fi
 if platform::command_exists "pi"; then
   # Canonical package set (mirrors modules/pi/settings.json `packages`).
   log::execute \
+    "pi install git:github.com/DJRHails/pi-redact" \
+    "pi-redact"
+
+  log::execute \
     "pi install git:github.com/DJRHails/pi-smart-sessions" \
     "pi-smart-sessions"
 
