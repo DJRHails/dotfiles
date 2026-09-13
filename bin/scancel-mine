@@ -28,7 +28,7 @@ Usage:
   --dry-run          list what would be cancelled, cancel nothing
   --prefix <p>       override $SLURM_JOB_PREFIX (normalised via slurm-job-prefix)
   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
-                     required when squeue is not on PATH, e.g. --via ant-cluster
+                     required when squeue is not on PATH, e.g. --via bulbasaur
   -h, --help         print this help
 EOF
 }
@@ -136,7 +136,7 @@ slurm() {
 
 if [[ -z "$via" ]] && ! command -v squeue >/dev/null 2>&1; then
   echo "scancel-mine: no squeue on PATH — pass --via <ssh-host>" \
-    "(e.g. ant-cluster, eur-cluster)" >&2
+    "(e.g. bulbasaur, charmander)" >&2
   exit 2
 fi
 

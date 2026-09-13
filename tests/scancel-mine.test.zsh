@@ -194,7 +194,7 @@ mv "$work/squeue.hidden" "$stub/squeue"
 # which is what makes the job-name column (and so the prefix match) work at all
 : >"$SCANCEL_LOG"
 install_squeue 'echo "111 worker1-train"'
-out="$(bash "$mine" --prefix worker1 --via ant-cluster 2>&1)"; rc=$?
+out="$(bash "$mine" --prefix worker1 --via bulbasaur 2>&1)"; rc=$?
 check via-succeeds 0 $rc
 check via-cancels-explicit-ids "111" "$(<"$SCANCEL_LOG")"
 install_squeue "$FOUR_ROWS"
