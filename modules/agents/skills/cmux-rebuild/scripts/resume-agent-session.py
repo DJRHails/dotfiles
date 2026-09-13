@@ -25,9 +25,10 @@ Hard-won details this script owns so you don't have to:
     send is never re-typed into the now-running agent TUI. Exits nonzero unless the id was
     verified on the statusline.
   - A partial session id that matches two transcripts resumes an arbitrary one (`head -1` in
-    `pi::resume`, which fuzzy-matches; a partial claude id simply fails to resolve). The script
-    resolves the fragment against the same stores the resolvers search — every `~/.pi*` profile
-    included — aborts on ambiguity, and passes the full unique id.
+    `pi::resume`, which fuzzy-matches; `claude::resume` takes a prefix and refuses an ambiguous
+    one itself, but a remote send still needs the full id up front). The script resolves the
+    fragment against the same stores the resolvers search — every `~/.pi*` profile included —
+    aborts on ambiguity, and passes the full unique id.
   - A remote session name that already exists (live OR an EXITED skeleton) would be attached or
     resurrected instead of running the layout — it aborts and asks for a different --slug.
   - Layout-created sessions get no cmux resume binding (`--bind` does not cover them); the next
