@@ -72,3 +72,10 @@ repos:
         entry: zsh -f tests/sfw-aliases.test.zsh
         language: system
         pass_filenames: false
+      # claude::resume takes an id prefix; a resolver that guessed on an ambiguous
+      # prefix would open another session's work under the wrong cwd, silently.
+      - id: claude-resume-tests
+        name: claude::resume resolution suite
+        entry: zsh -f tests/claude-resume.test.zsh
+        language: system
+        pass_filenames: false

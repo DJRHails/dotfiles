@@ -99,17 +99,34 @@ ant::msg() {
 # Resume a session by id, cd-ing into its original directory first. Claude can
 # only --resume a session from the cwd it was started in, and session-search
 # only prints the bare `claude --resume <id>`. This resolves both the directory
-# and the owning config profile so a copy-pasted id Just Works.
+# and the owning config profile so a copy-pasted id Just Works. The id may be a
+# prefix — the judge and rebuild reports print the first eight hex chars — as
+# long as it names exactly one session; claude itself needs the full id.
 claude::resume() {
   emulate -L zsh
   local id=$1
-  [[ -n $id ]] || { echo "claude::resume: usage: claude::resume <session-id>" >&2; return 1; }
+  [[ -n $id ]] || { echo "claude::resume: usage: claude::resume <session-id-or-prefix>" >&2; return 1; }
 
   # Search every config-dir variant (default + ant) and the legacy agents dir.
+  # Subagent transcripts (*/subagents/*) share the id namespace but cannot be
+  # resumed, so they never count as a match.
+  local -a files
+  files=(${(f)"$(command find "$HOME/.claude" "$HOME/.claude-ant" "$HOME/.agents" \
+            -type f -name "${id}*.jsonl" -not -path '*/subagents/*' -print 2>/dev/null)"})
+  (( ${#files} )) || { echo "claude::resume: no session '$id' under ~/.claude*, ~/.agents" >&2; return 1; }
+
+  # One session, possibly recorded under several project dirs after a cwd move;
+  # two different ids sharing the prefix is a genuine ambiguity, never a guess.
+  local -aU ids
+  ids=(${files:t:r})
+  if (( ${#ids} > 1 )); then
+    echo "claude::resume: '$id' is ambiguous — it prefixes ${#ids} sessions:" >&2
+    printf '  %s\n' "${ids[@]}" >&2
+    return 1
+  fi
+  id=${ids[1]}
   local file
-  file=$(command find "$HOME/.claude" "$HOME/.claude-ant" "$HOME/.agents" \
-           -type f -name "${id}.jsonl" -print 2>/dev/null | head -1)
-  [[ -n $file ]] || { echo "claude::resume: no session '$id' under ~/.claude*, ~/.agents" >&2; return 1; }
+  file=$(command ls -t "${files[@]}" | head -1)
 
   # The encoded project dir is lossy ('/' and '.' both collapse to '-'), so read
   # the real working directory from the transcript's cwd field instead. Use jq,
