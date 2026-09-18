@@ -36,3 +36,7 @@ pre-commit:
     # means installs bypass the firewall while it still looks installed.
     sfw-aliases-tests:
       run: zsh -f tests/sfw-aliases.test.zsh
+    # mdunwrap rewrites markdown in place, and a reflow bug fails quietly: two bullets
+    # merged, a table row swallowed, a code block joined — the file still parses.
+    mdunwrap-tests:
+      run: bash tests/mdunwrap.test.sh
