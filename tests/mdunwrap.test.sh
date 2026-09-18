@@ -141,6 +141,37 @@ expect_line "hard break keeps the following line separate" "$work/breaks.md" "Li
 expect_line "lines after a hard break join, and a mid-paragraph break survives" "$work/breaks.md" "next line kept separate but this one joins  "
 expect_line "the line after a mid-paragraph break stays separate" "$work/breaks.md" "after a second break."
 
+cat >"$work/nested.md" <<'EOF'
+- outer
+  - inner item with a fence
+    ```sh
+    echo a
+    echo b
+    ```
+  - inner item with a quote
+    > quoted text that
+    > wraps
+- outer again
+
+Intro to indented code.
+
+    code line one
+    code line two
+
+> ---
+> A rule opens this quote,
+> the text still joins.
+
+a | b
+--- | ---
+1 | 2
+EOF
+expect_count "fence inside a nested item untouched" "$work/nested.md" "^    (\`\`\`sh|echo a|echo b|\`\`\`)$" 4
+expect_line "quote inside a list item keeps its indent" "$work/nested.md" "    > quoted text that wraps"
+expect_count "indented code block untouched" "$work/nested.md" '^    code line (one|two)$' 2
+expect_line "quote opening with a rule still unwraps" "$work/nested.md" "> A rule opens this quote, the text still joins."
+expect_count "pipeless table rows untouched" "$work/nested.md" '^(a \| b|--- \| ---|1 \| 2)$' 3
+
 # Invariants over every fixture: word stream unchanged, second pass is a no-op.
 for fixture in "$work"/*.md; do
   name="$(basename "$fixture")"
