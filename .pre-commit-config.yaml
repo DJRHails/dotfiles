@@ -79,3 +79,10 @@ repos:
         entry: zsh -f tests/claude-resume.test.zsh
         language: system
         pass_filenames: false
+      # mdunwrap rewrites markdown in place, and a reflow bug fails quietly: two bullets
+      # merged, a table row swallowed, a code block joined — the file still parses.
+      - id: mdunwrap-tests
+        name: mdunwrap reflow behaviour suite
+        entry: bash tests/mdunwrap.test.sh
+        language: system
+        pass_filenames: false
