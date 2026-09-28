@@ -5,6 +5,7 @@
 modules/agents/skills/discord/**                   filter=glassine diff=glassine merge=glassine
 modules/agents/skills/diagram-design/**            filter=glassine diff=glassine merge=glassine
 modules/agents/skills/gantry-cli/**                filter=glassine diff=glassine merge=glassine
+modules/agents/skills/remarkable/**                filter=glassine diff=glassine merge=glassine
 modules/agents/skills/research-meeting-playbook/** filter=glassine diff=glassine merge=glassine
 modules/agents/skills/runpod-ant-cluster/**        filter=glassine diff=glassine merge=glassine
 modules/agents/skills/sage-saint/**                filter=glassine diff=glassine merge=glassine
