@@ -32,8 +32,10 @@ review comments, issue text, and `.gitattributes` paths themselves.
 - **Encrypted blobs:** `git show`/`git cat-file -p` print ciphertext. Read plaintext with
   `git cat-file --filters <rev>:<path>`; create an encrypted blob from a working-tree file with
   `git hash-object -w --path=<path> <file>` (the `--path` applies the clean filter).
-- **Glassine ciphertext is non-deterministic**: re-encrypting identical plaintext gives a new
-  blob, so `git status`/`git diff --stat` can report changes that are ciphertext-only. Compare
+- **Glassine reuses ciphertext only against the index**: cleaning plaintext identical to the
+  path's index entry returns that entry's blob, but a path with no (or a differing) index entry
+  gets fresh, non-deterministic ciphertext — so `git status`/`git diff --stat` can report
+  changes that are ciphertext-only. Compare
   plaintext (`git cat-file --filters`) before believing a diff; `git restore --staged` clears
   index-only noise.
 - In zsh, `"$var:refs/…"` applies the `:r` modifier to `$var` — write `"${var}:refs/…"`.
