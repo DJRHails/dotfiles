@@ -17,7 +17,10 @@ cost of not moving ~20 repos into an org.
 
 **A `runs-on` pointing at the `taffy` label in a repo with no pool does not fall
 back — it queues against a label nothing answers, and `timeout-minutes` does not
-bound queue time.** Provision before merging the workflow change.
+bound queue time.** taffy's runner-discovery cron (gantry's
+`provision_runners.sh --discover`, every 10 minutes) registers a default pool
+for a recently pushed repo with a queued taffy job, so a new repo can simply
+merge and wait one tick; add it here only to size the pool beyond that default.
 
 ## Finding repos that need a pool
 
