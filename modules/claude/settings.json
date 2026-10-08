@@ -135,6 +135,11 @@
           {
             "type": "command",
             "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/check_login_session.sh",
+            "timeout": 10
           }
         ]
       }
