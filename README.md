@@ -53,6 +53,7 @@ cd ~/.files
 | `piknik`                | Cross-machine clipboard.
 | `python`                | python3, uv, and virtualenv quality-of-life aliases.
 | `raycast`               | Raycast (macOS launcher).
+| `release-age`           | 7-day minimum release age for npm/pnpm/bun/uv/pip/cargo — a compromised release gets a week to be caught before it can install here.
 | `rust`                  | Rust toolchain via rustup, plus cargo tools.
 | `sfw`                   | Socket Firewall — blocks known-malicious packages on npm/pnpm/yarn/pip/uv/cargo installs.
 | `slurm`                 | Slurm helper aliases for GPU clusters.
@@ -104,6 +105,7 @@ Current edges:
 | `gpu-vm`     | `ssh`           | The `Host gpu*` stanzas live in `modules/ssh/config.tmpl`.
 | `pi`         | `node`          | `install.sh` uses `npm install -g`.
 | `python`     | `git`           | `install.sh` writes `init.templateDir` into `~/.gitconfig.local`.
+| `release-age`| `node`          | `setup.sh` writes the age into npm's and pnpm's user config with their own `config set`.
 | `zellij`     | `python`        | `install.*.sh` installs `humane` with `uv tool install`.
 
 Shipping a `*.zsh` fragment is deliberately **not** an edge: `zshrc` globs

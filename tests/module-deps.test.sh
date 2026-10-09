@@ -178,6 +178,9 @@ cli_order="$(DOTFILES="$repo_root" resolve zsh ssh git python node piknik tailsc
 check cli-pulls-in-rust-and-go "0" \
   "$([[ $cli_order == *rust* && $cli_order == *go* ]] && echo 0 || echo 1)"
 
+# release-age's setup.sh drives npm and pnpm, so node has to be installed first.
+check real-node-before-release-age "0" "$(before node release-age)"
+
 if ((fails == 0)); then
   printf 'all passed\n'
   exit 0

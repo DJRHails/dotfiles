@@ -1,0 +1,6 @@
+# Seconds; bun >= 1.3. Read by bun's package-manager commands only, and a
+# project bunfig.toml overrides it. Versions already in bun.lock are kept.
+# Exempt a package with minimumReleaseAgeExcludes = ["<name>"]; bypass once
+# with `bun add --minimum-release-age 0 <pkg>`.
+[install]
+minimumReleaseAge = 604800
