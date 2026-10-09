@@ -212,10 +212,16 @@ vague_pattern+="several sources|observers have cited)"
 scan_pattern "vague-attribution" "$vague_pattern" "${files[@]}"
 
 # --- 11. Rule of three (balanced "X, Y, and Z" tricolons) ---
-# Heuristic: a clause with exactly two commas before "and". The character
-# classes exclude commas, so four-item lists (the recommended fix) do not match.
+# Heuristic: three short items (one to three words each) joined by two commas
+# and "and"/"or", the last ending the clause. Short items are what make a
+# tricolon rhetorical ("fast, reliable, and secure"); a list of clause-length
+# steps ("loaded the image, appended the vars, and recreated the gateway") is a
+# plain account and does not match. The first item must not follow a comma, so
+# four-item lists (the recommended fix) do not match on their last three.
 
-scan_pattern "rule-of-three" "(^|[.;:!?] )[^,.;:!?]+, [^,.;:!?]+, and [^,.;:!?]+" "${files[@]}"
+triad_item="[[:alnum:]'’-]+( [[:alnum:]'’-]+){0,2}"
+triad_pattern="(^|[^,] )${triad_item}, ${triad_item},? (and|or) ${triad_item}([.;:!?)]|$)"
+scan_pattern "rule-of-three" "$triad_pattern" "${files[@]}"
 
 # --- Summary ---
 

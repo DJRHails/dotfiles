@@ -4,15 +4,17 @@
 # Stop is the only event that can reopen a finished turn: its input carries the
 # final text as last_assistant_message, and exiting 2 hands stderr back to Claude
 # as the reason to continue. The gate strips code (fenced blocks and inline
-# spans), runs the prose-conventions checker on the prose that is left, and
-# returns the hits as a rewrite instruction. The reply already on screen stays
-# where it is; the rewrite lands beneath it. Rewrites are capped per prompt so a
-# rule that misfires cannot loop a session.
+# spans), runs the prose-conventions checker on the prose that is left, asks a
+# small model which hits are real, and returns those as a rewrite instruction.
+# The reply already on screen stays where it is; the rewrite lands beneath it.
+# Rewrites are capped per prompt so a rule that misfires cannot loop a session.
 #
 #   checker   modules/agents/skills/prose-conventions/prose-lint.sh
-#   state    $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
-#   log       $XDG_STATE_HOME/claude-response-gate/gate.log
+#   judge     claude -p --model haiku with response-gate-judge.md (skipped without claude)
+#   state     $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
+#   log       $XDG_STATE_HOME/claude-response-gate/gate.log  (hits, judge drops and reasons)
 #   off       CLAUDE_RESPONSE_GATE=0      cap: CLAUDE_RESPONSE_GATE_MAX (default 1)
+#             CLAUDE_RESPONSE_GATE_JUDGE=0  regex hits only, no judge
 #   cost      scripts/response-gate-cost.py <transcript.jsonl> reports the share of a
 #             session's tokens that went on gate rewrites
 set -uo pipefail
@@ -61,14 +63,17 @@ if ((rewrites >= max)); then
   exit 0
 fi
 
-# Fenced blocks and inline spans are code; the rules are about prose. The
-# checker runs from the temp dir on a bare filename so its location column
-# reads `reply.md:N`, which becomes `line N` below.
+# Fenced blocks and inline spans are code; the rules are about prose. Fences go
+# entirely; an inline span becomes the word `codespan` rather than nothing, so
+# the sentence around it keeps its shape ("the tarball is `x`." deleted to
+# "the tarball is ." reads as a stranded auxiliary). The checker runs from the
+# temp dir on a bare filename so its location column reads `reply.md:N`, which
+# becomes `line N` below.
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
 # shellcheck disable=SC2016  # the backticks are literal markdown, not a subshell
 awk '/^[[:space:]]*(```|~~~)/ {fence = !fence; next} !fence' <<<"$reply" |
-  sed -E 's/`[^`]*`//g' >"$tmp/reply.md"
+  sed -E 's/`[^`]*`/codespan/g' >"$tmp/reply.md"
 [[ -s "$tmp/reply.md" ]] || exit 0
 
 # Rules the gate does not enforce. Each is a shape heuristic: it matches the
@@ -96,9 +101,60 @@ add_hits < <(cd "$tmp" && bash "$lint" reply.md 2>/dev/null | sed 's/\x1b\[[0-9;
 
 ((${#hits[@]} > 0)) || exit 0
 
+# The regexes are the recall stage and over-match: a quoted example, a plain
+# list of steps, or markdown structure all look like the tic they hunt. A small
+# model reads each hit in the context of the whole reply and keeps only the
+# real ones. --restricted ignores the user's settings files, so the judge's own
+# session runs no hooks (CLAUDE_RESPONSE_GATE=0 backs that up); `command`
+# skips any shell-function wrapper that adds a bypass flag --restricted refuses.
+# A judge that fails or answers malformed JSON leaves every regex hit standing,
+# and the log says so.
+judge_hits() {
+  local listing="" i prompt verdicts
+  for i in "${!hits[@]}"; do listing+="$((i + 1)). ${hits[$i]}"$'\n'; done
+  prompt=$(<"$judge_prompt")
+  prompt=${prompt/REPLY/$reply}
+  prompt=${prompt/HITS/$listing}
+  (cd "$tmp" && CLAUDE_RESPONSE_GATE=0 timeout 60 command claude -p --restricted \
+    --tools "" --model haiku --no-session-persistence --output-format json \
+    --json-schema "$judge_schema" "$prompt" >"$tmp/judge.out" 2>"$tmp/judge.err")
+  # The CLI reports an API or auth failure inside its JSON (terminal_reason,
+  # result) with an empty stderr, so the log carries both.
+  if ! verdicts=$(jq -ec '.structured_output.verdicts | arrays' "$tmp/judge.out" 2>/dev/null); then
+    printf '%s\t%s\tjudge failed, keeping all %s hit(s): %s %s\n' "$(stamp)" "${sid:0:8}" \
+      "${#hits[@]}" "$(jq -rj '"\(.terminal_reason // "") \(.result // "")"' "$tmp/judge.out" \
+        2>/dev/null | head -c 200)" "$(head -c 200 "$tmp/judge.err" | tr '\n' ' ')" >>"$log"
+    return
+  fi
+  jq -r '.[] | select(.real == false) | "\(.hit)\t\(.reason)"' <<<"$verdicts" |
+    while IFS=$'\t' read -r i reason; do
+      printf '%s\t%s\t  dropped: %s  (%s)\n' "$(stamp)" "${sid:0:8}" \
+        "${hits[$((i - 1))]:-?}" "$reason" >>"$log"
+    done
+  # A hit with no verdict stays: only an explicit "not real" drops one.
+  local kept=()
+  while read -r i; do kept+=("${hits[$((i - 1))]}"); done < <(jq -r --argjson n "${#hits[@]}" \
+    '[.[] | select(.real == false) | .hit] as $drop
+     | range(1; $n + 1) | select(. as $i | ($drop | map(. == $i) | any) | not)' <<<"$verdicts")
+  hits=("${kept[@]+"${kept[@]}"}")
+}
+
+judge_prompt="$(dirname "${BASH_SOURCE[0]}")/response-gate-judge.md"
+judge_schema='{"type":"object","required":["verdicts"],"properties":{"verdicts":{"type":"array",
+"items":{"type":"object","required":["hit","real","reason"],"properties":{"hit":{"type":"integer"},
+"real":{"type":"boolean"},"reason":{"type":"string"}}}}}}'
+if [[ "${CLAUDE_RESPONSE_GATE_JUDGE:-1}" != 0 && -f "$judge_prompt" ]] && command -v claude >/dev/null; then
+  judge_hits
+  ((${#hits[@]} > 0)) || exit 0
+fi
+
 printf '%s %s\n' "$pid" "$((rewrites + 1))" >"$state"
 printf '%s\t%s\trewrite %s: %s\n' "$(stamp)" "${sid:0:8}" "$((rewrites + 1))" \
   "$(printf '%s\n' "${hits[@]}" | grep -o '^\[[^]]*\]' | sort -u | tr '\n' ' ')" >>"$log"
+# The matched text, one line per hit, so a misfiring rule can be judged later.
+for hit in "${hits[@]}"; do
+  printf '%s\t%s\t  hit: %s\n' "$(stamp)" "${sid:0:8}" "$hit" >>"$log"
+done
 
 {
   printf 'Your reply broke the house prose rules (the prose-conventions skill). Each hit shows the rule, the text it matched, and the line of the reply it sits on:\n\n'

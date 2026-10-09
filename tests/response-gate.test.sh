@@ -14,6 +14,9 @@ hook="$repo_root/modules/claude/hooks/response-gate.sh"
 work="$(mktemp -d)"
 trap 'rm -rf -- "$work"' EXIT
 export XDG_STATE_HOME="$work/state"
+# The LLM judge is off for the regex tests; the judge section turns it on
+# against a stub `claude`, so the suite never makes a model call.
+export CLAUDE_RESPONSE_GATE_JUDGE=0
 gate_dir="$work/state/claude-response-gate"
 
 fails=0
@@ -113,7 +116,7 @@ check long-lines-truncated "0" "$(awk 'length($0) > 240 {bad++} END {print bad +
 lint="$repo_root/modules/agents/skills/prose-conventions/prose-lint.sh"
 # No dots inside the items: prose-lint's triad regex stops at a full stop, so a
 # filename like bunfig.toml would hide the match and make this test vacuous.
-triad='The module links the bun config, the uv config, and the pip config into place.'
+triad='The module links three files into place: the bun config, the uv config, and the pip config.'
 printf '%s\n' "$triad" >"$work/triad.md"
 # The sample must be a real lint hit, or the pass below proves nothing.
 check triad-is-a-lint-hit "1" "$(bash "$lint" "$work/triad.md" 2>/dev/null | grep -c 'rule-of-three')"
@@ -131,6 +134,44 @@ while read -r id; do
     "$([ "$(grep -cE "(\"|\\[|format_count )$id(\"|\\]| )" "$lint")" -ge 1 ] && echo 0 || echo 1)"
 done < <(sed -n 's/^skipped_rules=(\(.*\))$/\1/p' "$hook" | tr ' ' '\n')
 check skip-list-parsed "1" "$([ -n "$(sed -n 's/^skipped_rules=(\(.*\))$/\1/p' "$hook")" ] && echo 1 || echo 0)"
+
+# -- the LLM judge keeps only the hits it calls real ---------------------------------
+# A stub `claude` on PATH stands in for the model: it records its argv and env,
+# then answers with $STUB_VERDICTS (or fails when STUB_FAIL is set).
+mkdir -p "$work/bin"
+cat >"$work/bin/claude" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"$STUB_ARGS"
+printf 'gate=%s\n' "${CLAUDE_RESPONSE_GATE:-unset}" >>"$STUB_ARGS"
+[[ -n "${STUB_FAIL:-}" ]] && { echo "simulated outage" >&2; exit 1; }
+printf '{"structured_output":{"verdicts":%s}}\n' "$STUB_VERDICTS"
+STUB
+chmod +x "$work/bin/claude"
+judged() {
+  PATH="$work/bin:$PATH" CLAUDE_RESPONSE_GATE_JUDGE=1 STUB_ARGS="$work/stub-args" "$@"
+}
+two_hits='Great question! This robust design ships today.'
+check judge-sample-has-two-hits "2" "$(gate "$two_hits" j0 false >/dev/null; grep -c '^  \[' "$work/err")"
+
+drop_all='[{"hit":1,"real":false,"reason":"quoted"},{"hit":2,"real":false,"reason":"literal"}]'
+check judge-drop-all-passes "0" "$(STUB_VERDICTS=$drop_all judged gate "$two_hits" j1 false)"
+check judge-drop-all-silent "" "$(cat "$work/err")"
+check_contains judge-logs-drop "dropped: [" "$(cat "$gate_dir/gate.log")"
+check judge-runs-restricted "1" "$(grep -cx -- '--restricted' "$work/stub-args")"
+check judge-disables-own-gate "1" "$(grep -cx 'gate=0' "$work/stub-args")"
+
+keep_one='[{"hit":1,"real":true,"reason":"tic"},{"hit":2,"real":false,"reason":"literal"}]'
+check judge-keep-one-blocks "2" "$(STUB_VERDICTS=$keep_one judged gate "$two_hits" j2 false)"
+check judge-keep-one-count "1" "$(grep -c '^  \[' "$work/err")"
+
+check judge-missing-verdict-keeps-hit "2" "$(STUB_VERDICTS='[{"hit":1,"real":false,"reason":"x"}]' \
+  judged gate "$two_hits" j3 false)"
+check judge-missing-verdict-count "1" "$(grep -c '^  \[' "$work/err")"
+
+check judge-failure-keeps-all "2" "$(STUB_FAIL=1 judged gate "$two_hits" j4 false)"
+check judge-failure-count "2" "$(grep -c '^  \[' "$work/err")"
+check_contains judge-failure-logged "judge failed, keeping all 2" "$(cat "$gate_dir/gate.log")"
+check judge-garbage-keeps-all "2" "$(STUB_VERDICTS='"nonsense"' judged gate "$two_hits" j5 false)"
 
 # -- off switch and degenerate input ------------------------------------------------
 check off-switch "0" "$(CLAUDE_RESPONSE_GATE=0 gate "$dirty" p8 false)"
