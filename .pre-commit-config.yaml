@@ -94,3 +94,17 @@ repos:
         entry: bash tests/release-age.test.sh
         language: system
         pass_filenames: false
+      # /note must block exactly the command and nothing else: a miss spends a model
+      # turn on a status-line note, a false match swallows an ordinary prompt.
+      - id: note-hook-tests
+        name: /note hook behaviour suite
+        entry: bash tests/note-hook.test.sh
+        language: system
+        pass_filenames: false
+      # The response gate reopens finished turns. Without its cap, reset, code
+      # exemption and off switch a misfiring rule loops a session.
+      - id: response-gate-tests
+        name: response gate behaviour suite
+        entry: bash tests/response-gate.test.sh
+        language: system
+        pass_filenames: false

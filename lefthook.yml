@@ -45,3 +45,11 @@ pre-commit:
     # installs ungated while the module still looks applied.
     release-age-tests:
       run: bash tests/release-age.test.sh
+    # /note must block exactly the command and nothing else: a miss spends a model
+    # turn on a status-line note, a false match swallows an ordinary prompt.
+    note-hook-tests:
+      run: bash tests/note-hook.test.sh
+    # The response gate reopens finished turns. Without its cap, reset, code
+    # exemption and off switch a misfiring rule loops a session.
+    response-gate-tests:
+      run: bash tests/response-gate.test.sh

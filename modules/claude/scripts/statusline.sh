@@ -171,4 +171,10 @@ if [ "$cache_pct" -gt 0 ] 2>/dev/null; then
     line2="$line2 $(printf ' \033[2m↻%s%%\033[0m' "$cache_pct")"
 fi
 
+# A note pinned with /note (hooks/note.sh writes one line per session).
+note_file="${TMPDIR:-/tmp}/claude-note-${session_id}.txt"
+if [ -n "$session_id" ] && [ -s "$note_file" ]; then
+    line1="$line1 $(printf '%b \033[93m📌 %s\033[0m' "$SEP" "$(cat "$note_file")")"
+fi
+
 printf '%b\n\n%b' "$line1" "$line2"

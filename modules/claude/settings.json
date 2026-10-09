@@ -103,6 +103,11 @@
           {
             "type": "command",
             "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/response-gate.sh",
+            "timeout": 60
           }
         ]
       }
@@ -111,6 +116,11 @@
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.files/modules/claude/hooks/note.sh",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
