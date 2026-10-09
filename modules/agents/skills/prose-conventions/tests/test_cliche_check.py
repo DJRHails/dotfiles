@@ -162,6 +162,16 @@ def test_anaphora_counts_sentences():
     assert matches[0].badge == "4"
 
 
+def test_anaphora_ignores_list_markers():
+    bullets = "- **Kept:** the old rule.\n- **Dropped:** the new one.\n- **Unchanged:** the rest.\n"
+    assert not _find("sentence-anaphora", bullets)
+
+
+def test_anaphora_still_fires_inside_a_list():
+    bullets = "- Maybe it works.\n- Maybe it doesn't.\n- Maybe nobody cares.\n"
+    assert _find("sentence-anaphora", bullets)
+
+
 def test_scan_reports_line_numbers(tmp_path):
     target = tmp_path / "doc.md"
     target.write_text("clean line\n\nThat's not nothing.\n", encoding="utf-8")

@@ -186,7 +186,9 @@ def _question_chain_finder(min_run: int) -> Finder:
 
 def _anaphora_finder(min_run: int) -> Finder:
     """Build a finder for runs of sentences opening on the same content word."""
-    word = re.compile(r"[A-Za-z'’-]+")
+    # A word starts with a letter, so a list marker (`- `) or a bold label's
+    # asterisks never count as every bullet's shared opener.
+    word = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
     def heads(text: str) -> list[tuple[int, int, str]]:
         out = []
