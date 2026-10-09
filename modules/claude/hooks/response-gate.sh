@@ -4,14 +4,13 @@
 # Stop is the only event that can reopen a finished turn: its input carries the
 # final text as last_assistant_message, and exiting 2 hands stderr back to Claude
 # as the reason to continue. The gate strips code (fenced blocks and inline
-# spans), runs the prose-conventions checkers on the prose that is left, and
+# spans), runs the prose-conventions checker on the prose that is left, and
 # returns the hits as a rewrite instruction. The reply already on screen stays
 # where it is; the rewrite lands beneath it. Rewrites are capped per prompt so a
 # rule that misfires cannot loop a session.
 #
-#   checkers  modules/agents/skills/prose-conventions/prose-lint.sh
-#             modules/agents/skills/prose-conventions/cliche-check.py (via uv; skipped without it)
-#   state     $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
+#   checker   modules/agents/skills/prose-conventions/prose-lint.sh
+#   state    $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
 #   log       $XDG_STATE_HOME/claude-response-gate/gate.log
 #   off       CLAUDE_RESPONSE_GATE=0      cap: CLAUDE_RESPONSE_GATE_MAX (default 2)
 set -uo pipefail
@@ -20,7 +19,6 @@ set -uo pipefail
 
 skill_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../agents/skills/prose-conventions" 2>/dev/null && pwd)"
 lint="$skill_dir/prose-lint.sh"
-cliche="$skill_dir/cliche-check.py"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/claude-response-gate"
 mkdir -p "$state_dir"
 log="$state_dir/gate.log"
@@ -42,7 +40,9 @@ reply=$(jq -r '.last_assistant_message // ""' <<<"$input")
 
 # A fresh reply (stop_hook_active false) starts the count over; a continuation
 # of the same prompt carries it on. prompt_id can be empty on old builds, in
-# which case the flag alone drives it.
+# which case the flag alone drives it: the state stores `-` in its place, since
+# `read` would drop an empty first field and shift the count into it.
+pid=${pid:--}
 max=${CLAUDE_RESPONSE_GATE_MAX:-2}
 state="$state_dir/${sid}.state"
 rewrites=0
@@ -56,7 +56,7 @@ if ((rewrites >= max)); then
 fi
 
 # Fenced blocks and inline spans are code; the rules are about prose. The
-# checkers run from the temp dir on a bare filename so their location column
+# checker runs from the temp dir on a bare filename so its location column
 # reads `reply.md:N`, which becomes `line N` below.
 tmp=$(mktemp -d)
 trap 'rm -rf -- "$tmp"' EXIT
@@ -76,17 +76,6 @@ add_hits() {
   done
 }
 add_hits < <(cd "$tmp" && bash "$lint" reply.md 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g')
-
-if command -v uv >/dev/null 2>&1; then
-  out=$(cd "$tmp" && UV_PYTHON_DOWNLOADS=never timeout 20 \
-    uv run --quiet --script "$cliche" --no-colour --context sentence reply.md 2>"$tmp/cliche.err")
-  rc=$?
-  case $rc in
-  0 | 1) add_hits <<<"$out" ;;
-  *) printf '%s\t%s\tcliche-check skipped (exit %s): %s\n' "$(stamp)" "${sid:0:8}" "$rc" \
-    "$(head -c 200 "$tmp/cliche.err" | tr '\n' ' ')" >>"$log" ;;
-  esac
-fi
 
 ((${#hits[@]} > 0)) || exit 0
 
