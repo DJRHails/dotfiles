@@ -1,5 +1,8 @@
 # uv >= 0.9.17 for a relative duration. Gates `uv add`, `uv lock`, `uv pip`,
-# `uv tool` and `uvx`; versions already in uv.lock are kept. A project uv.toml
-# or [tool.uv] table overrides this file. Exempt a package with
-# exclude-newer-package = { <name> = false }.
+# `uv tool` and `uvx`. uv records the setting in uv.lock ([options]
+# exclude-newer-span), so a lock made without it is re-resolved by the next
+# `uv run`/`uv sync` and fails `--locked` until re-locked, and a lock re-made
+# here fails `--locked` on hosts without this file; `--frozen` skips the check.
+# A project uv.toml or [tool.uv] table overrides this file. Exempt a package
+# with exclude-newer-package = { <name> = false }.
 exclude-newer = "7 days"
