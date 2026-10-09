@@ -59,15 +59,12 @@ _claude_ant_ensure() {
 claude::ant() {
   _claude_ant_ensure
   mkdir -p "$HOME/.claude-ant/anthropic"
-  # Subshell: keep .env.ant's ANTHROPIC_API_KEY scoped to this launch — leaked
-  # into the shell it outranks profiles on every later ant/claude call.
-  # Auth comes from the API key alone: ANTHROPIC_CONFIG_DIR points the
-  # ant-profile lookup at an empty dir so claude doesn't also see
-  # ~/.config/anthropic's profiles and warn about ambiguous auth.
+  # Auth is the personal claude.ai login stored for this config dir
+  # (first launch: /login). An ambient API key or token would outrank it, so
+  # unset them in a subshell; ANTHROPIC_CONFIG_DIR points the ant-profile
+  # lookup at an empty dir so ~/.config/anthropic's profiles can't compete.
   (
-    set -a
-    source "${_claude_aliases_dir}/.env.ant"
-    set +a
+    unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
     CLAUDE_CONFIG_DIR="$HOME/.claude-ant" \
       ANTHROPIC_CONFIG_DIR="$HOME/.claude-ant/anthropic" \
       CMUX_PRESERVE_CLAUDE_AUTH_SELECTION_ENV=1 \
