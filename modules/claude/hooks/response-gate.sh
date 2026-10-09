@@ -12,7 +12,9 @@
 #   checker   modules/agents/skills/prose-conventions/prose-lint.sh
 #   state    $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
 #   log       $XDG_STATE_HOME/claude-response-gate/gate.log
-#   off       CLAUDE_RESPONSE_GATE=0      cap: CLAUDE_RESPONSE_GATE_MAX (default 2)
+#   off       CLAUDE_RESPONSE_GATE=0      cap: CLAUDE_RESPONSE_GATE_MAX (default 1)
+#   cost      scripts/response-gate-cost.py <transcript.jsonl> reports the share of a
+#             session's tokens that went on gate rewrites
 set -uo pipefail
 
 [[ "${CLAUDE_RESPONSE_GATE:-1}" == 0 ]] && exit 0
@@ -43,7 +45,11 @@ reply=$(jq -r '.last_assistant_message // ""' <<<"$input")
 # which case the flag alone drives it: the state stores `-` in its place, since
 # `read` would drop an empty first field and shift the count into it.
 pid=${pid:--}
-max=${CLAUDE_RESPONSE_GATE_MAX:-2}
+# One rewrite per prompt by default. A rewrite that still fails is a misfiring
+# rule more often than bad prose, and every rewrite re-reads the whole context
+# and regenerates the reply: measured at about 1.5% of a long session's spend
+# for a single rewrite (scripts/response-gate-cost.py).
+max=${CLAUDE_RESPONSE_GATE_MAX:-1}
 state="$state_dir/${sid}.state"
 rewrites=0
 if [[ "$active" == true ]] && read -r last_pid last_n <"$state" 2>/dev/null &&
@@ -65,11 +71,22 @@ awk '/^[[:space:]]*(```|~~~)/ {fence = !fence; next} !fence' <<<"$reply" |
   sed -E 's/`[^`]*`//g' >"$tmp/reply.md"
 [[ -s "$tmp/reply.md" ]] || exit 0
 
+# Rules the gate does not enforce. Each is a shape heuristic: it matches the
+# form of a sentence rather than a banned word, and on a technical reply the
+# form is usually earned. The guide's own tricolon rule exempts lists of
+# concrete specifics, which no regex can tell from an abstract triad, and a
+# false positive here costs a whole turn.
+#   rule-of-three   any clause shaped "A, B, and C"
+skipped_rules=(rule-of-three)
+
 hits=()
 add_hits() {
-  local line
+  local line id
   while IFS= read -r line; do
     [[ "$line" == \[* ]] || continue
+    id=${line%%]*}
+    id=${id#[}
+    [[ " ${skipped_rules[*]} " == *" $id "* ]] && continue
     line=${line//reply.md:/line }
     line=${line%  reply.md}
     hits+=("${line:0:220}")
