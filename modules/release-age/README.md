@@ -69,11 +69,19 @@ pointer, and cargo loads the file without a warning.
 
 ## Known limits (accepted)
 
-- **Lockfiles win.** The gate runs at resolution time. `uv sync`, `npm ci`,
+- **Lockfiles win.** The gate runs at resolution time. `npm ci`,
   `pnpm install --frozen-lockfile`, `bun install` against `bun.lock` and
   `cargo build` reuse whatever is pinned, including a version someone else
   pinned at one day old. Only `add`, `update`, `lock --upgrade` and unpinned
   installs are gated, which is also where the exposure is.
+- **uv is the exception: the gate is part of the lock.** uv writes
+  `exclude-newer-span = "P7D"` into `uv.lock`'s `[options]`, so a lock made
+  without the gate is out of date here: `uv run` / `uv sync` re-resolve it
+  (downgrading anything younger than 7 days), and `uv sync --locked` /
+  `uv lock --check` fail until it is re-locked. Once a lock is re-made here,
+  it fails `--locked` on every host and CI runner that lacks this file. On a
+  shared repo, either commit `exclude-newer` in `[tool.uv]` so every machine
+  agrees, or use `--frozen`, which skips the check.
 - **Security fixes wait a week too.** Use the bypass table when a patch matters
   more than the cooldown.
 - **A brand-new package** whose only release is younger than 7 days cannot be
