@@ -80,6 +80,18 @@ check fresh-reply-state "p2 1" "$(cat "$gate_dir/s1.state")"
 check cap-one-first "2" "$(CLAUDE_RESPONSE_GATE_MAX=1 gate "$dirty" p3 false)"
 check cap-one-second "0" "$(CLAUDE_RESPONSE_GATE_MAX=1 gate "$dirty" p3 true)"
 
+# -- without prompt_id the flag alone drives the count, and the cap still holds -------
+no_pid() {
+  jq -cn --arg r "$dirty" --argjson a "$1" \
+    '{session_id: "s2", stop_hook_active: $a, last_assistant_message: $r}' |
+    bash "$hook" >/dev/null 2>&1
+  echo $?
+}
+check no-pid-first "2" "$(no_pid false)"
+check no-pid-rewrite "2" "$(no_pid true)"
+check no-pid-cap "0" "$(no_pid true)"
+check no-pid-fresh-resets "2" "$(no_pid false)"
+
 # -- code is exempt: fenced blocks and inline spans are stripped before linting -------
 code=$'Run this:\n\n```bash\nrobust tapestry leverage  # great question\n```\n\nand the inline `great question` form too.'
 check code-exempt "0" "$(gate "$code" p4 false)"
