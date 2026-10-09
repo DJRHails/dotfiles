@@ -89,9 +89,17 @@ mkdir -p "$work/home/.config/npm" "$work/home-unlinked"
 ln -s "$module/npmrc" "$work/home/.config/npm/npmrc"
 policy="$work/home/.config/npm/npmrc"
 
+# The system bin dirs minus the package managers: a NodeSource host (and Debian's
+# npm package) installs npm into /usr/bin, where it would answer the no-npm case.
+mkdir -p "$work/sys"
+for tool in /usr/bin/* /bin/*; do
+  case "${tool##*/}" in npm | npx | pnpm | pnpx | corepack) continue ;; esac
+  [ -e "$work/sys/${tool##*/}" ] || ln -s "$tool" "$work/sys/${tool##*/}"
+done
+
 # run_setup <state> [stub-bin-dir] [home] — source setup.sh the way bootstrap
-# does (in a subshell with $DOTFILES set), with only the stubs and the system
-# bin dirs on PATH so the real npm/pnpm can never answer. Reusing a <state>
+# does (in a subshell with $DOTFILES set), with only the stubs and that filtered
+# system bin dir on PATH so the real npm/pnpm can never answer. Reusing a <state>
 # name reruns against the files the previous run left. Prints the exit code;
 # the run's output lands in <state>/out.
 run_setup() {
@@ -104,7 +112,7 @@ run_setup() {
     export NPM_STUB_VERSION="${NPM_STUB_VERSION:-11.19.0}"
     export PNPM_STUB_RC="$state/pnpmrc" PNPM_STUB_LOG="$state/pnpm.log"
     export PNPM_STUB_VERSION="${PNPM_STUB_VERSION:-10.32.1}"
-    export PATH="$bin:/usr/bin:/bin" DOTFILES="$repo_root"
+    export PATH="$bin:$work/sys" DOTFILES="$repo_root"
     # shellcheck source=/dev/null
     . "$module/setup.sh"
   ) >"$state/out" 2>&1
