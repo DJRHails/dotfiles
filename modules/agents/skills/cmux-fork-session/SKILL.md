@@ -49,8 +49,8 @@ pin pi's session log; `CMUX_DURABLE_HOST` / `CMUX_APP_HOST` override the remote 
 3. **Create the surface**: `cmux rpc surface.split` beside the caller, or `surface.create` for a
    tab.
 4. **Launch the fork.** *Claude:* `cd <cwd> && <launcher> --resume <id> --fork-session`, choosing
-   the launcher that matches the session's config dir — `~/.claude-ant` → `claude::ant` (sources
-   `.env.ant` auth + ensure step), `~/.claude` → `claude`, otherwise
+   the launcher that matches the session's config dir — `~/.claude-ant` → `claude::ant` (scrubs
+   ambient API keys + ensure step), `~/.claude` → `claude`, otherwise
    `CLAUDE_CONFIG_DIR=<cfg> claude`. Matching the wrapper matters: a bare `CLAUDE_CONFIG_DIR=…
    claude` skips `claude::ant`'s auth and lands "Not logged in". *pi:* `cd <cwd> && pi --fork
    <session.jsonl> --provider … --model … --thinking …` (see [pi specifics](#pi-specifics)).
