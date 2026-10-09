@@ -1,0 +1,5 @@
+# uv >= 0.9.17 for a relative duration. Gates `uv add`, `uv lock`, `uv pip`,
+# `uv tool` and `uvx`; versions already in uv.lock are kept. A project uv.toml
+# or [tool.uv] table overrides this file. Exempt a package with
+# exclude-newer-package = { <name> = false }.
+exclude-newer = "7 days"

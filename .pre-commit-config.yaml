@@ -86,3 +86,11 @@ repos:
         entry: bash tests/mdunwrap.test.sh
         language: system
         pass_filenames: false
+      # The release-age gate is a security control with a quiet failure mode: a
+      # setup that skips a tool, or a value that drifts in one of six units, leaves
+      # installs ungated while the module still looks applied.
+      - id: release-age-tests
+        name: release-age module behaviour suite
+        entry: bash tests/release-age.test.sh
+        language: system
+        pass_filenames: false

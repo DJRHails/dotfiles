@@ -40,3 +40,8 @@ pre-commit:
     # merged, a table row swallowed, a code block joined — the file still parses.
     mdunwrap-tests:
       run: bash tests/mdunwrap.test.sh
+    # The release-age gate is a security control with a quiet failure mode: a
+    # setup that skips a tool, or a value that drifts in one of six units, leaves
+    # installs ungated while the module still looks applied.
+    release-age-tests:
+      run: bash tests/release-age.test.sh
