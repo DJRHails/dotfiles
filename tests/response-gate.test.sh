@@ -61,12 +61,13 @@ check dirty-no-tmp-path "0" "$(grep -c '/reply.md' "$work/err")"
 check dirty-state "p1 1" "$(cat "$gate_dir/s1.state")"
 check_contains dirty-logged "rewrite 1" "$(cat "$gate_dir/gate.log")"
 
-# -- the rewrite is checked again, then the gate gives up at the cap -----------------
-check rewrite-checked "2" "$(gate "$dirty" p1 true)"
-check rewrite-state "p1 2" "$(cat "$gate_dir/s1.state")"
+# -- one rewrite per prompt by default: the rewrite is not gated again, since a
+#    reply that fails twice is usually a misfiring rule and every rewrite is a
+#    full turn ---------------------------------------------------------------------
 check cap-reached "0" "$(gate "$dirty" p1 true)"
 check cap-silent "" "$(cat "$work/err")"
-check_contains cap-logged "gave up after 2" "$(cat "$gate_dir/gate.log")"
+check cap-state-kept "p1 1" "$(cat "$gate_dir/s1.state")"
+check_contains cap-logged "gave up after 1" "$(cat "$gate_dir/gate.log")"
 
 # -- a new prompt starts the count over ---------------------------------------------
 check new-prompt-gated "2" "$(gate "$dirty" p2 false)"
@@ -76,9 +77,12 @@ check new-prompt-state "p2 1" "$(cat "$gate_dir/s1.state")"
 check fresh-reply-resets "2" "$(gate "$dirty" p2 false)"
 check fresh-reply-state "p2 1" "$(cat "$gate_dir/s1.state")"
 
-# -- a lower cap is honoured -------------------------------------------------------
-check cap-one-first "2" "$(CLAUDE_RESPONSE_GATE_MAX=1 gate "$dirty" p3 false)"
-check cap-one-second "0" "$(CLAUDE_RESPONSE_GATE_MAX=1 gate "$dirty" p3 true)"
+# -- a higher cap re-checks the rewrite, then gives up ------------------------------
+check cap-two-first "2" "$(CLAUDE_RESPONSE_GATE_MAX=2 gate "$dirty" p3 false)"
+check cap-two-rewrite "2" "$(CLAUDE_RESPONSE_GATE_MAX=2 gate "$dirty" p3 true)"
+check cap-two-state "p3 2" "$(cat "$gate_dir/s1.state")"
+check cap-two-reached "0" "$(CLAUDE_RESPONSE_GATE_MAX=2 gate "$dirty" p3 true)"
+check_contains cap-two-logged "gave up after 2" "$(cat "$gate_dir/gate.log")"
 
 # -- without prompt_id the flag alone drives the count, and the cap still holds -------
 no_pid() {
@@ -88,7 +92,6 @@ no_pid() {
   echo $?
 }
 check no-pid-first "2" "$(no_pid false)"
-check no-pid-rewrite "2" "$(no_pid true)"
 check no-pid-cap "0" "$(no_pid true)"
 check no-pid-fresh-resets "2" "$(no_pid false)"
 
@@ -104,6 +107,30 @@ check prose-after-code-still-gated "2" "$(gate "$prose_after_code" p6 false)"
 long="Great question! $(printf 'word %.0s' $(seq 1 120))"
 gate "$long" p7 false >/dev/null
 check long-lines-truncated "0" "$(awk 'length($0) > 240 {bad++} END {print bad + 0}' "$work/err")"
+
+# -- shape heuristics are not enforced: the guide exempts concrete triads, and a
+#    regex cannot tell them from abstract ones ---------------------------------------
+lint="$repo_root/modules/agents/skills/prose-conventions/prose-lint.sh"
+# No dots inside the items: prose-lint's triad regex stops at a full stop, so a
+# filename like bunfig.toml would hide the match and make this test vacuous.
+triad='The module links the bun config, the uv config, and the pip config into place.'
+printf '%s\n' "$triad" >"$work/triad.md"
+# The sample must be a real lint hit, or the pass below proves nothing.
+check triad-is-a-lint-hit "1" "$(bash "$lint" "$work/triad.md" 2>/dev/null | grep -c 'rule-of-three')"
+check concrete-triad-passes "0" "$(gate "$triad" p11 false)"
+check triad-silent "" "$(cat "$work/err")"
+dirty_triad='Great question! It links the bun config, the uv config, and the pip config.'
+check dirty-triad-still-blocks "2" "$(gate "$dirty_triad" p12 false)"
+check dirty-triad-names-real-rule "1" "$(grep -c '\[sycophantic\]' "$work/err")"
+check dirty-triad-omits-skipped "0" "$(grep -c 'rule-of-three' "$work/err")"
+# Every skipped id is a category prose-lint actually emits, so a typo in the
+# list cannot silently re-enable a rule.
+while read -r id; do
+  [[ -n "$id" ]] || continue
+  check "skipped-id-is-a-lint-category-$id" "0" \
+    "$([ "$(grep -cE "(\"|\\[|format_count )$id(\"|\\]| )" "$lint")" -ge 1 ] && echo 0 || echo 1)"
+done < <(sed -n 's/^skipped_rules=(\(.*\))$/\1/p' "$hook" | tr ' ' '\n')
+check skip-list-parsed "1" "$([ -n "$(sed -n 's/^skipped_rules=(\(.*\))$/\1/p' "$hook")" ] && echo 1 || echo 0)"
 
 # -- off switch and degenerate input ------------------------------------------------
 check off-switch "0" "$(CLAUDE_RESPONSE_GATE=0 gate "$dirty" p8 false)"
