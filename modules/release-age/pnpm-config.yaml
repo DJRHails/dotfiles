@@ -1,0 +1,6 @@
+# pnpm 12's global settings file (pnpm 10 ignores it and is set through its rc by
+# setup.sh instead). Minutes; strict mode is on whenever the age is set explicitly,
+# so an install errors rather than falls back to a younger version. Exempt packages
+# with minimumReleaseAgeExclude; bypass once with
+# `pnpm add --config.minimum-release-age=0 <pkg>`.
+minimumReleaseAge: 10080

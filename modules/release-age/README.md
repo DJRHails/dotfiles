@@ -13,18 +13,29 @@ ones nobody has looked at yet.
 
 | tool  | setting                                        | unit     | needs       | applied by
 | ----- | ---------------------------------------------- | -------- | ----------- | ---
-| npm   | `min-release-age=7`                            | days     | npm 11.10   | `setup.sh`, `npm config set --location=user`
-| pnpm  | `minimum-release-age=10080`                    | minutes  | pnpm 10.16  | `setup.sh`, `pnpm config set -g`
+| npm   | `min-release-age=7`                            | days     | npm 11.10   | `npmrc` → `~/.config/npm/npmrc`, reached through the `globalconfig=` pointer `setup.sh` writes into `~/.npmrc`
+| pnpm  | `minimum-release-age=10080`                    | minutes  | pnpm 10.16  | pnpm 10: `setup.sh`, `pnpm config set -g`. pnpm 12: `pnpm-config.yaml` → `~/.config/pnpm/config.yaml` (`~/Library/Preferences/pnpm/` on macOS)
 | bun   | `[install] minimumReleaseAge = 604800`         | seconds  | bun 1.3     | `bunfig.toml` → `~/.bunfig.toml`
 | uv    | `exclude-newer = "7 days"`                     | duration | uv 0.9.17   | `uv.toml` → `~/.config/uv/uv.toml`
 | pip   | `[global] uploaded-prior-to = P7D`             | ISO 8601 | pip 26.1    | `pip.conf` → `~/.config/pip/pip.conf`, plus `~/Library/Application Support/pip/` on macOS
 | cargo | `[registry] global-min-publish-age = "7 days"` | duration | cargo 1.100 | `cargo-config.toml` → `~/.cargo/config.toml`
 
-- **npm and pnpm are set in place, not symlinked.** `~/.npmrc` and pnpm's global
-  rc also hold per-machine registry tokens that must not live in this repo.
-  Each tool's own `config set` rewrites its file keeping every other line, and
-  `setup.sh` reads the value back first, so re-running it writes nothing.
-  Node 22 LTS bundles npm 10, which predates the key: on such a host `setup.sh`
+- **Tokens stay out of the repo.** `~/.npmrc` and pnpm's global rc also hold
+  per-machine registry tokens, so neither is itself a symlink. npm reads a
+  second file as its global layer, and the only line `setup.sh` writes into
+  `~/.npmrc` is the pointer to the tracked one; put any further npm policy in
+  `npmrc`, not in setup. The user file still wins on precedence, so `setup.sh`
+  removes the copy of the key an earlier revision wrote there and fails if some
+  other value shadows the tracked one. `npm config set -g` now edits the
+  tracked file.
+- **pnpm has two shapes.** pnpm 10 keeps every global setting in one rc beside
+  its auth entries and follows npm's pointer as well, but npm warns on every
+  call about a key it does not know, so pnpm's key cannot share that file and
+  `setup.sh` writes it with `pnpm config set -g`. pnpm 12 splits settings into
+  `config.yaml`, which is the tracked `pnpm-config.yaml`, and ignores the
+  pointer; its `config set -g` finds the value already present and writes
+  nothing.
+- Node 22 LTS bundles npm 10, which predates the key: on such a host `setup.sh`
   fails with the fix (`npm install -g npm`) rather than write a key that old
   npm would warn about on every call.
 - **pip on macOS** prefers `~/Library/Application Support/pip/pip.conf` as soon
@@ -41,9 +52,9 @@ ones nobody has looked at yet.
 
 Verified 2026-10-09 on npm 11.19, pnpm 10.32, bun 1.3.10, uv 0.11.8, pip 26.2.1
 and cargo 1.97: each gate resolved an older version of a daily-published
-package (`typescript@next`, `boto3`) than the ungated run, pnpm 10 and 12 both
-accept the kebab-case key through `config set -g`, and cargo loads the file
-without a warning.
+package (`typescript@next`, `boto3`) than the ungated run, npm and pnpm 10 both
+honour the `globalconfig=` pointer, pnpm 12 reads `config.yaml` and ignores the
+pointer, and cargo loads the file without a warning.
 
 ## Bypassing it
 

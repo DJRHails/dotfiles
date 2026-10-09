@@ -1,0 +1,8 @@
+# npm's global config layer: ~/.npmrc carries `globalconfig=~/.config/npm/npmrc`
+# (written once by setup.sh) so tokens stay in the untracked user file and policy
+# lives here. The user file wins on precedence. Only keys npm itself knows belong
+# here: pnpm 10 reads this file through the same pointer, but npm warns on every
+# call about any key it does not recognise, so pnpm's key stays in pnpm's rc.
+# Days; npm >= 11.10. Exempt packages with min-release-age-exclude; bypass once
+# with `npm install --min-release-age=0 <pkg>`.
+min-release-age=7
