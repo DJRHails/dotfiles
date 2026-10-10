@@ -10,7 +10,9 @@
 # Rewrites are capped per prompt so a rule that misfires cannot loop a session.
 #
 #   checker   modules/agents/skills/prose-conventions/prose-lint.sh
-#   judge     claude -p --model haiku with response-gate-judge.md (skipped without claude)
+#   judge     claude -p --model haiku with response-gate-judge.md (skipped without claude;
+#             fails "Not logged in" wherever claude authenticates from env, since
+#             Claude Code strips its credential vars from hook processes)
 #   state     $XDG_STATE_HOME/claude-response-gate/<session_id>.state  "<prompt_id> <rewrites>"
 #   log       $XDG_STATE_HOME/claude-response-gate/gate.log  (hits, judge drops and reasons)
 #   off       CLAUDE_RESPONSE_GATE=0      cap: CLAUDE_RESPONSE_GATE_MAX (default 1)
@@ -41,6 +43,9 @@ pid=$(jq -r '.prompt_id // empty' <<<"$input")
 active=$(jq -r '.stop_hook_active // false' <<<"$input")
 reply=$(jq -r '.last_assistant_message // ""' <<<"$input")
 [[ -n "$sid" && -n "${reply//[[:space:]]/}" ]] || exit 0
+# A reply that is one JSON document is structured output (pr-reviewer's verdict),
+# not prose: a rewrite can only break the shape a reader parses.
+jq -e 'type == "object" or type == "array"' <<<"$reply" >/dev/null 2>&1 && exit 0
 
 # A fresh reply (stop_hook_active false) starts the count over; a continuation
 # of the same prompt carries it on. prompt_id can be empty on old builds, in
@@ -101,30 +106,54 @@ add_hits < <(cd "$tmp" && bash "$lint" reply.md 2>/dev/null | sed 's/\x1b\[[0-9;
 
 ((${#hits[@]} > 0)) || exit 0
 
+# Matches whose literal or technical sense is the common one in an engineering
+# reply, so only a reader of the context can tell the tic: "the robust tier" names
+# a property where "a robust solution" is the banned intensifier, "a lasting
+# refusal" is a state, "an underscore" is a character, Swift is a language, "read
+# literally" is the plain adverb, "marks an import as guarded" and "each row
+# represents a run" are the literal verbs. These stand only when the judge calls
+# them real. Replaying the gantry fleet's 137 gated replies (2026-10-09/10), every
+# robust, lasting, underscore, literally and marks hit was a misfire; swift,
+# highlight and represents have the same split between a literal and a tic sense.
+contextual_re='^\[banned-vocab\] +"(robust|lasting|underscore|swift|highlight)"'
+contextual_re+='|^\[copula-avoidance\] +"(marks|represents) |^\[unnecessary-word\] +"literally"'
+drop_contextual() {
+  local hit kept=()
+  for hit in "${hits[@]}"; do
+    if [[ "${hit,,}" =~ $contextual_re ]]; then
+      printf '%s\t%s\t  unjudged, dropped: %s\n' "$(stamp)" "${sid:0:8}" "$hit" >>"$log"
+    else
+      kept+=("$hit")
+    fi
+  done
+  hits=("${kept[@]+"${kept[@]}"}")
+}
+
 # The regexes are the recall stage and over-match: a quoted example, a plain
 # list of steps, or markdown structure all look like the tic they hunt. A small
 # model reads each hit in the context of the whole reply and keeps only the
 # real ones. --restricted ignores the user's settings files, so the judge's own
-# session runs no hooks (CLAUDE_RESPONSE_GATE=0 backs that up); `command`
-# skips any shell-function wrapper that adds a bypass flag --restricted refuses.
-# A judge that fails or answers malformed JSON leaves every regex hit standing,
-# and the log says so.
+# session runs no hooks (CLAUDE_RESPONSE_GATE=0 backs that up). `timeout` execs
+# the claude on PATH, so no shell-function wrapper gets in; it cannot run the
+# `command` builtin either, which is why the judge is not wrapped in it.
+# The reply and hits are appended rather than substituted into placeholders:
+# bash 5.2 expands `&` in a ${x/pat/rep} replacement to the matched text.
+# A judge that fails or answers malformed JSON returns 1 and leaves every hit
+# for the caller, which keeps all but the contextual ones; the log says so.
 judge_hits() {
   local listing="" i prompt verdicts
   for i in "${!hits[@]}"; do listing+="$((i + 1)). ${hits[$i]}"$'\n'; done
-  prompt=$(<"$judge_prompt")
-  prompt=${prompt/REPLY/$reply}
-  prompt=${prompt/HITS/$listing}
-  (cd "$tmp" && CLAUDE_RESPONSE_GATE=0 timeout 60 command claude -p --restricted \
+  prompt="$(<"$judge_prompt")"$'\n\n<reply>\n'"$reply"$'\n</reply>\n\n<hits>\n'"$listing"'</hits>'
+  (cd "$tmp" && CLAUDE_RESPONSE_GATE=0 timeout 60 claude -p --restricted \
     --tools "" --model haiku --no-session-persistence --output-format json \
     --json-schema "$judge_schema" "$prompt" >"$tmp/judge.out" 2>"$tmp/judge.err")
   # The CLI reports an API or auth failure inside its JSON (terminal_reason,
   # result) with an empty stderr, so the log carries both.
   if ! verdicts=$(jq -ec '.structured_output.verdicts | arrays' "$tmp/judge.out" 2>/dev/null); then
-    printf '%s\t%s\tjudge failed, keeping all %s hit(s): %s %s\n' "$(stamp)" "${sid:0:8}" \
+    printf '%s\t%s\tjudge failed on %s hit(s): %s %s\n' "$(stamp)" "${sid:0:8}" \
       "${#hits[@]}" "$(jq -rj '"\(.terminal_reason // "") \(.result // "")"' "$tmp/judge.out" \
         2>/dev/null | head -c 200)" "$(head -c 200 "$tmp/judge.err" | tr '\n' ' ')" >>"$log"
-    return
+    return 1
   fi
   jq -r '.[] | select(.real == false) | "\(.hit)\t\(.reason)"' <<<"$verdicts" |
     while IFS=$'\t' read -r i reason; do
@@ -143,10 +172,12 @@ judge_prompt="$(dirname "${BASH_SOURCE[0]}")/response-gate-judge.md"
 judge_schema='{"type":"object","required":["verdicts"],"properties":{"verdicts":{"type":"array",
 "items":{"type":"object","required":["hit","real","reason"],"properties":{"hit":{"type":"integer"},
 "real":{"type":"boolean"},"reason":{"type":"string"}}}}}}'
+judged=0
 if [[ "${CLAUDE_RESPONSE_GATE_JUDGE:-1}" != 0 && -f "$judge_prompt" ]] && command -v claude >/dev/null; then
-  judge_hits
-  ((${#hits[@]} > 0)) || exit 0
+  judge_hits && judged=1
 fi
+((judged)) || drop_contextual
+((${#hits[@]} > 0)) || exit 0
 
 printf '%s %s\n' "$pid" "$((rewrites + 1))" >"$state"
 printf '%s\t%s\trewrite %s: %s\n' "$(stamp)" "${sid:0:8}" "$((rewrites + 1))" \
@@ -157,7 +188,7 @@ for hit in "${hits[@]}"; do
 done
 
 {
-  printf 'Your reply broke the house prose rules (the prose-conventions skill). Each hit shows the rule, the text it matched, and the line of the reply it sits on:\n\n'
+  printf 'Your reply broke the house prose rules (the prose-conventions skill). Each hit shows the rule, the matched text in quotes, the line around it, and its line number in the reply:\n\n'
   printf '  %s\n' "${hits[@]:0:20}"
   ((${#hits[@]} > 20)) && printf '  ... and %d more\n' $((${#hits[@]} - 20))
   printf '\nRewrite the whole reply so it passes and send only the rewrite, with no apology\n'
