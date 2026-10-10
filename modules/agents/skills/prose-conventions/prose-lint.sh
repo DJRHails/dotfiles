@@ -123,12 +123,12 @@ scan_pattern() {
     [[ "$match" =~ ^import[[:space:]] ]] && continue
     [[ "$match" =~ ^[a-z][a-zA-Z_-]*:([[:space:]]|$) ]] && continue
     # One hit per distinct match, so a second banned word on the line is not
-    # hidden behind the first.
+    # hidden behind the first. Patterns that anchor on a neighbouring character
+    # carry it into the span, so it is trimmed before duplicates are dropped.
     while IFS= read -r span; do
-      # Patterns that anchor on a neighbouring character carry it into the span.
-      span=${span#"${span%%[[:alnum:]]*}"}
       warn "$category" "$span" "$match" "$file" "$line"
-    done < <(rg -io -- "$pattern" <<<"$match" | awk '!seen[tolower($0)]++')
+    done < <(rg -io -- "$pattern" <<<"$match" | sed -E 's/^[^[:alnum:]]+//' |
+      awk '!seen[tolower($0)]++')
   done < <(rg -inH --no-heading -- "$pattern" "$@" 2>/dev/null || true)
 }
 

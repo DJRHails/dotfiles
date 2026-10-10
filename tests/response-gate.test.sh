@@ -180,6 +180,8 @@ check judge-garbage-keeps-all "2" "$(STUB_VERDICTS='"nonsense"' judged gate "$tw
 # never enforced, while a certain hit beside it still blocks.
 tier='Keep the extractor in the robust tier, weighted low.'
 check contextual-unjudged-passes "0" "$(gate "$tier" c1 false)"
+check contextual-copula-unjudged-passes "0" "$(gate 'Each row represents a run.' c4 false)"
+check contextual-literally-unjudged-passes "0" "$(gate 'Read the flag literally.' c5 false)"
 check_contains contextual-unjudged-logged "unjudged, dropped: [banned-vocab]" \
   "$(cat "$gate_dir/gate.log")"
 mixed='Great question! Keep the extractor in the robust tier.'

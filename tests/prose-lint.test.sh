@@ -137,6 +137,15 @@ flags "banned word alone" banned-vocab \
 ignores "banned word ending a compound" banned-vocab \
   "A multivariate model over the obfuscation-robust features."
 
+# A word repeated on a line is one hit, whatever character precedes each use.
+repeats=$(categories_for "Robust, robust and (robust results." | grep -c '^\[banned-vocab\]$')
+if [[ "$repeats" == 1 ]]; then
+  printf 'ok   repeated word is one hit\n'
+else
+  printf 'FAIL repeated word is one hit: got %s [banned-vocab] hits\n' "$repeats"
+  ((fails++))
+fi
+
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
   exit 1
