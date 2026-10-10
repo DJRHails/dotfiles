@@ -29,9 +29,11 @@ BANNED_ATMOSPHERIC=(
   liminal
 )
 
+# The article is part of each pattern: the tic is "stands as a testament", while
+# "the review stands as posted" and "sub-features are" are plain English.
 COPULA_AVOIDANCE=(
-  "serves as" "stands as" "marks a" "represents a"
-  "boasts a" "features a" "offers a"
+  "serves as" "stands as (a|an|the)" "marks (a|an)" "represents (a|an)"
+  "boasts (a|an)" "features (a|an)" "offers (a|an)"
 )
 
 FILLER_PHRASES=(
@@ -68,8 +70,13 @@ UNNECESSARY_WORDS=(
 
 UNNECESSARY_PHRASES=(
   "in many ways" "to some extent" "it could be said"
-  "it's worth noting" "note that" "observe that"
+  "it's worth noting"
 )
+
+# "Note that X" is filler only as the imperative that opens a sentence or a list
+# item; "I sent the lane a note that the fix landed" uses the noun.
+IMPERATIVE_NOTE="(^|[.!?:;(][[:space:]]+)[[:space:]]*([-*+]|[0-9]+[.)])?[[:space:]]*"
+IMPERATIVE_NOTE+="(\\*\\*|__?)?(please )?(note|observe) that\\b"
 
 BANNED_PHRASES=(
   "dive into" "align with" "in conclusion" "that said"
@@ -90,23 +97,39 @@ PUNCHLINE_ABSTRACTIONS=(
 
 total_hits=0
 
+# Prints the hit as `[category] "matched text"  whole line  file:line`. The
+# matched text comes first so a reader of a long line can find the culprit.
 warn() {
-  local category="$1" match="$2" file="$3" line="$4"
+  local category="$1" span="$2" match="$3" file="$4" line="$5"
   ((total_hits++)) || true
-  printf "${YELLOW}%-24s${RESET} ${RED}%s${RESET}  ${CYAN}%s:%s${RESET}\n" \
-    "[$category]" "$match" "$file" "$line"
+  printf "${YELLOW}%-24s${RESET} ${RED}\"%s\"${RESET}  %s  ${CYAN}%s:%s${RESET}\n" \
+    "[$category]" "$span" "$match" "$file" "$line"
+}
+
+# A phrase as a whole-word pattern: "here is a" must not match "there is a",
+# nor "marks a" the start of "marks an".
+phrase_re() {
+  local re="\\b$1" word_end='[[:alnum:])]$'
+  [[ "$1" =~ $word_end ]] && re+="\\b"
+  printf '%s' "$re"
 }
 
 scan_pattern() {
-  local category="$1" pattern="$2"
+  local category="$1" pattern="$2" span
   shift 2
   while IFS=: read -r file line match; do
     # Skip non-prose lines: markdown tables, imports, YAML frontmatter keys
     [[ "$match" =~ ^[[:space:]]*\| ]] && continue
     [[ "$match" =~ ^import[[:space:]] ]] && continue
     [[ "$match" =~ ^[a-z][a-zA-Z_-]*:([[:space:]]|$) ]] && continue
-    warn "$category" "$match" "$file" "$line"
-  done < <(rg -inH --no-heading "$pattern" "$@" 2>/dev/null || true)
+    # One hit per distinct match, so a second banned word on the line is not
+    # hidden behind the first. Patterns that anchor on a neighbouring character
+    # carry it into the span, so it is trimmed before duplicates are dropped.
+    while IFS= read -r span; do
+      warn "$category" "$span" "$match" "$file" "$line"
+    done < <(rg -io -- "$pattern" <<<"$match" | sed -E 's/^[^[:alnum:]]+//' |
+      awk '!seen[tolower($0)]++')
+  done < <(rg -inH --no-heading -- "$pattern" "$@" 2>/dev/null || true)
 }
 
 # --- Determine input files ---
@@ -122,8 +145,10 @@ printf "${BOLD}Scanning %d file(s) for AI writing patterns...${RESET}\n\n" "${#f
 
 # --- 1. Banned vocabulary ---
 
+# A banned word that ends a hyphenated compound is a term, not vocabulary:
+# "obfuscation-robust features" names a property.
 vocab_pattern=$(IFS='|'; echo "${BANNED_VOCAB[*]}")
-scan_pattern "banned-vocab" "\\b($vocab_pattern)\\b" "${files[@]}"
+scan_pattern "banned-vocab" "(^|[^-_[:alnum:]])($vocab_pattern)\\b" "${files[@]}"
 
 # --- 2. Banned atmospheric words ---
 
@@ -133,31 +158,31 @@ scan_pattern "banned-atmospheric" "\\b($atmo_pattern)\\b" "${files[@]}"
 # --- 3. Copula avoidance ---
 
 for phrase in "${COPULA_AVOIDANCE[@]}"; do
-  scan_pattern "copula-avoidance" "$phrase" "${files[@]}"
+  scan_pattern "copula-avoidance" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 4. Filler phrases ---
 
 for phrase in "${FILLER_PHRASES[@]}"; do
-  scan_pattern "filler-phrase" "$phrase" "${files[@]}"
+  scan_pattern "filler-phrase" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 5. Sycophantic tone ---
 
 for phrase in "${SYCOPHANTIC[@]}"; do
-  scan_pattern "sycophantic" "$phrase" "${files[@]}"
+  scan_pattern "sycophantic" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 6. Significance puffery ---
 
 for phrase in "${SIGNIFICANCE_PUFFERY[@]}"; do
-  scan_pattern "significance-puffery" "$phrase" "${files[@]}"
+  scan_pattern "significance-puffery" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 7. Negative parallelisms ---
 
 for pattern in "${NEGATIVE_PARALLELISMS[@]}"; do
-  scan_pattern "negative-parallelism" "$pattern" "${files[@]}"
+  scan_pattern "negative-parallelism" "$(phrase_re "$pattern")" "${files[@]}"
 done
 
 # --- 7b. Unnecessary words and hedge phrases ---
@@ -168,6 +193,7 @@ scan_pattern "unnecessary-word" "\\b($unnecessary_pattern)\\b" "${files[@]}"
 for phrase in "${UNNECESSARY_PHRASES[@]}"; do
   scan_pattern "unnecessary-word" "\\b$phrase\\b" "${files[@]}"
 done
+scan_pattern "unnecessary-word" "$IMPERATIVE_NOTE" "${files[@]}"
 
 # --- 7c. Banned multi-word phrases ---
 
