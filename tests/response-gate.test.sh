@@ -150,7 +150,7 @@ chmod +x "$work/bin/claude"
 judged() {
   PATH="$work/bin:$PATH" CLAUDE_RESPONSE_GATE_JUDGE=1 STUB_ARGS="$work/stub-args" "$@"
 }
-two_hits='Great question! This robust design ships today.'
+two_hits='Great question! This crucial design ships today.'
 check judge-sample-has-two-hits "2" "$(gate "$two_hits" j0 false >/dev/null; grep -c '^  \[' "$work/err")"
 
 drop_all='[{"hit":1,"real":false,"reason":"quoted"},{"hit":2,"real":false,"reason":"literal"}]'
@@ -170,8 +170,36 @@ check judge-missing-verdict-count "1" "$(grep -c '^  \[' "$work/err")"
 
 check judge-failure-keeps-all "2" "$(STUB_FAIL=1 judged gate "$two_hits" j4 false)"
 check judge-failure-count "2" "$(grep -c '^  \[' "$work/err")"
-check_contains judge-failure-logged "judge failed, keeping all 2" "$(cat "$gate_dir/gate.log")"
+check_contains judge-failure-logged "judge failed on 2" "$(cat "$gate_dir/gate.log")"
 check judge-garbage-keeps-all "2" "$(STUB_VERDICTS='"nonsense"' judged gate "$two_hits" j5 false)"
+
+# -- a contextual hit stands only on the judge's word -------------------------------
+# "robust" names a property far more often than it intensifies in a technical
+# reply; every gated "robust" on the fleet was a misfire. With no judge (gantry
+# workers: Claude Code strips the credentials from hook env) the hit is dropped,
+# never enforced, while a certain hit beside it still blocks.
+tier='Keep the extractor in the robust tier, weighted low.'
+check contextual-unjudged-passes "0" "$(gate "$tier" c1 false)"
+check contextual-copula-unjudged-passes "0" "$(gate 'Each row represents a run.' c4 false)"
+check contextual-literally-unjudged-passes "0" "$(gate 'Read the flag literally.' c5 false)"
+check_contains contextual-unjudged-logged "unjudged, dropped: [banned-vocab]" \
+  "$(cat "$gate_dir/gate.log")"
+mixed='Great question! Keep the extractor in the robust tier.'
+check contextual-judge-down-blocks "2" "$(STUB_FAIL=1 judged gate "$mixed" c2 false)"
+check contextual-judge-down-keeps-certain "1" "$(grep -c '^  \[sycophantic\]' "$work/err")"
+check contextual-judge-down-drops-contextual "0" "$(grep -c '"robust"' "$work/err")"
+keep_both='[{"hit":1,"real":true,"reason":"tic"},{"hit":2,"real":true,"reason":"intensifier"}]'
+check contextual-judged-real-blocks "2" "$(STUB_VERDICTS=$keep_both judged gate "$mixed" c3 false)"
+check contextual-judged-real-kept "1" "$(grep -c '"robust"' "$work/err")"
+
+# -- structured output is not prose -----------------------------------------------
+# pr-reviewer ends on a JSON verdict; a rewrite of it can only break the parse.
+verdict='{"verdict": "approve", "summary": "Great question! A robust tapestry, delivered."}'
+check json-reply-passes "0" "$(gate "$verdict" s1 false)"
+check json-reply-silent "" "$(cat "$work/err")"
+
+# -- the hit quotes the matched text, so a long line still shows its culprit ---------
+check dirty-quotes-span "1" "$(gate "$dirty" q1 false >/dev/null; grep -c '"tapestry"' "$work/err")"
 
 # -- off switch and degenerate input ------------------------------------------------
 check off-switch "0" "$(CLAUDE_RESPONSE_GATE=0 gate "$dirty" p8 false)"
