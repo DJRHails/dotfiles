@@ -25,6 +25,7 @@ BANNED_VOCAB=(
   spine
   bolstered exemplifies valuable
   renowned esteemed acclaimed
+  lift
 )
 
 BANNED_ATMOSPHERIC=(

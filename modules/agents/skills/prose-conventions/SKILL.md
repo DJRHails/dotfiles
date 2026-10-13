@@ -134,6 +134,7 @@ The list is not a rule about register. A word being overused by a model does not
 | `resonate with`, `encompassing` | AI abstraction verbs |
 | `indelible mark`, `deeply rooted`, `focal point`, `turning point` | Significance puffery nouns |
 | `setting the stage for`, `reflects broader` | Narrative glue implying a causal claim you have not made |
+| `lift` (as a multiplier) | "a 10x lift", "a 0.2x lift" — growth-marketing noun for a ratio; give the before and after numbers instead. A 0.2x lift is a fall. The literal lift to the third floor is fine |
 
 ### Banned Atmospheric Words
 
