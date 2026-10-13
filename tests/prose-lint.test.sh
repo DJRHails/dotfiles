@@ -136,6 +136,34 @@ flags "banned word alone" banned-vocab \
   "This is a robust solution."
 ignores "banned word ending a compound" banned-vocab \
   "A multivariate model over the obfuscation-robust features."
+flags "functions as" copula-avoidance \
+  "The service functions as a gateway."
+flags "associated with" vague-connection \
+  "He is associated with the orchestra."
+ignores "disassociated with" vague-connection \
+  "She disassociated with the group in 2019."
+flags "isn't just, it" negative-parallelism \
+  "It isn't just a tool, it is a platform."
+flags "not a X, but a" negative-parallelism \
+  "It was not a bug, but a feature."
+flags "rather, it" negative-parallelism \
+  "Rather, it constitutes a change."
+ignores "bare rather than" negative-parallelism \
+  "We cached it rather than recomputing it."
+
+# --- file-level formatting tells fire on counts, not single lines -----------
+
+flags "title case heading" title-case-heading "## The Big Fancy Heading"
+ignores "sentence case heading" title-case-heading "## Signs of AI writing"
+flags "emoji heading" emoji-heading "## Launch 🚀 plan"
+# shellcheck disable=SC1111  # the curly quotes are the sample, not syntax
+flags "curly quotes" curly-quotes "He said “cheap” twice."
+flags "five bold lead-ins" bold-lead-in-list \
+  "$(printf -- '- **Item %s:** text\n' 1 2 3 4 5)"
+ignores "four bold lead-ins" bold-lead-in-list \
+  "$(printf -- '- **Item %s:** text\n' 1 2 3 4)"
+flags "three rules" thematic-break "$(printf -- '---\nx\n---\ny\n---\n')"
+ignores "frontmatter delimiters" thematic-break "$(printf -- '---\ntitle: x\n---\nbody\n')"
 
 # A word repeated on a line is one hit, whatever character precedes each use.
 repeats=$(categories_for "Robust, robust and (robust results." | grep -c '^\[banned-vocab\]$')

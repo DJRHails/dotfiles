@@ -17,6 +17,14 @@ if [[ "$(uname -s)" == "Linux" ]] && (( $+commands[trash-put] )); then
   alias trash='trash-put'
 fi
 
+# The Mac App Store Tailscale app and the Homebrew CLI are built separately, so
+# even at an identical release the CLI warns "client version != tailscaled
+# server version" on every invocation — upgrading Homebrew never silences it.
+# The binary inside the app bundle is the daemon's own build, so it always matches.
+if [[ "$(uname -s)" == "Darwin" ]] && [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then
+  alias tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+fi
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 alias -g G="| grep" # Grep pipe shortcut

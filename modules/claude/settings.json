@@ -43,7 +43,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-opus-5-5",
   "enableAllProjectMcpServers": false,
   "skillOverrides": {
     "code-review": "off",
@@ -57,6 +57,15 @@
           {
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/notify.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
           }
         ]
       }
@@ -90,6 +99,15 @@
             "command": "python3 ~/.files/modules/claude/hooks/block_self_matching_pkill.py"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -110,6 +128,15 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -126,6 +153,15 @@
             "command": "python3 ~/.files/modules/claude/hooks/sync_cmux_tab.py"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -140,6 +176,92 @@
             "type": "command",
             "command": "bash ~/.files/modules/claude/hooks/check_login_session.sh",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py=\"$HOME/.local/share/sidepulse/venv/bin/python\"; [ -x \"$py\" ] && \"$py\" -m sidepulse.hook_entry --provider claude --log \"$HOME/.local/state/sidepulse/agent-monitor/claude.jsonl\"; true"
           }
         ]
       }
