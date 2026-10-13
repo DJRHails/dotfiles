@@ -11,7 +11,6 @@ modules/agents/skills/diagram-design
 modules/agents/skills/discord
 modules/agents/skills/gantry-cli
 modules/agents/skills/research-meeting-playbook
-modules/agents/skills/runpod-ant-cluster
 modules/agents/skills/saint-chrome
 modules/agents/skills/slack
 modules/agents/skills/tailscale-topology

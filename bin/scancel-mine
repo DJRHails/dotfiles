@@ -4,8 +4,8 @@ set -euo pipefail
 #
 # Every worker reaches the clusters as the same unix account, so `scancel -u $USER` is a
 # FLEET-WIDE cancel: one such sweep destroyed a peer's long-queued multi-GPU serve and
-# several array tasks. (Details in the runpod-ant-cluster skill, which is encrypted at
-# rest — keep them out of this file, which is public.) The job NAME is the discriminator
+# several array tasks. (This file is public — keep incident details out of it.) The job
+# NAME is the discriminator
 # we standardise on, so this resolves a name prefix to explicit job ids and cancels
 # those — never a user filter.
 #
@@ -28,7 +28,7 @@ Usage:
   --dry-run          list what would be cancelled, cancel nothing
   --prefix <p>       override $SLURM_JOB_PREFIX (normalised via slurm-job-prefix)
   --via <ssh-host>   run squeue/scancel over ssh (a worker container has no Slurm);
-                     required when squeue is not on PATH, e.g. --via bulbasaur
+                     required when squeue is not on PATH, e.g. --via login-node
   -h, --help         print this help
 EOF
 }
@@ -136,7 +136,7 @@ slurm() {
 
 if [[ -z "$via" ]] && ! command -v squeue >/dev/null 2>&1; then
   echo "scancel-mine: no squeue on PATH — pass --via <ssh-host>" \
-    "(e.g. bulbasaur, charmander)" >&2
+    "(e.g. login-node)" >&2
   exit 2
 fi
 

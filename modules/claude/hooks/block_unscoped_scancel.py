@@ -5,8 +5,7 @@ Every worker reaches the Slurm clusters as the *same* unix account, so the idiom
 read as self-scoped are not: ``scancel -u $USER`` / ``scancel --me`` /
 ``squeue -u $USER … | xargs scancel`` reap every *peer* worker's queued compute too.
 That is not hypothetical — one such sweep destroyed a peer's long-queued multi-GPU serve
-and several array tasks, none of them belonging to the caller. The full incident record
-lives in the ``runpod-ant-cluster`` skill, which is encrypted at rest.
+and several array tasks, none of them belonging to the caller.
 
 A cancel is allowed only when it names its targets: explicit job ids, or a job name.
 A user filter is not a target and never makes a cancel safe.
