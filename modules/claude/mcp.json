@@ -2,9 +2,10 @@
   "mcpServers": {
     "playwriter": {
       "type": "stdio",
-      "command": "npx",
+      "command": "sh",
       "args": [
-        "playwriter@0.0.105"
+        "-c",
+        "exec \"$HOME/.files/modules/claude/bin/playwriter-mcp\""
       ],
       "env": {
         "PLAYWRITER_AUTO_ENABLE": "1"

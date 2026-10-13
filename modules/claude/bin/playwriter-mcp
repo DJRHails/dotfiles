@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Launch the playwriter MCP server, authenticated to a token-guarded relay.
+#
+# On a host whose relay runs `playwriter serve --token …`, every client must
+# send that token, or the relay rejects it ("invalid or missing token") and the
+# MCP server reports the extension as not connected. The CLI only sends the
+# token in host mode, so PLAYWRITER_HOST is pointed at the local relay too.
+# The token lives in ~/.zshrc.local (untracked), never in this repo. Hosts
+# without one run the server exactly as before.
+set -euo pipefail
+
+token=$(zsh -c 'source ~/.zshrc.local >/dev/null 2>&1; printf %s "${PLAYWRITER_TOKEN:-}"' 2>/dev/null || true)
+if [[ -n "$token" ]]; then
+  export PLAYWRITER_TOKEN="$token"
+  export PLAYWRITER_HOST="${PLAYWRITER_HOST:-http://127.0.0.1:19988}"
+fi
+
+exec npx -y playwriter@0.7.0 "$@"
