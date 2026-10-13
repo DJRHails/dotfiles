@@ -86,5 +86,40 @@
     "git.confirmSync": false,
     "terminal.integrated.scrollback": 10000,
     "python.languageServer": "Pylance",
-    "security.promptForRemoteFileProtocolHandling": false
+    "security.promptForRemoteFileProtocolHandling": false,
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "criticmarkup.addition",
+                "settings": {
+                    "foreground": "#00bb00"
+                }
+            },
+            {
+                "scope": "criticmarkup.deletion",
+                "settings": {
+                    "foreground": "#dd0000"
+                }
+            },
+            {
+                "scope": "criticmarkup.substitution",
+                "settings": {
+                    "foreground": "#ff8600"
+                }
+            },
+            {
+                "scope": "criticmarkup.comment",
+                "settings": {
+                    "foreground": "#0000bb"
+                }
+            },
+            {
+                "scope": "criticmarkup.highlight",
+                "settings": {
+                    "foreground": "#aa53a9"
+                }
+            }
+        ]
+    },
+    "files.autoSave": "afterDelay"
 }
