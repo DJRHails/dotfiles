@@ -121,5 +121,6 @@
             }
         ]
     },
+    "isogram.enabled": true,
     "files.autoSave": "afterDelay"
 }
