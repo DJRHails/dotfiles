@@ -200,3 +200,18 @@ def test_exit_code_is_zero_on_clean_file(tmp_path):
 def test_only_and_skip_select_patterns():
     assert [p.id for p in cc._select(["not-nothing"], [])] == ["not-nothing"]
     assert "not-nothing" not in [p.id for p in cc._select(None, ["not-nothing"])]
+
+
+def test_undecodable_file_is_an_error_not_a_finding(tmp_path, capsys):
+    target = tmp_path / "latin1.md"
+    target.write_bytes(b"caf\xe9\n")
+    assert cc.main([str(target), "--no-colour"]) == 2
+    assert "cannot read" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flag", ["--only", "--skip"])
+def test_unknown_pattern_id_is_an_error(tmp_path, capsys, flag):
+    target = tmp_path / "doc.md"
+    target.write_text("That's not nothing.\n", encoding="utf-8")
+    assert cc.main([str(target), flag, "not-nothin", "--no-colour"]) == 2
+    assert "not-nothin" in capsys.readouterr().err

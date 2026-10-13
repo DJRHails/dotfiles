@@ -187,7 +187,7 @@ done
 # --- 3b. Vague expression of connection ---
 
 for phrase in "${VAGUE_CONNECTION[@]}"; do
-  scan_pattern "vague-connection" "$phrase" "${files[@]}"
+  scan_pattern "vague-connection" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 4. Filler phrases ---

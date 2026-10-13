@@ -640,7 +640,10 @@ def scan(text: str, path: Path, patterns: Sequence[Pattern]) -> Iterator[Hit]:
 
 
 def _select(only: list[str] | None, skip: list[str]) -> tuple[Pattern, ...]:
-    chosen = PATTERNS if not only else tuple(p for p in PATTERNS if p.id in set(only))
+    unknown = sorted(set(only or []).union(skip) - {p.id for p in PATTERNS})
+    if unknown:
+        raise ValueError(f"unknown pattern id(s): {', '.join(unknown)}; see --list")
+    chosen =PATTERNS if not only else tuple(p for p in PATTERNS if p.id in set(only))
     return tuple(p for p in chosen if p.id not in set(skip))
 
 
@@ -701,14 +704,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Usage: cliche-check.py <file ...>", file=sys.stderr)
         return 2
 
-    patterns = _select(args.only, args.skip)
+    try:
+        patterns = _select(args.only, args.skip)
+    except ValueError as err:
+        print(f"cliche-check: {err}", file=sys.stderr)
+        return 2
     colour = not args.no_colour and sys.stdout.isatty()
     hits: list[Hit] = []
     totals: dict[str, int] = {p.id: 0 for p in PATTERNS}
     for path in args.files:
         try:
             text = path.read_text(encoding="utf-8")
-        except OSError as err:
+        except (OSError, UnicodeDecodeError) as err:
             print(f"cliche-check: cannot read {path}: {err}", file=sys.stderr)
             return 2
         if args.windows:
