@@ -15,4 +15,4 @@ if [[ -n "$token" ]]; then
   export PLAYWRITER_HOST="${PLAYWRITER_HOST:-http://127.0.0.1:19988}"
 fi
 
-exec npx -y playwriter@0.7.0 "$@"
+exec npx -y playwriter@0.8.0 "$@"
