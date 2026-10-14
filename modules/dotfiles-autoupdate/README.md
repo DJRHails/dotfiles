@@ -21,8 +21,9 @@ is missing — but only when that is safe:
   (`skip — on branch <name>`),
 - it has **no modified or staged tracked files** — otherwise skipped
   (`skip — modified tracked files`),
-- its HEAD is reachable from a branch, remote-tracking ref or tag — commits made on the
-  detached HEAD would be orphaned by the move, so it is skipped
+- its HEAD is reachable from a branch, remote-tracking ref or tag, or is a commit the
+  superproject itself pinned — otherwise it holds commits made on the detached HEAD,
+  which the move would orphan, so it is skipped
   (`skip — HEAD is on no branch, remote or tag`),
 - untracked files (e.g. a `.data/` of worktrees) never block the move and are kept,
 - a failed fetch skips that submodule only (`skip — pin <sha> not available`).
