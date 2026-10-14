@@ -9,8 +9,10 @@
 # worktree means a stale skill.
 #
 # A submodule is moved only when it is initialised, its HEAD is detached (a
-# checked-out branch means someone is working there), and it has no modified or
-# staged tracked files. Untracked files never block the move and are kept:
+# checked-out branch means someone is working there), it has no modified or
+# staged tracked files, and its HEAD is contained in some branch, remote-tracking
+# ref or tag (otherwise it holds commits made on the detached HEAD, which the
+# move would orphan). Untracked files never block the move and are kept:
 # `git checkout` leaves them alone (and refuses, logged, if the new commit
 # would overwrite one). A missing pin is fetched inside the submodule; a fetch
 # failure skips that submodule only. Never forces, never resets, never pushes.
@@ -29,6 +31,10 @@ unsafe_reason() {
     printf 'on branch %s' "$branch"
   elif [ -n "$(git -C "$path" status --porcelain --untracked-files=no)" ]; then
     printf 'modified tracked files'
+  elif [ -z "$(git -C "$path" for-each-ref --count=1 --contains HEAD \
+    refs/heads refs/remotes refs/tags)" ]; then
+    # Commits made on a detached HEAD: moving off them would orphan them.
+    printf 'HEAD is on no branch, remote or tag (local commits?)'
   fi
 }
 

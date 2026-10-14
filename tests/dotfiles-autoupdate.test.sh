@@ -546,6 +546,18 @@ check "submodule on branch: branch still checked out" \
 check "submodule on branch: skip logged" \
   "1" "$(grep -c 'submodule sub: skip — on branch work' <<< "$log")"
 
+# --- submodules: commits made on the detached HEAD are never orphaned ---------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'local\n' > "$clone/sub/tracked.txt"
+sub_git "$clone/sub" commit -am "local work"
+local_commit="$(sub_head)"
+log="$(run_update)"
+
+check "submodule local commits: HEAD untouched" "$local_commit" "$(sub_head)"
+check "submodule local commits: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — HEAD is on no branch, remote or tag' <<< "$log")"
+
 # --- submodules: untracked files neither block the move nor get removed -------
 setup_submodule_repo
 bump_upstream_pin "$sub_v2"
