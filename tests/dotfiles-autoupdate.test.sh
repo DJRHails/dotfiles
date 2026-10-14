@@ -444,6 +444,143 @@ check "sfw offline: exits 0" "0" "$(cat "$work/status")"
 check "sfw offline: later steps still ran" \
   "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
 
+# --- submodules: stubs ---------------------------------------------------------
+# A superproject whose `sub` submodule is pinned to v1 and checked out detached,
+# the way `git submodule update` leaves it. v2 exists only on the submodule's
+# origin, so following a bump to it needs a fetch inside the submodule.
+sub_git() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}" > /dev/null 2>&1; }
+
+setup_submodule_repo() {
+  setup_repo
+  local so="$work/sub-origin" sw="$work/sub-work"
+  rm -rf -- "$so" "$sw"
+  git init --quiet --bare -b main "$so"
+  git clone --quiet "$so" "$sw" 2> /dev/null
+  sub_git "$sw" checkout -b main
+  printf 'v1\n' > "$sw/tracked.txt"
+  sub_git "$sw" add -A
+  sub_git "$sw" commit -m v1
+  sub_git "$sw" push origin HEAD:main
+  sub_v1="$(git -C "$sw" rev-parse HEAD)"
+  git_quiet -c protocol.file.allow=always submodule add "$so" sub
+  git_quiet commit -m "add sub"
+  git_quiet push origin HEAD:main
+  sub_git "$clone/sub" checkout --detach
+  printf 'v2\n' > "$sw/tracked.txt"
+  sub_git "$sw" commit -am v2
+  sub_git "$sw" push origin HEAD:main
+  sub_v2="$(git -C "$sw" rev-parse HEAD)"
+}
+
+# Upstream bumps the pin (what the bump workflow does): only the gitlink moves.
+bump_upstream_pin() {
+  local up="$work/upstream"
+  rm -rf -- "$up"
+  git clone --quiet "$work/origin" "$up" 2> /dev/null
+  sub_git "$up" update-index --cacheinfo "160000,$1,sub"
+  sub_git "$up" commit -m "bump sub"
+  git -C "$up" push --quiet origin HEAD:main
+}
+
+sub_head() { git -C "$clone/sub" rev-parse HEAD; }
+
+# --- submodules: a clean detached submodule follows a bumped pin --------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+log="$(run_update)"
+
+check "submodule clean: superproject pulled" \
+  "$sub_v2" "$(git -C "$clone" rev-parse HEAD:sub)"
+check "submodule clean: moved to the new pin" "$sub_v2" "$(sub_head)"
+check "submodule clean: worktree shows the pinned content" \
+  "v2" "$(cat "$clone/sub/tracked.txt")"
+check "submodule clean: logged" \
+  "1" "$(grep -c "submodule sub: ${sub_v1:0:8} -> ${sub_v2:0:8}" <<< "$log")"
+check "submodule clean: superproject now clean" \
+  "" "$(git -C "$clone" status --porcelain)"
+
+# --- submodules: a lagging submodule is moved even when already up to date ----
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+git_quiet pull --ff-only --no-recurse-submodules
+log="$(run_update)"
+
+check "submodule lagging, superproject current: up to date" \
+  "1" "$(grep -c 'ok: up to date' <<< "$log")"
+check "submodule lagging, superproject current: moved to the pin" "$sub_v2" "$(sub_head)"
+
+# --- submodules: a modified tracked file blocks the move ----------------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'work in progress\n' > "$clone/sub/tracked.txt"
+log="$(run_update)"
+
+check "submodule dirty: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule dirty: edit kept" \
+  "work in progress" "$(cat "$clone/sub/tracked.txt")"
+check "submodule dirty: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — modified tracked files' <<< "$log")"
+check "submodule dirty: superproject still pulled" \
+  "$sub_v2" "$(git -C "$clone" rev-parse HEAD:sub)"
+
+# --- submodules: a staged change blocks the move too --------------------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'staged\n' > "$clone/sub/new.txt"
+sub_git "$clone/sub" add new.txt
+log="$(run_update)"
+
+check "submodule staged: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule staged: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — modified tracked files' <<< "$log")"
+
+# --- submodules: a checked-out branch is somebody's work, never moved ---------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+sub_git "$clone/sub" checkout -b work
+log="$(run_update)"
+
+check "submodule on branch: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule on branch: branch still checked out" \
+  "work" "$(git -C "$clone/sub" symbolic-ref --short HEAD)"
+check "submodule on branch: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — on branch work' <<< "$log")"
+
+# --- submodules: untracked files neither block the move nor get removed -------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+mkdir -p "$clone/sub/.data/worktrees/feature"
+printf 'scratch\n' > "$clone/sub/.data/worktrees/feature/notes.txt"
+printf 'loose\n' > "$clone/sub/untracked.txt"
+log="$(run_update)"
+
+check "submodule untracked: moved to the pin" "$sub_v2" "$(sub_head)"
+check "submodule untracked: nested untracked dir survives" \
+  "scratch" "$(cat "$clone/sub/.data/worktrees/feature/notes.txt" 2> /dev/null)"
+check "submodule untracked: loose untracked file survives" \
+  "loose" "$(cat "$clone/sub/untracked.txt" 2> /dev/null)"
+
+# --- submodules: an unreachable pin is logged and skipped, never fatal --------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+git -C "$clone/sub" remote set-url origin "$work/no-such-origin"
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+log="$(run_update)"
+
+check "submodule fetch fails: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule fetch fails: skip logged" \
+  "1" "$(grep -c "submodule sub: skip — pin ${sub_v2:0:8} not available" <<< "$log")"
+check "submodule fetch fails: exits 0" "0" "$(cat "$work/status")"
+check "submodule fetch fails: later steps still ran" \
+  "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
+# --- submodules: one already at its pin logs nothing ---------------------------
+setup_submodule_repo
+log="$(run_update)"
+
+check "submodule at pin: nothing logged" "0" "$(grep -c 'submodule sub' <<< "$log")"
+
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
   exit 1

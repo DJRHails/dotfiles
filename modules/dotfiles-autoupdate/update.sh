@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Daily auto-update — fast-forward pull of the dotfiles repo, then convergence
-# steps bootstrap couldn't finish (the gh-stack extension) and a refresh of
-# pi's installed extension packages.
+# Daily auto-update — fast-forward pull of the dotfiles repo, moving clean
+# submodules to their recorded pins, then convergence steps bootstrap couldn't
+# finish (the gh-stack extension) and a refresh of pi's installed extension
+# packages.
 #
-# Safe by construction: never clobbers local work (skips a dirty tree), never
+# Safe by construction: never clobbers local work (stashes and reapplies, or
+# keeps the stash on conflict; skips submodules with local work), never
 # merges/rebases (fast-forward only), never pushes. Scheduled once a day by
 # this module's install scripts: launchd on macOS, a systemd user timer on
 # Linux. Logs to $XDG_STATE_HOME/dotfiles/autoupdate.log.
@@ -50,6 +52,7 @@ update_dotfiles() {
   local_rev="$(git rev-parse @)"
   if [ "$local_rev" = "$(git rev-parse '@{u}')" ]; then
     log "ok: up to date ($branch @ ${local_rev:0:8})"
+    sync_submodules
     return 0
   fi
 
@@ -71,9 +74,9 @@ update_dotfiles() {
   fi
 
   # Fast-forward only — a diverged branch needs a human, never an auto-merge.
-  # Submodules are left untouched (never checked out over possible in-submodule
-  # WIP); run `git submodule update` by hand to follow a bumped pin.
+  local fast_forwarded=false
   if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
+    fast_forwarded=true
     log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
   elif git merge-base --is-ancestor @ '@{u}'; then
     log "ERROR: $branch is behind upstream but the fast-forward FAILED (see errors above)"
@@ -88,6 +91,22 @@ update_dotfiles() {
   if [ "$stashed" = true ]; then
     restore_stash
   fi
+  if [ "$fast_forwarded" = true ]; then
+    sync_submodules
+  fi
+}
+
+# Follow bumped submodule pins where that is safe — clean, detached worktrees
+# only; anything else is skipped with the reason logged. The logic lives in
+# sync-submodules.sh, shared with the manual `dotfiles::update`. Never fatal:
+# a failure here must not cost the steps after the pull.
+sync_submodules() {
+  local script line
+  script="$(dirname "${BASH_SOURCE[0]}")/sync-submodules.sh"
+  while IFS= read -r line; do
+    log "$line"
+  done < <(bash "$script" "$DOTFILES" 2>>"$LOG" ||
+    echo "ERROR: submodule sync failed (see errors above)")
 }
 
 # Reapply the stash taken above — but only when it applies cleanly.
