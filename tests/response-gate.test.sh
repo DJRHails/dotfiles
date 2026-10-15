@@ -126,6 +126,13 @@ dirty_triad='Great question! It links the bun config, the uv config, and the pip
 check dirty-triad-still-blocks "2" "$(gate "$dirty_triad" p12 false)"
 check dirty-triad-names-real-rule "1" "$(grep -c '\[sycophantic\]' "$work/err")"
 check dirty-triad-omits-skipped "0" "$(grep -c 'rule-of-three' "$work/err")"
+# A recap of bold lead-in bullets reads well in a reply, so the gate lets a run
+# of them through even past prose-lint's threshold.
+lead_ins="$(printf -- '- **Step %s:** the job ran and the log is clean.\n' 1 2 3 4 5 6)"
+printf '%s\n' "$lead_ins" >"$work/lead-ins.md"
+check lead-ins-are-a-lint-hit "1" "$(bash "$lint" "$work/lead-ins.md" 2>/dev/null | grep -c 'bold-lead-in-list')"
+check bold-lead-ins-pass "0" "$(gate "$lead_ins" p13 false)"
+check bold-lead-ins-silent "" "$(cat "$work/err")"
 # Every skipped id is a category prose-lint actually emits, so a typo in the
 # list cannot silently re-enable a rule.
 while read -r id; do
