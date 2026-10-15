@@ -86,8 +86,11 @@ awk '/^[[:space:]]*(```|~~~)/ {fence = !fence; next} !fence' <<<"$reply" |
 # form is usually earned. The guide's own tricolon rule exempts lists of
 # concrete specifics, which no regex can tell from an abstract triad, and a
 # false positive here costs a whole turn.
-#   rule-of-three   any clause shaped "A, B, and C"
-skipped_rules=(rule-of-three)
+#   rule-of-three       any clause shaped "A, B, and C"
+#   bold-lead-in-list   a run of "- **Lead:** text" bullets; in a chat reply
+#                       the bold leads make a recap easy to scan, and the
+#                       reader asked to keep them (2026-10-15)
+skipped_rules=(rule-of-three bold-lead-in-list)
 
 hits=()
 add_hits() {
