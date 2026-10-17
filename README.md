@@ -46,7 +46,7 @@ What the value rests on: the module model plus the dependency resolver in `boots
 the commit-time test suites that guard the modules which delete files, rewrite config unattended
 or gate package installs. If those suites stopped running, nothing else would catch a regression.
 
-Confidence tags are an assessment of the evidence in this repo (sample sizes, seeds, intervals),
+Confidence tags are an assessment of the evidence in this repo (test runs, code paths, git history),
 added in a 2026-10 README audit; they are not new measurements. For a tooling repo like this
 one, "evidence" means test runs, code paths and commit history rather than samples or seeds.
 
