@@ -29,8 +29,9 @@ not packaged for general use, and several modules assume the author's accounts a
   `deps.conf`; the bootstrapper topologically sorts them and aborts on a cycle or unknown name.
   See [Dependencies](#dependencies). [confidence: ~90%; `tests/module-deps.test.sh` passes]
 - **The risky parts are guarded by test suites that run only at commit time.** Symlink pruning,
-  the daily auto-update, the package-install firewall and release-age gate, and the agent hooks
-  each have a suite wired into the pre-commit hooks; there is no test CI. See
+  the daily auto-update, the package-install firewall and release-age gate, and three of the
+  agent hooks (the scancel guard, `/note` and the response gate) each have a suite wired into the
+  pre-commit hooks; the other agent hooks do not, and there is no test CI. See
   [What is verified](#what-is-verified). [confidence: ~90% that the hooked suites pass at the
   audited commit; they cover only the cases they test]
 - **Part of the repo is encrypted and unreadable in a public clone.** Sensitive files are
@@ -176,7 +177,7 @@ Current edges:
 
 Shipping a `*.zsh` fragment is deliberately **not** an edge: `zshrc` globs
 `$DOTFILES/modules/*/*.zsh` over the repo tree at shell startup, so nothing is
-resolved at install time and 13 identical `→ zsh` edges would make `zsh` a
+resolved at install time and 14 identical `→ zsh` edges would make `zsh` a
 mandatory graph root that buries the real ordering constraints.
 
 Run `bash tests/module-deps.test.sh` to check the graph still resolves.
@@ -195,7 +196,8 @@ mirror each other: `.pre-commit-config.yaml` (run with `prek` or `pre-commit`) a
   symlink pruning (`link-symlinks`), the daily auto-update (`dotfiles-autoupdate`), the
   package-install firewall and release-age gate (`sfw-aliases`, `release-age`), the Slurm
   cancel guard (`block_unscoped_scancel_test.py`, `scancel-mine`), the CI credential helper,
-  `mdunwrap`, `prose-lint`, and the agent hooks (`note-hook`, `response-gate`, `claude-resume`).
+  `mdunwrap`, `prose-lint`, the `/note` and response-gate agent hooks (`note-hook`,
+  `response-gate`), and the `claude::resume` resolver (`claude-resume`).
   `lefthook.yml` runs 10 of the 12.
 
 The other 8 suites in `tests/` (including `module-deps`) are in neither hook config; run them by
