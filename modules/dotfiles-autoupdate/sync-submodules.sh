@@ -9,8 +9,10 @@
 # worktree means a stale skill.
 #
 # A submodule is moved only when it is initialised, its HEAD is detached (a
-# checked-out branch means someone is working there), and it has no modified or
-# staged tracked files. Untracked files never block the move and are kept:
+# checked-out branch means someone is working there), it has no modified or
+# staged tracked files, and its HEAD is contained in some branch, remote-tracking
+# ref or tag or was itself pinned by the superproject (otherwise it holds commits
+# made on the detached HEAD, which the move would orphan). Untracked files never block the move and are kept:
 # `git checkout` leaves them alone (and refuses, logged, if the new commit
 # would overwrite one). A missing pin is fetched inside the submodule; a fetch
 # failure skips that submodule only. Never forces, never resets, never pushes.
@@ -24,11 +26,18 @@ cd "$repo"
 
 # Prints the reason a submodule must not be moved, or nothing when it is safe.
 unsafe_reason() {
-  local path=$1 branch
+  local path=$1 have=$2 branch
   if branch="$(git -C "$path" symbolic-ref --quiet --short HEAD)"; then
     printf 'on branch %s' "$branch"
   elif [ -n "$(git -C "$path" status --porcelain --untracked-files=no)" ]; then
     printf 'modified tracked files'
+  elif [ -z "$(git -C "$path" for-each-ref --count=1 --contains HEAD \
+    refs/heads refs/remotes refs/tags)" ] &&
+    [ -z "$(git log -1 --format=%h --find-object="$have" HEAD -- "$path")" ]; then
+    # Commits made on a detached HEAD: moving off them would orphan them. A
+    # commit the superproject once pinned is not local work, even when no ref
+    # holds it (fetched by bare commit id, or its branch since pruned).
+    printf 'HEAD is on no branch, remote or tag (local commits?)'
   fi
 }
 
@@ -56,7 +65,7 @@ sync_one() {
   }
   [ "$have" = "$want" ] && return 0
 
-  reason="$(unsafe_reason "$path")"
+  reason="$(unsafe_reason "$path" "$have")"
   if [ -n "$reason" ]; then
     echo "submodule $path: skip — $reason (pin is ${want:0:8}, at ${have:0:8})"
     return 0
