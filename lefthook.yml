@@ -7,6 +7,8 @@ pre-commit:
   commands:
     crypt-patterns:
       run: scripts/check-crypt-patterns.sh
+    dockerignore-crypt:
+      run: scripts/check-dockerignore-crypt.sh
     glassine-check:
       run: glassine check
     # The scancel guard is a safety control: a bypass in it costs peer workers' queued

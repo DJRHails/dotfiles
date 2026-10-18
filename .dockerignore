@@ -4,18 +4,23 @@
 tmp
 docs/*.gif
 
-# Glassine-encrypted skills: the working tree is DECRYPTED, so these must
-# never enter the docker build context or they leak as plaintext image layers.
-# Keep this list in sync with the glassine patterns in .gitattributes.
+# Glassine-encrypted paths: the working tree is DECRYPTED, so these must never
+# enter the docker build context or they leak as plaintext image layers.
+# Mirror every glassine rule in .gitattributes here (minus any trailing /**);
+# scripts/check-dockerignore-crypt.sh fails the commit when one is missing.
 modules/agents/skills/diagram-design
 modules/agents/skills/discord
 modules/agents/skills/gantry-cli
+modules/agents/skills/remarkable
 modules/agents/skills/research-meeting-playbook
+modules/agents/skills/sage-saint
 modules/agents/skills/saint-chrome
+modules/agents/skills/saint-cli
 modules/agents/skills/slack
 modules/agents/skills/tailscale-topology
 modules/agents/skills/uptime-alerts
 modules/agents/skills/web-animation-design
 modules/agents/commands/archive-book.md
 modules/claude/safe.zsh
+modules/onepassword/ssh/agent.toml
 docs/legacy-transcrypt.md

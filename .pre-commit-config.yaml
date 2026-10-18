@@ -14,6 +14,11 @@ repos:
         entry: scripts/check-crypt-patterns.sh
         language: script
         pass_filenames: false
+      - id: check-dockerignore-crypt
+        name: check .dockerignore excludes glassine-encrypted files
+        entry: scripts/check-dockerignore-crypt.sh
+        language: script
+        pass_filenames: false
       - id: glassine-check
         name: staged glassine-managed files are encrypted
         entry: glassine check
