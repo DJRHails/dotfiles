@@ -9,6 +9,10 @@ pre-commit:
       run: scripts/check-crypt-patterns.sh
     dockerignore-crypt:
       run: scripts/check-dockerignore-crypt.sh
+    # The check above fails quiet: if it stops seeing encrypted files it passes every
+    # commit while decrypted files go into image layers.
+    dockerignore-crypt-tests:
+      run: bash tests/dockerignore-crypt.test.sh
     glassine-check:
       run: glassine check
     # The scancel guard is a safety control: a bypass in it costs peer workers' queued
