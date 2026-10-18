@@ -192,13 +192,16 @@ mirror each other: `.pre-commit-config.yaml` (run with `prek` or `pre-commit`) a
 - secret scanners (`gitleaks`, `trufflehog`; `.pre-commit-config.yaml` only);
 - `scripts/check-crypt-patterns.sh` and `glassine check`, which refuse a commit whose encryption
   rules don't match the tracked files or whose encrypted paths are staged as plaintext;
-- 12 behaviour suites under `tests/` for the parts whose failure is quiet or destructive:
-  symlink pruning (`link-symlinks`), the daily auto-update (`dotfiles-autoupdate`), the
+- `scripts/check-dockerignore-crypt.sh`, which refuses a commit when an encrypted file is not
+  excluded from the docker build context (`.dockerignore`);
+- 13 behaviour suites under `tests/` for the parts whose failure is quiet or destructive:
+  the `.dockerignore` encryption check (`dockerignore-crypt`), symlink pruning
+  (`link-symlinks`), the daily auto-update (`dotfiles-autoupdate`), the
   package-install firewall and release-age gate (`sfw-aliases`, `release-age`), the Slurm
   cancel guard (`block_unscoped_scancel_test.py`, `scancel-mine`), the CI credential helper,
   `mdunwrap`, `prose-lint`, the `/note` and response-gate agent hooks (`note-hook`,
   `response-gate`), and the `claude::resume` resolver (`claude-resume`).
-  `lefthook.yml` runs 10 of the 12.
+  `lefthook.yml` runs 11 of the 13.
 
 The other 8 suites in `tests/` (including `module-deps`) are in neither hook config; run them by
 hand.
