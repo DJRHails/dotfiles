@@ -44,9 +44,14 @@ fake_home="$work/home"
 
 # A bare origin plus a clone, so the script's fetch/merge run for real.
 setup_repo() {
-  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home" "$work/glassine.calls"
+  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home" "$work/glassine.calls" \
+    "$work/brew.calls" "$work/brew.env" "$work/brew.upgraded"
   mkdir -p "$fake_home"
   printf '[user]\n\tname = t\n\temail = t@t\n' > "$fake_home/.gitconfig"
+  # Every case gets a brew stub: update.sh puts /opt/homebrew/bin on PATH, so
+  # without one this suite — which runs at commit time — would upgrade the
+  # developer's real Homebrew on every macOS commit.
+  stub_brew
   git init --quiet --bare "$work/origin"
   git clone --quiet "$work/origin" "$work/clone" 2> /dev/null
   clone="$work/clone"
@@ -119,6 +124,53 @@ done < <(git -C "$clone" ls-files)
 exit 0
 STUB
   chmod +x "$fake_home/.local/bin/glassine"
+}
+
+# A stand-in for brew that records each call. `outdated` reports jq, ripgrep and
+# a pinned node until an upgrade succeeds, then only node — the way a real
+# `brew upgrade` leaves pinned formulae outdated. upgrade-partial upgrades jq but
+# not ripgrep and exits 1, as brew does when one formula fails among several;
+# outdated-fail-after makes the post-upgrade `outdated` fail.
+stub_brew() {
+  local mode=${1:-ok}
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/brew" << STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$work/brew.calls"
+case "\$1" in
+  outdated)
+    [ "$mode" = outdated-fail-after ] && [ -f "$work/brew.upgraded" ] && exit 1
+    if [ ! -f "$work/brew.upgraded" ]; then
+      printf 'jq\nripgrep\n'
+    elif [ "$mode" = upgrade-partial ]; then
+      printf 'ripgrep\n'
+    fi
+    printf 'node\n'
+    ;;
+  upgrade)
+    printf '%s %s\n' "\${NONINTERACTIVE:-unset}" "\${HOMEBREW_NO_AUTO_UPDATE:-unset}" > "$work/brew.env"
+    [ "$mode" = upgrade-fail ] && exit 1
+    touch "$work/brew.upgraded"
+    [ "$mode" = upgrade-partial ] && exit 1
+    ;;
+esac
+exit 0
+STUB
+  chmod +x "$fake_home/.local/bin/brew"
+}
+
+# Report a different kernel from `uname -s`; everything else (the sfw step's
+# `uname -m`) passes through to the real binary.
+stub_uname() {
+  local real
+  real="$(command -v uname)"
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/uname" << STUB
+#!/usr/bin/env bash
+[ "\$*" = -s ] && { echo "$1"; exit 0; }
+exec "$real" "\$@"
+STUB
+  chmod +x "$fake_home/.local/bin/uname"
 }
 
 # Mark the clone as a glassine repo the way a real one is marked: a tracked
@@ -580,6 +632,74 @@ setup_submodule_repo
 log="$(run_update)"
 
 check "submodule at pin: nothing logged" "0" "$(grep -c 'submodule sub' <<< "$log")"
+
+# --- homebrew: formulae are updated, upgraded and cleaned, never casks ---------
+setup_repo
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew: update, upgrade --formula, cleanup in order" \
+  "update --quiet|upgrade --formula|cleanup" \
+  "$(grep -v '^outdated' "$work/brew.calls" | paste -sd'|' -)"
+check "brew: no cask is ever touched" "0" "$(grep -c 'cask' "$work/brew.calls")"
+check "brew: upgrade runs non-interactive, without a second auto-update" \
+  "1 1" "$(cat "$work/brew.env")"
+check "brew: summary names what moved, not the pinned formula" \
+  "1" "$(grep -c 'brew: upgraded jq ripgrep$' <<< "$log")"
+check "brew: exits 0" "0" "$(cat "$work/status")"
+
+# --- homebrew: nothing outdated logs up to date --------------------------------
+setup_repo
+stub_uname Darwin
+touch "$work/brew.upgraded"
+log="$(run_update)"
+
+check "brew current: logged as up to date" \
+  "1" "$(grep -c 'brew: formulae up to date' <<< "$log")"
+
+# --- homebrew: a failing upgrade is logged and the cleanup still runs ----------
+setup_repo
+stub_brew upgrade-fail
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew upgrade fails: failure logged" \
+  "1" "$(grep -c 'brew: FAILED to upgrade formulae' <<< "$log")"
+check "brew upgrade fails: no upgrade claimed" "0" "$(grep -c 'brew: upgraded' <<< "$log")"
+check "brew upgrade fails: cleanup still ran" "cleanup" "$(tail -1 "$work/brew.calls")"
+check "brew upgrade fails: exits 0" "0" "$(cat "$work/status")"
+
+# --- homebrew: a partial upgrade still names what moved ------------------------
+setup_repo
+stub_brew upgrade-partial
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew partial upgrade: failure logged" \
+  "1" "$(grep -c 'brew: FAILED to upgrade formulae' <<< "$log")"
+check "brew partial upgrade: names only what moved" \
+  "1" "$(grep -c 'brew: upgraded jq$' <<< "$log")"
+check "brew partial upgrade: not logged as up to date" \
+  "0" "$(grep -c 'brew: formulae up to date' <<< "$log")"
+
+# --- homebrew: an unreadable post-upgrade list claims nothing ------------------
+setup_repo
+stub_brew outdated-fail-after
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew outdated fails after upgrade: nothing claimed" \
+  "0" "$(grep -c 'brew: upgraded' <<< "$log")"
+
+# --- homebrew: a non-macOS host never calls brew -------------------------------
+setup_repo
+stub_uname Linux
+log="$(run_update)"
+
+check "brew on Linux: never called" \
+  "never-called" "$(cat "$work/brew.calls" 2> /dev/null || echo never-called)"
+check "brew on Linux: nothing logged" "0" "$(grep -c 'brew:' <<< "$log")"
+check "brew on Linux: exits 0" "0" "$(cat "$work/status")"
 
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
