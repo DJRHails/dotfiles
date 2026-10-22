@@ -26,6 +26,13 @@ is missing — but only when that is safe:
 
 Uninitialised submodules are left to `bootstrap.sh`. Nothing is forced or reset.
 
+**Homebrew formulae are upgraded on macOS** — `brew update`, `brew upgrade --formula`,
+`brew cleanup`, non-interactively, with a one-line summary of what moved. **Formulae only,
+never casks**: a cask upgrade can quit a running GUI app (the terminal included) and can need
+sudo, and the casks that matter mostly self-update. Hold a formula back with `brew pin`. A
+failing brew is logged and never stops the steps after it; Linux hosts and hosts without
+`brew` skip the step.
+
 Logs to `$XDG_STATE_HOME/dotfiles/autoupdate.log` (default
 `~/.local/state/dotfiles/autoupdate.log`).
 
