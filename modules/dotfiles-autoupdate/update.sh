@@ -272,18 +272,20 @@ upgrade_homebrew() {
     log "brew: update FAILED (offline?); upgrading against the existing index"
   fi
 
-  local before after upgraded
+  # `brew upgrade` carries on past a formula that fails and exits 1 at the end,
+  # so the diff runs whatever its status; an unreadable `after` claims nothing.
+  local before after upgraded upgrade_ok=1
   before="$(brew_batch outdated --formula --quiet 2>>"$LOG")" || before=""
-  if brew_batch upgrade --formula >>"$LOG" 2>&1; then
-    after="$(brew_batch outdated --formula --quiet 2>>"$LOG")" || after=""
-    upgraded="$(comm -23 <(sort <<<"$before") <(sort <<<"$after") | xargs)"
-    if [ -n "$upgraded" ]; then
-      log "brew: upgraded $upgraded"
-    else
-      log "brew: formulae up to date"
-    fi
-  else
+  if ! brew_batch upgrade --formula >>"$LOG" 2>&1; then
+    upgrade_ok=0
     log "brew: FAILED to upgrade formulae (see errors above)"
+  fi
+  after="$(brew_batch outdated --formula --quiet 2>>"$LOG")" || after="$before"
+  upgraded="$(comm -23 <(sort <<<"$before") <(sort <<<"$after") | xargs)"
+  if [ -n "$upgraded" ]; then
+    log "brew: upgraded $upgraded"
+  elif ((upgrade_ok)); then
+    log "brew: formulae up to date"
   fi
 
   if ! brew_batch cleanup >>"$LOG" 2>&1; then
