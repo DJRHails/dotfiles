@@ -110,9 +110,13 @@ def _dollars(usage: dict[str, int], prices: dict[str, float]) -> float:
 def _parse_prices(spec: str | None) -> dict[str, float] | None:
     if spec is None:
         return None
-    parts = [float(p) for p in spec.split(",")]
+    wanted = f"--prices wants four numbers: IN,OUT,READ,WRITE dollars per million, got {spec!r}"
+    try:
+        parts = [float(p) for p in spec.split(",")]
+    except ValueError:
+        raise SystemExit(wanted) from None
     if len(parts) != 4:
-        raise SystemExit("--prices wants four numbers: IN,OUT,READ,WRITE dollars per million")
+        raise SystemExit(wanted)
     return dict(zip(USAGE_KEYS, parts, strict=True))
 
 
