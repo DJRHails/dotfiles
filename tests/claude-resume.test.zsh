@@ -69,6 +69,11 @@ check "full id still resolves" \
   "ANT --resume $unique_id in $work/proj-a" "$(claude::resume "$unique_id" 2>&1)"
 check "default-profile session routes through plain claude" \
   "DEFAULT --resume $default_id in $work/proj-c config=unset" "$(claude::resume bbbb3333 2>&1)"
+check "default-profile session drops an inherited CLAUDE_CONFIG_DIR, leaving the caller's" \
+  "DEFAULT --resume $default_id in $work/proj-c config=unset
+caller=$HOME/.claude-other" \
+  "$(export CLAUDE_CONFIG_DIR="$HOME/.claude-other"
+     claude::resume bbbb3333 2>&1; print -r -- "caller=$CLAUDE_CONFIG_DIR")"
 check "same id under two project dirs follows the newest transcript" \
   "ANT --resume $moved_id in $work/proj-b" "$(claude::resume dddd5555 2>&1)"
 
