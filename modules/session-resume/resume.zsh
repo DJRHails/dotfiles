@@ -18,6 +18,10 @@ _agent_session_resume() {
     CODEX_HOME=$codex_home codex resume "$id" "$@"
   elif [[ $claude_home == $HOME/.claude-ant ]]; then
     claude::ant --resume "$id" "$@"
+  elif [[ $claude_home == $HOME/.claude ]]; then
+    # Claude reads ~/.claude.json (and the keychain login) only when
+    # CLAUDE_CONFIG_DIR is unset; pointing it at ~/.claude starts a blank profile.
+    (unset CLAUDE_CONFIG_DIR; claude --resume "$id" "$@")
   else
     CLAUDE_CONFIG_DIR=$claude_home claude --resume "$id" "$@"
   fi

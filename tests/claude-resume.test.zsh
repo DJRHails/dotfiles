@@ -43,7 +43,7 @@ source "$aliases_zsh"
 # The launchers print where they were called and with what, instead of
 # starting claude.
 claude::ant() { print "ANT $* in $PWD"; }
-claude() { print "DEFAULT $* in $PWD"; }
+claude() { print "DEFAULT $* in $PWD config=${CLAUDE_CONFIG_DIR-unset}"; }
 
 fails=0
 check() {
@@ -68,7 +68,7 @@ check "unique prefix resolves to the full id, cwd and ant profile" \
 check "full id still resolves" \
   "ANT --resume $unique_id in $work/proj-a" "$(claude::resume "$unique_id" 2>&1)"
 check "default-profile session routes through plain claude" \
-  "DEFAULT --resume $default_id in $work/proj-c" "$(claude::resume bbbb3333 2>&1)"
+  "DEFAULT --resume $default_id in $work/proj-c config=unset" "$(claude::resume bbbb3333 2>&1)"
 check "same id under two project dirs follows the newest transcript" \
   "ANT --resume $moved_id in $work/proj-b" "$(claude::resume dddd5555 2>&1)"
 

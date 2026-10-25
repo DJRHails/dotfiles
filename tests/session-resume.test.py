@@ -68,7 +68,7 @@ class ResumeTests(unittest.TestCase):
         script = '''
 source "$1/modules/claude/aliases.zsh"
 source "$1/modules/codex/aliases.zsh"
-claude() { print -r -- "CLAUDE $* in $PWD config=$CLAUDE_CONFIG_DIR"; }
+claude() { print -r -- "CLAUDE $* in $PWD config=${CLAUDE_CONFIG_DIR-unset}"; }
 claude::ant() { print -r -- "ANT $* in $PWD"; }
 codex() { print -r -- "CODEX $* in $PWD"; }
 "$2::resume" "$3" --model test-model
@@ -162,7 +162,7 @@ codex() { print -r -- "CODEX $* in $PWD"; }
         self.assertIn("tool-result-pistachio", content)
         self.assertIn(CODEX_ID, (self.home / ".claude/history.jsonl").read_text())
         self.assertIn(f"--resume {CODEX_ID}", result.stdout)
-        self.assertIn(f"config={self.home}/.claude", result.stdout)
+        self.assertIn("config=unset", result.stdout)
 
     def test_unknown_id_missing_cwd_and_subagents_refuse(self) -> None:
         self.assertNotEqual(self.launch("codex", "ffff").returncode, 0)
