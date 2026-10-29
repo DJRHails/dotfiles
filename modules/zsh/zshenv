@@ -10,6 +10,23 @@ _dotfiles_bin="${DOTFILES:-$HOME/.files}/bin"
 [[ ":$PATH:" != *":$_dotfiles_bin:"* ]] && export PATH="${PATH:+$PATH:}$_dotfiles_bin"
 unset _dotfiles_bin
 
+# Claude Code re-sends every background agent's whole transcript to the agent's model every
+# 30 s only to fill its 3-5 word status line in the agents panel (query_source agent_summary;
+# anthropics/claude-code#86879 collects measurements of 18-26%), and no setting turns it off.
+# This Bun preload, vendored byte-for-byte from revision 4f1ad563fbe4 of
+# gist.github.com/flamerix-ai/c3905705cc4205e5de3011fa2e74efce, leaves that one timer unarmed.
+# It installs only inside Claude Code, so any other bun inheriting BUN_OPTIONS loads it as a
+# no-op. In .zshenv so every claude started from a shell gets it, interactive or not; a running
+# `claude daemon` keeps its old env until `claude daemon stop --any`. Write `--preload=` with
+# `=`: the space form breaks every `bun <subcommand>`. It matches the timer by source text and
+# fails open, so after a Claude Code update confirm that with CC_AGENT_SUMMARY_LOG=<file> set,
+# a background agent running past 30 s logs `summary timer #1 suppressed`.
+_no_agent_summary="${DOTFILES:-$HOME/.files}/modules/claude/scripts/no-agent-summary.js"
+if [[ -f $_no_agent_summary && " ${BUN_OPTIONS-} " != *" --preload=$_no_agent_summary "* ]]; then
+  export BUN_OPTIONS="${BUN_OPTIONS:+$BUN_OPTIONS }--preload=$_no_agent_summary"
+fi
+unset _no_agent_summary
+
 # Linux: logind gives every PAM login a per-user runtime dir. When it can't — its SessionsMax
 # (8192) fills up when a client opens a fresh ssh connection per call and each leaves a session
 # stuck in "closing" — pam_systemd is `optional`, so the login succeeds with no XDG_RUNTIME_DIR
