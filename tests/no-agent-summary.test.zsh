@@ -40,8 +40,18 @@ check no-hook-file-leaves-env "--smol" "$(bun_options_after "$work" --smol)"
 # claude actually installed here. Skipped where claude is absent.
 if (( $+commands[claude] )); then
   log="$work/hook.log"
-  BUN_OPTIONS="--preload=$hook" CC_AGENT_SUMMARY_LOG=$log claude --version >/dev/null
+  # A second preload records the real executable, past any wrapper script on PATH.
+  probe="$work/exec-path.js"
+  print -r -- 'require("fs").writeFileSync(process.env.EXEC_PATH_OUT, process.execPath)' >$probe
+  BUN_OPTIONS="--preload=$hook --preload=$probe" CC_AGENT_SUMMARY_LOG=$log \
+    EXEC_PATH_OUT="$work/exec-path" claude --version >/dev/null
   check activates-in-claude "preload active mode=off" "$(grep -o 'preload active mode=off' "$log")"
+  # The hook fails open: it finds the summary timer by this line in the callback's source, so an
+  # update that drops it leaves the hook active but suppressing nothing.
+  anchor='[AgentSummary] Timer fired'
+  has_anchor=no
+  grep -aqF -- "$anchor" "$(<$work/exec-path)" && has_anchor=yes
+  check claude-carries-anchor yes $has_anchor
 else
   print "skip activates-in-claude: no claude on PATH"
 fi
