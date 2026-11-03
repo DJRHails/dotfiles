@@ -10,7 +10,7 @@ consecutive snapshots. Pipe it into the Monitor tool and each line becomes a not
 
 ```bash
 ~/.agents/skills/pr-watch/scripts/pr-watch --repo OWNER/NAME --requeue 13029 12931 12408
-~/.agents/skills/pr-watch/scripts/pr-watch --author @me --requeue    # all my open, ready PRs
+~/.agents/skills/pr-watch/scripts/pr-watch --author @me --requeue --merge-approved  # merge mine as approved
 ~/.agents/skills/pr-watch/scripts/pr-watch --once 13029               # one pass, for testing
 ```
 
@@ -18,6 +18,12 @@ Arm it with Monitor at the 30-minute maximum and re-arm on each expiry notice. S
 in `~/.cache/pr-watch/<owner>_<repo>/`, so a re-arm resumes silently instead of replaying history,
 and the first pass over a new PR only records a baseline. `--author` is re-resolved every pass,
 so new PRs join and merged ones drop out. `--state-dir` isolates a watch from earlier ones.
+
+**When the user says "my PRs", watch `--author @me`, not a fixed list of numbers.** A fixed list
+silently misses every PR opened after the watch starts. Add explicit numbers only for other
+people's PRs. When they ask to merge PRs as they get approved, add `--merge-approved`: it turns on
+auto-merge for the user's own approved, non-conflicting PRs (never anyone else's), including PRs
+already approved when the watch starts.
 
 ## Events
 
@@ -30,6 +36,7 @@ so new PRs join and merged ones drop out. `--state-dir` isolates a watch from ea
 | `open-thread <id> last-by=<login>` | a new unresolved thread, or a reply on one |
 | `comment <id> <login>` | new top-level comment from someone else |
 | `removed-from-merge-queue <at> <reason>` | `merged`, or a drop such as `checks_timed_out` |
+| `approved; auto-merge enabled` | `--merge-approved` queued one of your approved PRs |
 | `requeued after checks_timed_out` | `--requeue` put an approved PR back in the queue |
 | `state=MERGED` / `state=CLOSED` | done; the PR is dropped from the watch |
 | `snapshot failed: <error>` | `gh` could not read the PR (typo'd number, auth, rate limit); printed once per failure streak |

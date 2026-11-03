@@ -6,7 +6,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 usage: pr-watch [--repo OWNER/NAME] [--author LOGIN] [--interval SECS] [--state-dir DIR]
-                [--requeue] [--once] [PR ...]
+                [--requeue] [--merge-approved] [--once] [PR ...]
 
   PR ...           PR numbers to watch.
   --author LOGIN   Also watch every open, non-draft PR by LOGIN (@me allowed); re-resolved each
@@ -17,11 +17,14 @@ usage: pr-watch [--repo OWNER/NAME] [--author LOGIN] [--interval SECS] [--state-
                    over a PR records a baseline and prints nothing.
   --requeue        When the merge queue drops an approved, open PR for checks_timed_out,
                    put it back (gh pr merge --auto) and print "requeued".
+  --merge-approved Turn on auto-merge (gh pr merge --auto) for every open, approved,
+                   non-conflicting PR you authored that does not have it yet, including PRs
+                   already approved on the first pass. Other people's PRs are never merged.
   --once           One pass, then exit.
 EOF
 }
 
-repo="" author="" interval=120 state_dir="" requeue=0 once=0
+repo="" author="" interval=120 state_dir="" requeue=0 merge_approved=0 once=0
 prs=()
 while (($#)); do
   case "$1" in
@@ -30,6 +33,7 @@ while (($#)); do
   --interval) interval=$2 && shift 2 ;;
   --state-dir) state_dir=$2 && shift 2 ;;
   --requeue) requeue=1 && shift ;;
+  --merge-approved) merge_approved=1 && shift ;;
   --once) once=1 && shift ;;
   -h | --help) usage && exit 0 ;;
   -*) echo "pr-watch: unknown option $1" >&2 && usage >&2 && exit 2 ;;
@@ -46,6 +50,10 @@ fi
 owner=${repo%/*} name=${repo#*/}
 state_dir=${state_dir:-$HOME/.cache/pr-watch/${owner}_${name}}
 mkdir -p "$state_dir"
+viewer=""
+if ((merge_approved)); then
+  viewer=$(gh api user --jq .login)
+fi
 
 # One sorted line per observable fact; a line that appears between passes is an event.
 # shellcheck disable=SC2016  # $owner/$me are GraphQL and jq variables, not shell ones
@@ -53,7 +61,7 @@ snapshot() {
   gh api graphql -F number="$1" -f owner="$owner" -f name="$name" -f query='
     query($owner: String!, $name: String!, $number: Int!) {
       repository(owner: $owner, name: $name) { pullRequest(number: $number) {
-        state mergeable reviewDecision
+        state mergeable reviewDecision isInMergeQueue autoMergeRequest { enabledAt }
         timelineItems(last: 5, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) { nodes {
           ... on RemovedFromMergeQueueEvent { createdAt reason } } }
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -64,6 +72,8 @@ snapshot() {
         author { login } } } }' --jq '.data.repository.pullRequest | .author.login as $me | [
       "state=\(.state)",
       "decision=\(.reviewDecision // "NONE")",
+      "author=\($me)",
+      (if .isInMergeQueue or .autoMergeRequest != null then "automerge=on" else empty end),
       "ci=\(.commits.nodes[0].commit.statusCheckRollup.state // "none")",
       (if .mergeable == "CONFLICTING" then "CONFLICTING"
        elif .mergeable == "UNKNOWN" then "mergeable=UNKNOWN" else empty end),
@@ -124,6 +134,21 @@ maybe_requeue() {
   fi
 }
 
+maybe_merge() {
+  local number=$1 current=$2
+  ((merge_approved)) || return 0
+  grep -qx 'state=OPEN' <<<"$current" && grep -qx 'decision=APPROVED' <<<"$current" &&
+    grep -qx "author=$viewer" <<<"$current" || return 0
+  ! grep -qxE 'automerge=on|CONFLICTING' <<<"$current" || return 0
+  if gh pr merge "$number" --repo "$repo" --auto >/dev/null 2>"$state_dir/stderr"; then
+    rm -f "$state_dir/$number.merge.failing"
+    echo "#$number: approved; auto-merge enabled  https://github.com/$repo/pull/$number"
+  else
+    report_failure "$number.merge" \
+      "#$number: approved but enabling auto-merge failed: $(head -n1 "$state_dir/stderr")"
+  fi
+}
+
 pass() {
   local number current file line
   [[ -z $author ]] || list_authored
@@ -142,7 +167,7 @@ pass() {
     if [[ -f $file ]]; then
       while IFS= read -r line; do
         case "$line" in
-        ci=PENDING | ci=EXPECTED | state=OPEN | decision=* | mergeable=UNKNOWN) ;;
+        ci=PENDING | ci=EXPECTED | state=OPEN | decision=* | mergeable=UNKNOWN | author=* | automerge=*) ;;
         *)
           echo "#$number: $line  https://github.com/$repo/pull/$number"
           maybe_requeue "$number" "$line"
@@ -153,6 +178,7 @@ pass() {
         echo "#$number: now APPROVED  https://github.com/$repo/pull/$number"
     fi
     echo "$current" >"$file"
+    maybe_merge "$number" "$current"
     if grep -qxE 'state=(MERGED|CLOSED)' <<<"$current"; then
       forget "$number"
     fi
