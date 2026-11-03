@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# Watch GitHub PRs and print one line per change: CI result, conflicts, reviews, unresolved
+# threads, comments, merge-queue removals, merges and closes. Built to feed Claude's Monitor tool.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: pr-watch [--repo OWNER/NAME] [--author LOGIN] [--interval SECS] [--state-dir DIR]
+                [--requeue] [--once] [PR ...]
+
+  PR ...           PR numbers to watch.
+  --author LOGIN   Also watch every open, non-draft PR by LOGIN (@me allowed); re-resolved each
+                   pass, so new PRs join and merged ones drop out.
+  --repo           Default: the current directory's GitHub repo.
+  --interval       Seconds between passes (default 120).
+  --state-dir      Where snapshots live (default ~/.cache/pr-watch/OWNER_NAME). The first pass
+                   over a PR records a baseline and prints nothing.
+  --requeue        When the merge queue drops an approved, open PR for checks_timed_out,
+                   put it back (gh pr merge --auto) and print "requeued".
+  --once           One pass, then exit.
+EOF
+}
+
+repo="" author="" interval=120 state_dir="" requeue=0 once=0
+prs=()
+while (($#)); do
+  case "$1" in
+  --repo) repo=$2 && shift 2 ;;
+  --author) author=$2 && shift 2 ;;
+  --interval) interval=$2 && shift 2 ;;
+  --state-dir) state_dir=$2 && shift 2 ;;
+  --requeue) requeue=1 && shift ;;
+  --once) once=1 && shift ;;
+  -h | --help) usage && exit 0 ;;
+  -*) echo "pr-watch: unknown option $1" >&2 && usage >&2 && exit 2 ;;
+  *) prs+=("$1") && shift ;;
+  esac
+done
+
+if [[ -z $repo ]]; then
+  repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+fi
+if ((${#prs[@]} == 0)) && [[ -z $author ]]; then
+  echo "pr-watch: give PR numbers and/or --author" >&2 && exit 2
+fi
+owner=${repo%/*} name=${repo#*/}
+state_dir=${state_dir:-$HOME/.cache/pr-watch/${owner}_${name}}
+mkdir -p "$state_dir"
+
+# One sorted line per observable fact; a line that appears between passes is an event.
+# shellcheck disable=SC2016  # $owner/$me are GraphQL and jq variables, not shell ones
+snapshot() {
+  gh api graphql -F number="$1" -f owner="$owner" -f name="$name" -f query='
+    query($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) { pullRequest(number: $number) {
+        state mergeable reviewDecision
+        timelineItems(last: 5, itemTypes: [REMOVED_FROM_MERGE_QUEUE_EVENT]) { nodes {
+          ... on RemovedFromMergeQueueEvent { createdAt reason } } }
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+        reviews(last: 50) { nodes { id author { login } state } }
+        reviewThreads(first: 100) { nodes { id isResolved comments(last: 1) {
+          nodes { author { login } } } } }
+        comments(last: 50) { nodes { id author { login } } }
+        author { login } } } }' --jq '.data.repository.pullRequest | .author.login as $me | [
+      "state=\(.state)",
+      "decision=\(.reviewDecision // "NONE")",
+      "ci=\(.commits.nodes[0].commit.statusCheckRollup.state // "none")",
+      (if .mergeable == "CONFLICTING" then "CONFLICTING" else empty end),
+      (.timelineItems.nodes[] | "removed-from-merge-queue \(.createdAt) \(.reason)"),
+      (.reviews.nodes[] | select(.author.login != $me)
+        | "review \(.id) \(.author.login) \(.state)"),
+      (.reviewThreads.nodes[] | select(.isResolved | not)
+        | "open-thread \(.id) last-by=\(.comments.nodes[0].author.login)"),
+      (.comments.nodes[] | select(.author.login != $me) | "comment \(.id) \(.author.login)")
+    ] | .[]' | sort
+}
+
+forget() {
+  local kept=() number
+  for number in ${prs[@]+"${prs[@]}"}; do
+    [[ $number == "$1" ]] || kept+=("$number")
+  done
+  prs=(${kept[@]+"${kept[@]}"})
+}
+
+watched() {
+  local number
+  for number in ${prs[@]+"${prs[@]}"}; do echo "$number"; done
+  if [[ -n $author ]]; then
+    gh pr list --repo "$repo" --author "$author" --state open \
+      --json number,isDraft --jq '.[] | select(.isDraft | not) | .number'
+  fi
+}
+
+maybe_requeue() {
+  local number=$1 line=$2
+  [[ $line == removed-from-merge-queue*checks_timed_out ]] || return 0
+  ((requeue)) || return 0
+  local now
+  now=$(snapshot "$number")
+  grep -qx 'state=OPEN' <<<"$now" && grep -qx 'decision=APPROVED' <<<"$now" || return 0
+  if gh pr merge "$number" --repo "$repo" --auto >/dev/null 2>&1; then
+    echo "#$number: requeued after checks_timed_out"
+  else
+    echo "#$number: requeue FAILED; run gh pr merge $number --repo $repo --auto"
+  fi
+}
+
+pass() {
+  local number current file line
+  for number in $(watched | sort -un); do
+    file="$state_dir/$number"
+    if ! current=$(snapshot "$number" 2>/dev/null) || [[ -z $current ]]; then
+      continue
+    fi
+    if [[ -f $file ]]; then
+      while IFS= read -r line; do
+        case "$line" in
+        ci=PENDING | ci=EXPECTED | state=OPEN | decision=*) ;;
+        *)
+          echo "#$number: $line  https://github.com/$repo/pull/$number"
+          maybe_requeue "$number" "$line"
+          ;;
+        esac
+      done < <(comm -13 "$file" <(echo "$current"))
+      grep -q '^decision=APPROVED$' <<<"$current" && ! grep -q '^decision=APPROVED$' "$file" &&
+        echo "#$number: now APPROVED  https://github.com/$repo/pull/$number"
+    fi
+    echo "$current" >"$file"
+    if grep -qxE 'state=(MERGED|CLOSED)' <<<"$current"; then
+      forget "$number"
+    fi
+  done
+}
+
+while true; do
+  pass
+  ((once)) && exit 0
+  sleep "$interval"
+done
