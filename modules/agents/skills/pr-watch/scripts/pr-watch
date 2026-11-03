@@ -65,7 +65,8 @@ snapshot() {
       "state=\(.state)",
       "decision=\(.reviewDecision // "NONE")",
       "ci=\(.commits.nodes[0].commit.statusCheckRollup.state // "none")",
-      (if .mergeable == "CONFLICTING" then "CONFLICTING" else empty end),
+      (if .mergeable == "CONFLICTING" then "CONFLICTING"
+       elif .mergeable == "UNKNOWN" then "mergeable=UNKNOWN" else empty end),
       (.timelineItems.nodes[] | "removed-from-merge-queue \(.createdAt) \(.reason)"),
       (.reviews.nodes[] | select(.author.login != $me)
         | "review \(.id) \(.author.login) \(.state)"),
@@ -134,10 +135,14 @@ pass() {
       continue
     fi
     rm -f "$file.failing"
+    # GitHub recomputes mergeability lazily; UNKNOWN keeps the last known conflict state.
+    if grep -qx 'mergeable=UNKNOWN' <<<"$current" && [[ -f $file ]] && grep -qx 'CONFLICTING' "$file"; then
+      current=$(printf '%s\nCONFLICTING\n' "$current" | sort)
+    fi
     if [[ -f $file ]]; then
       while IFS= read -r line; do
         case "$line" in
-        ci=PENDING | ci=EXPECTED | state=OPEN | decision=*) ;;
+        ci=PENDING | ci=EXPECTED | state=OPEN | decision=* | mergeable=UNKNOWN) ;;
         *)
           echo "#$number: $line  https://github.com/$repo/pull/$number"
           maybe_requeue "$number" "$line"
