@@ -9,7 +9,7 @@ description: Watch a set of GitHub PRs and get one notification per change — C
 consecutive snapshots. Pipe it into the Monitor tool and each line becomes a notification.
 
 ```bash
-~/.agents/skills/pr-watch/scripts/pr-watch --repo mantic-ai/mntc --requeue 13029 12931 12408
+~/.agents/skills/pr-watch/scripts/pr-watch --repo OWNER/NAME --requeue 13029 12931 12408
 ~/.agents/skills/pr-watch/scripts/pr-watch --author @me --requeue    # all my open, ready PRs
 ~/.agents/skills/pr-watch/scripts/pr-watch --once 13029               # one pass, for testing
 ```
@@ -32,6 +32,7 @@ so new PRs join and merged ones drop out. `--state-dir` isolates a watch from ea
 | `removed-from-merge-queue <at> <reason>` | `merged`, or a drop such as `checks_timed_out` |
 | `requeued after checks_timed_out` | `--requeue` put an approved PR back in the queue |
 | `state=MERGED` / `state=CLOSED` | done; the PR is dropped from the watch |
+| `snapshot failed: <error>` | `gh` could not read the PR (typo'd number, auth, rate limit); printed once per failure streak |
 
 ## Acting on events
 

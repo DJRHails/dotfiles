@@ -83,13 +83,27 @@ forget() {
   prs=(${kept[@]+"${kept[@]}"})
 }
 
-watched() {
-  local number
-  for number in ${prs[@]+"${prs[@]}"}; do echo "$number"; done
-  if [[ -n $author ]]; then
-    gh pr list --repo "$repo" --author "$author" --state open \
-      --json number,isDraft --jq '.[] | select(.isDraft | not) | .number'
+# Print a failure once per streak, so an outage is one notification rather than one per pass.
+report_failure() {
+  [[ -f $state_dir/$1.failing ]] || echo "$2"
+  touch "$state_dir/$1.failing"
+}
+
+# The author's open PRs plus the previous listing, so a PR that merged since still gets the pass
+# that prints its MERGED line. The listing persists, so this holds across a Monitor re-arm too.
+authored=()
+list_authored() {
+  local listed previous="" number
+  if ! listed=$(gh pr list --repo "$repo" --author "$author" --state open \
+    --json number,isDraft --jq '.[] | select(.isDraft | not) | .number' 2>"$state_dir/stderr"); then
+    report_failure author "pr-watch: listing PRs by $author failed: $(head -n1 "$state_dir/stderr")"
+    return 0
   fi
+  rm -f "$state_dir/author.failing"
+  [[ -f $state_dir/authored ]] && previous=$(<"$state_dir/authored")
+  echo "$listed" >"$state_dir/authored"
+  authored=()
+  for number in $listed $previous; do authored+=("$number"); done
 }
 
 maybe_requeue() {
@@ -97,7 +111,10 @@ maybe_requeue() {
   [[ $line == removed-from-merge-queue*checks_timed_out ]] || return 0
   ((requeue)) || return 0
   local now
-  now=$(snapshot "$number")
+  if ! now=$(snapshot "$number"); then
+    echo "#$number: requeue skipped, snapshot failed; run gh pr merge $number --repo $repo --auto"
+    return 0
+  fi
   grep -qx 'state=OPEN' <<<"$now" && grep -qx 'decision=APPROVED' <<<"$now" || return 0
   if gh pr merge "$number" --repo "$repo" --auto >/dev/null 2>&1; then
     echo "#$number: requeued after checks_timed_out"
@@ -108,11 +125,15 @@ maybe_requeue() {
 
 pass() {
   local number current file line
-  for number in $(watched | sort -un); do
+  [[ -z $author ]] || list_authored
+  for number in $(printf '%s\n' ${prs[@]+"${prs[@]}"} ${authored[@]+"${authored[@]}"} |
+    sort -un); do
     file="$state_dir/$number"
-    if ! current=$(snapshot "$number" 2>/dev/null) || [[ -z $current ]]; then
+    if ! current=$(snapshot "$number" 2>"$state_dir/stderr") || [[ -z $current ]]; then
+      report_failure "$number" "#$number: snapshot failed: $(head -n1 "$state_dir/stderr")"
       continue
     fi
+    rm -f "$file.failing"
     if [[ -f $file ]]; then
       while IFS= read -r line; do
         case "$line" in
