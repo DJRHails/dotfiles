@@ -20,6 +20,7 @@ usage: pr-watch [--repo OWNER/NAME] [--author LOGIN] [--interval SECS] [--state-
   --merge-approved Turn on auto-merge (gh pr merge --auto) for every open, approved,
                    non-conflicting PR you authored that does not have it yet, including PRs
                    already approved on the first pass. Other people's PRs are never merged.
+                   A PR the merge queue has dropped is left to --requeue and to you.
   --once           One pass, then exit.
 EOF
 }
@@ -140,6 +141,8 @@ maybe_merge() {
   grep -qx 'state=OPEN' <<<"$current" && grep -qx 'decision=APPROVED' <<<"$current" &&
     grep -qx "author=$viewer" <<<"$current" || return 0
   ! grep -qxE 'automerge=on|CONFLICTING' <<<"$current" || return 0
+  # After a queue drop, re-adding is --requeue's call (timeouts only) or the agent's, not ours.
+  ! grep -q '^removed-from-merge-queue ' <<<"$current" || return 0
   if gh pr merge "$number" --repo "$repo" --auto >/dev/null 2>"$state_dir/stderr"; then
     rm -f "$state_dir/$number.merge.failing"
     echo "#$number: approved; auto-merge enabled  https://github.com/$repo/pull/$number"
@@ -161,13 +164,15 @@ pass() {
     fi
     rm -f "$file.failing"
     # GitHub recomputes mergeability lazily; UNKNOWN keeps the last known conflict state.
-    if grep -qx 'mergeable=UNKNOWN' <<<"$current" && [[ -f $file ]] && grep -qx 'CONFLICTING' "$file"; then
+    if grep -qx 'mergeable=UNKNOWN' <<<"$current" && [[ -f $file ]] &&
+      grep -qx 'CONFLICTING' "$file"; then
       current=$(printf '%s\nCONFLICTING\n' "$current" | sort)
     fi
     if [[ -f $file ]]; then
       while IFS= read -r line; do
         case "$line" in
-        ci=PENDING | ci=EXPECTED | state=OPEN | decision=* | mergeable=UNKNOWN | author=* | automerge=*) ;;
+        ci=PENDING | ci=EXPECTED | state=OPEN | decision=* | mergeable=UNKNOWN) ;;
+        author=* | automerge=*) ;;
         *)
           echo "#$number: $line  https://github.com/$repo/pull/$number"
           maybe_requeue "$number" "$line"

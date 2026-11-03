@@ -23,7 +23,8 @@ so new PRs join and merged ones drop out. `--state-dir` isolates a watch from ea
 silently misses every PR opened after the watch starts. Add explicit numbers only for other
 people's PRs. When they ask to merge PRs as they get approved, add `--merge-approved`: it turns on
 auto-merge for the user's own approved, non-conflicting PRs (never anyone else's), including PRs
-already approved when the watch starts.
+already approved when the watch starts. It never re-adds a PR the merge queue dropped: timeouts
+are `--requeue`'s job, and any other drop needs its failing check read first.
 
 ## Events
 
