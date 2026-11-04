@@ -18,7 +18,8 @@ usage: pr-watch [--repo OWNER/NAME] [--author LOGIN] [--interval SECS] [--state-
   --requeue        When the merge queue drops an approved, open PR for checks_timed_out,
                    put it back (gh pr merge --auto) and print "requeued".
   --merge-approved Turn on auto-merge (gh pr merge --auto) for every open, approved,
-                   non-conflicting PR you authored that does not have it yet, including PRs
+                   non-conflicting PR you authored with no unresolved review threads that
+                   does not have it yet, including PRs
                    already approved on the first pass. Other people's PRs are never merged.
                    A PR the merge queue has dropped is left to --requeue and to you.
   --once           One pass, then exit.
@@ -141,6 +142,8 @@ maybe_merge() {
   grep -qx 'state=OPEN' <<<"$current" && grep -qx 'decision=APPROVED' <<<"$current" &&
     grep -qx "author=$viewer" <<<"$current" || return 0
   ! grep -qxE 'automerge=on|CONFLICTING' <<<"$current" || return 0
+  # Review threads are answered and resolved before merging, bot threads included.
+  ! grep -q '^open-thread ' <<<"$current" || return 0
   # After a queue drop, re-adding is --requeue's call (timeouts only) or the agent's, not ours.
   ! grep -q '^removed-from-merge-queue ' <<<"$current" || return 0
   if gh pr merge "$number" --repo "$repo" --auto >/dev/null 2>"$state_dir/stderr"; then
