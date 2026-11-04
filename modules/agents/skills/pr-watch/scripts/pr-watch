@@ -168,6 +168,11 @@ pass() {
     sort -un); do
     file="$state_dir/$number"
     if ! current=$(snapshot "$number" 2>"$state_dir/stderr") || [[ -z $current ]]; then
+      # An outage that starts mid-pass would otherwise fail every remaining PR in turn.
+      if ! gh api rate_limit --silent 2>/dev/null; then
+        report_failure github "pr-watch: GitHub unreachable: $(head -n1 "$state_dir/stderr")"
+        return 0
+      fi
       report_failure "$number" "#$number: snapshot failed: $(head -n1 "$state_dir/stderr")"
       continue
     fi
