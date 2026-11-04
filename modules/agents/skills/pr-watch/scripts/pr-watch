@@ -154,6 +154,12 @@ maybe_merge() {
 
 pass() {
   local number current file line
+  # One outage line rather than one per PR; rate_limit calls do not count against the limit.
+  if ! gh api rate_limit --silent 2>"$state_dir/stderr"; then
+    report_failure github "pr-watch: GitHub unreachable: $(head -n1 "$state_dir/stderr")"
+    return 0
+  fi
+  rm -f "$state_dir/github.failing"
   [[ -z $author ]] || list_authored
   for number in $(printf '%s\n' ${prs[@]+"${prs[@]}"} ${authored[@]+"${authored[@]}"} |
     sort -un); do
