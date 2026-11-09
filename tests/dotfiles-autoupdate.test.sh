@@ -44,9 +44,14 @@ fake_home="$work/home"
 
 # A bare origin plus a clone, so the script's fetch/merge run for real.
 setup_repo() {
-  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home" "$work/glassine.calls"
+  rm -rf -- "$work/origin" "$work/clone" "$work/state" "$fake_home" "$work/glassine.calls" \
+    "$work/brew.calls" "$work/brew.env" "$work/brew.upgraded"
   mkdir -p "$fake_home"
   printf '[user]\n\tname = t\n\temail = t@t\n' > "$fake_home/.gitconfig"
+  # Every case gets a brew stub: update.sh puts /opt/homebrew/bin on PATH, so
+  # without one this suite — which runs at commit time — would upgrade the
+  # developer's real Homebrew on every macOS commit.
+  stub_brew
   git init --quiet --bare "$work/origin"
   git clone --quiet "$work/origin" "$work/clone" 2> /dev/null
   clone="$work/clone"
@@ -119,6 +124,53 @@ done < <(git -C "$clone" ls-files)
 exit 0
 STUB
   chmod +x "$fake_home/.local/bin/glassine"
+}
+
+# A stand-in for brew that records each call. `outdated` reports jq, ripgrep and
+# a pinned node until an upgrade succeeds, then only node — the way a real
+# `brew upgrade` leaves pinned formulae outdated. upgrade-partial upgrades jq but
+# not ripgrep and exits 1, as brew does when one formula fails among several;
+# outdated-fail-after makes the post-upgrade `outdated` fail.
+stub_brew() {
+  local mode=${1:-ok}
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/brew" << STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$work/brew.calls"
+case "\$1" in
+  outdated)
+    [ "$mode" = outdated-fail-after ] && [ -f "$work/brew.upgraded" ] && exit 1
+    if [ ! -f "$work/brew.upgraded" ]; then
+      printf 'jq\nripgrep\n'
+    elif [ "$mode" = upgrade-partial ]; then
+      printf 'ripgrep\n'
+    fi
+    printf 'node\n'
+    ;;
+  upgrade)
+    printf '%s %s\n' "\${NONINTERACTIVE:-unset}" "\${HOMEBREW_NO_AUTO_UPDATE:-unset}" > "$work/brew.env"
+    [ "$mode" = upgrade-fail ] && exit 1
+    touch "$work/brew.upgraded"
+    [ "$mode" = upgrade-partial ] && exit 1
+    ;;
+esac
+exit 0
+STUB
+  chmod +x "$fake_home/.local/bin/brew"
+}
+
+# Report a different kernel from `uname -s`; everything else (the sfw step's
+# `uname -m`) passes through to the real binary.
+stub_uname() {
+  local real
+  real="$(command -v uname)"
+  mkdir -p "$fake_home/.local/bin"
+  cat > "$fake_home/.local/bin/uname" << STUB
+#!/usr/bin/env bash
+[ "\$*" = -s ] && { echo "$1"; exit 0; }
+exec "$real" "\$@"
+STUB
+  chmod +x "$fake_home/.local/bin/uname"
 }
 
 # Mark the clone as a glassine repo the way a real one is marked: a tracked
@@ -443,6 +495,240 @@ check "sfw offline: skip logged" \
 check "sfw offline: exits 0" "0" "$(cat "$work/status")"
 check "sfw offline: later steps still ran" \
   "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
+# --- submodules: stubs ---------------------------------------------------------
+# A superproject whose `sub` submodule is pinned to v1 and checked out detached,
+# the way `git submodule update` leaves it. v2 exists only on the submodule's
+# origin, so following a bump to it needs a fetch inside the submodule.
+sub_git() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}" > /dev/null 2>&1; }
+
+setup_submodule_repo() {
+  setup_repo
+  local so="$work/sub-origin" sw="$work/sub-work"
+  rm -rf -- "$so" "$sw"
+  git init --quiet --bare -b main "$so"
+  git clone --quiet "$so" "$sw" 2> /dev/null
+  sub_git "$sw" checkout -b main
+  printf 'v1\n' > "$sw/tracked.txt"
+  sub_git "$sw" add -A
+  sub_git "$sw" commit -m v1
+  sub_git "$sw" push origin HEAD:main
+  sub_v1="$(git -C "$sw" rev-parse HEAD)"
+  git_quiet -c protocol.file.allow=always submodule add "$so" sub
+  git_quiet commit -m "add sub"
+  git_quiet push origin HEAD:main
+  sub_git "$clone/sub" checkout --detach
+  printf 'v2\n' > "$sw/tracked.txt"
+  sub_git "$sw" commit -am v2
+  sub_git "$sw" push origin HEAD:main
+  sub_v2="$(git -C "$sw" rev-parse HEAD)"
+}
+
+# Upstream bumps the pin (what the bump workflow does): only the gitlink moves.
+bump_upstream_pin() {
+  local up="$work/upstream"
+  rm -rf -- "$up"
+  git clone --quiet "$work/origin" "$up" 2> /dev/null
+  sub_git "$up" update-index --cacheinfo "160000,$1,sub"
+  sub_git "$up" commit -m "bump sub"
+  git -C "$up" push --quiet origin HEAD:main
+}
+
+sub_head() { git -C "$clone/sub" rev-parse HEAD; }
+
+# --- submodules: a clean detached submodule follows a bumped pin --------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+log="$(run_update)"
+
+check "submodule clean: superproject pulled" \
+  "$sub_v2" "$(git -C "$clone" rev-parse HEAD:sub)"
+check "submodule clean: moved to the new pin" "$sub_v2" "$(sub_head)"
+check "submodule clean: worktree shows the pinned content" \
+  "v2" "$(cat "$clone/sub/tracked.txt")"
+check "submodule clean: logged" \
+  "1" "$(grep -c "submodule sub: ${sub_v1:0:8} -> ${sub_v2:0:8}" <<< "$log")"
+check "submodule clean: superproject now clean" \
+  "" "$(git -C "$clone" status --porcelain)"
+
+# --- submodules: a lagging submodule is moved even when already up to date ----
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+git_quiet pull --ff-only --no-recurse-submodules
+log="$(run_update)"
+
+check "submodule lagging, superproject current: up to date" \
+  "1" "$(grep -c 'ok: up to date' <<< "$log")"
+check "submodule lagging, superproject current: moved to the pin" "$sub_v2" "$(sub_head)"
+
+# --- submodules: a modified tracked file blocks the move ----------------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'work in progress\n' > "$clone/sub/tracked.txt"
+log="$(run_update)"
+
+check "submodule dirty: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule dirty: edit kept" \
+  "work in progress" "$(cat "$clone/sub/tracked.txt")"
+check "submodule dirty: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — modified tracked files' <<< "$log")"
+check "submodule dirty: superproject still pulled" \
+  "$sub_v2" "$(git -C "$clone" rev-parse HEAD:sub)"
+
+# --- submodules: a staged change blocks the move too --------------------------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'staged\n' > "$clone/sub/new.txt"
+sub_git "$clone/sub" add new.txt
+log="$(run_update)"
+
+check "submodule staged: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule staged: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — modified tracked files' <<< "$log")"
+
+# --- submodules: a checked-out branch is somebody's work, never moved ---------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+sub_git "$clone/sub" checkout -b work
+log="$(run_update)"
+
+check "submodule on branch: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule on branch: branch still checked out" \
+  "work" "$(git -C "$clone/sub" symbolic-ref --short HEAD)"
+check "submodule on branch: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — on branch work' <<< "$log")"
+
+# --- submodules: commits made on the detached HEAD are never orphaned ---------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+printf 'local\n' > "$clone/sub/tracked.txt"
+sub_git "$clone/sub" commit -am "local work"
+local_commit="$(sub_head)"
+log="$(run_update)"
+
+check "submodule local commits: HEAD untouched" "$local_commit" "$(sub_head)"
+check "submodule local commits: skip logged" \
+  "1" "$(grep -c 'submodule sub: skip — HEAD is on no branch, remote or tag' <<< "$log")"
+
+# --- submodules: a pin no ref holds still follows the next bump ---------------
+# A pin fetched by bare commit id (here: only on a PR ref) is on no local ref,
+# but the superproject recorded it, so moving off it orphans nothing.
+setup_submodule_repo
+printf 'v3\n' > "$work/sub-work/tracked.txt"
+sub_git "$work/sub-work" commit -am v3
+sub_git "$work/sub-work" push origin HEAD:refs/pull/1/head
+sub_v3="$(git -C "$work/sub-work" rev-parse HEAD)"
+bump_upstream_pin "$sub_v3"
+run_update > /dev/null
+bump_upstream_pin "$sub_v2"
+log="$(run_update)"
+
+check "submodule pin on no ref: reached the PR-ref pin first" \
+  "1" "$(grep -c "submodule sub: ${sub_v1:0:8} -> ${sub_v3:0:8}" <<< "$log")"
+check "submodule pin on no ref: follows the next bump" "$sub_v2" "$(sub_head)"
+
+# --- submodules: untracked files neither block the move nor get removed -------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+mkdir -p "$clone/sub/.data/worktrees/feature"
+printf 'scratch\n' > "$clone/sub/.data/worktrees/feature/notes.txt"
+printf 'loose\n' > "$clone/sub/untracked.txt"
+log="$(run_update)"
+
+check "submodule untracked: moved to the pin" "$sub_v2" "$(sub_head)"
+check "submodule untracked: nested untracked dir survives" \
+  "scratch" "$(cat "$clone/sub/.data/worktrees/feature/notes.txt" 2> /dev/null)"
+check "submodule untracked: loose untracked file survives" \
+  "loose" "$(cat "$clone/sub/untracked.txt" 2> /dev/null)"
+
+# --- submodules: an unreachable pin is logged and skipped, never fatal --------
+setup_submodule_repo
+bump_upstream_pin "$sub_v2"
+git -C "$clone/sub" remote set-url origin "$work/no-such-origin"
+mkdir -p "$fake_home/.ssh"
+printf 'Host github.com\n  User git\n' > "$fake_home/.ssh/config"
+log="$(run_update)"
+
+check "submodule fetch fails: HEAD untouched" "$sub_v1" "$(sub_head)"
+check "submodule fetch fails: skip logged" \
+  "1" "$(grep -c "submodule sub: skip — pin ${sub_v2:0:8} not available" <<< "$log")"
+check "submodule fetch fails: exits 0" "0" "$(cat "$work/status")"
+check "submodule fetch fails: later steps still ran" \
+  "1" "$([ -f "$fake_home/.gitconfig.github-ssh" ] && echo 1 || echo 0)"
+
+# --- submodules: one already at its pin logs nothing ---------------------------
+setup_submodule_repo
+log="$(run_update)"
+
+check "submodule at pin: nothing logged" "0" "$(grep -c 'submodule sub' <<< "$log")"
+
+# --- homebrew: formulae are updated, upgraded and cleaned, never casks ---------
+setup_repo
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew: update, upgrade --formula, cleanup in order" \
+  "update --quiet|upgrade --formula|cleanup" \
+  "$(grep -v '^outdated' "$work/brew.calls" | paste -sd'|' -)"
+check "brew: no cask is ever touched" "0" "$(grep -c 'cask' "$work/brew.calls")"
+check "brew: upgrade runs non-interactive, without a second auto-update" \
+  "1 1" "$(cat "$work/brew.env")"
+check "brew: summary names what moved, not the pinned formula" \
+  "1" "$(grep -c 'brew: upgraded jq ripgrep$' <<< "$log")"
+check "brew: exits 0" "0" "$(cat "$work/status")"
+
+# --- homebrew: nothing outdated logs up to date --------------------------------
+setup_repo
+stub_uname Darwin
+touch "$work/brew.upgraded"
+log="$(run_update)"
+
+check "brew current: logged as up to date" \
+  "1" "$(grep -c 'brew: formulae up to date' <<< "$log")"
+
+# --- homebrew: a failing upgrade is logged and the cleanup still runs ----------
+setup_repo
+stub_brew upgrade-fail
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew upgrade fails: failure logged" \
+  "1" "$(grep -c 'brew: FAILED to upgrade formulae' <<< "$log")"
+check "brew upgrade fails: no upgrade claimed" "0" "$(grep -c 'brew: upgraded' <<< "$log")"
+check "brew upgrade fails: cleanup still ran" "cleanup" "$(tail -1 "$work/brew.calls")"
+check "brew upgrade fails: exits 0" "0" "$(cat "$work/status")"
+
+# --- homebrew: a partial upgrade still names what moved ------------------------
+setup_repo
+stub_brew upgrade-partial
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew partial upgrade: failure logged" \
+  "1" "$(grep -c 'brew: FAILED to upgrade formulae' <<< "$log")"
+check "brew partial upgrade: names only what moved" \
+  "1" "$(grep -c 'brew: upgraded jq$' <<< "$log")"
+check "brew partial upgrade: not logged as up to date" \
+  "0" "$(grep -c 'brew: formulae up to date' <<< "$log")"
+
+# --- homebrew: an unreadable post-upgrade list claims nothing ------------------
+setup_repo
+stub_brew outdated-fail-after
+stub_uname Darwin
+log="$(run_update)"
+
+check "brew outdated fails after upgrade: nothing claimed" \
+  "0" "$(grep -c 'brew: upgraded' <<< "$log")"
+
+# --- homebrew: a non-macOS host never calls brew -------------------------------
+setup_repo
+stub_uname Linux
+log="$(run_update)"
+
+check "brew on Linux: never called" \
+  "never-called" "$(cat "$work/brew.calls" 2> /dev/null || echo never-called)"
+check "brew on Linux: nothing logged" "0" "$(grep -c 'brew:' <<< "$log")"
+check "brew on Linux: exits 0" "0" "$(cat "$work/status")"
 
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"

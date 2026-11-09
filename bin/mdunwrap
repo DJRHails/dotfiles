@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""Reflow hard-wrapped markdown so each paragraph, list item and quote is one line.
+
+Everything whose line breaks carry meaning is left byte-for-byte: fenced and indented
+code, tables, headings, thematic breaks, HTML comments, link definitions, `$$` maths,
+and the YAML front matter — except a folded `>` / `>-` scalar there, which is joined onto
+one indented line. A line ending in two spaces or a backslash is a hard break and keeps it.
+Blockquotes are unwrapped recursively, so a list inside a quote behaves like a list.
+
+  mdunwrap < wrapped.md > flat.md     filter stdin to stdout, like 2md
+  mdunwrap SKILL.md                   print SKILL.md unwrapped
+  mdunwrap -i SKILL.md README.md      rewrite the files in place (only if they change)
+  mdunwrap --check docs/*.md          exit 1 and name any file that is still wrapped
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_MATH_FENCE = re.compile(r"^ {0,3}\$\$\s*$")
+_HEADING = re.compile(r"^ {0,3}#{1,6}(\s|$)")
+_SETEXT = re.compile(r"^ {0,3}(=+|-+)\s*$")
+_RULE = re.compile(r"^ {0,3}([-*_])(\s*\1){2,}\s*$")
+_TABLE = re.compile(r"^\s*\|")
+_QUOTE = re.compile(r"^ {0,3}>")
+_LIST = re.compile(r"^(?P<indent>\s*)(?P<marker>[-*+]|\d{1,9}[.)])(?P<gap>\s+)(?P<text>.*)$")
+_LINK_DEF = re.compile(r"^ {0,3}\[[^\]]+\]:\s")
+_COMMENT_OPEN = re.compile(r"^\s*<!--")
+_HARD_BREAK = re.compile(r"( {2,}|\\)$")
+_FOLDED_KEY = re.compile(r"^[\w-]+:\s*>-?\s*$")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" \t"))
+
+
+def _starts_block(line: str) -> bool:
+    """A line that opens a new block, so a paragraph or item must not swallow it."""
+    return bool(
+        _FENCE.match(line)
+        or _MATH_FENCE.match(line)
+        or _HEADING.match(line)
+        or _RULE.match(line)
+        or _TABLE.match(line)
+        or _QUOTE.match(line)
+        or _LIST.match(line)
+        or _LINK_DEF.match(line)
+        or _COMMENT_OPEN.match(line)
+    )
+
+
+def _copy_fence(lines: list[str], i: int, out: list[str]) -> int:
+    opener = _FENCE.match(lines[i]).group(1)
+    out.append(lines[i])
+    i += 1
+    while i < len(lines):
+        out.append(lines[i])
+        closing = _FENCE.match(lines[i])
+        i += 1
+        if closing and closing.group(1)[0] == opener[0] and len(closing.group(1)) >= len(opener):
+            break
+    return i
+
+
+def _copy_until(lines: list[str], i: int, out: list[str], stop: re.Pattern[str] | str) -> int:
+    """Copy lines verbatim up to and including the first one that satisfies ``stop``."""
+    while i < len(lines):
+        out.append(lines[i])
+        line = lines[i]
+        i += 1
+        hit = stop in line if isinstance(stop, str) else stop.match(line)
+        if hit:
+            break
+    return i
+
+
+def _copy_front_matter(lines: list[str], out: list[str]) -> int:
+    out.append(lines[0])
+    i = 1
+    while i < len(lines) and lines[i] != "---":
+        line = lines[i]
+        if _FOLDED_KEY.match(line):
+            out.append(line)
+            i += 1
+            folded: list[str] = []
+            while (
+                i < len(lines) and lines[i] != "---" and (lines[i].startswith(" ") or not lines[i])
+            ):
+                if lines[i].strip():
+                    folded.append(lines[i].strip())
+                i += 1
+            out.append("  " + " ".join(folded))
+            continue
+        out.append(line)
+        i += 1
+    if i < len(lines):
+        out.append(lines[i])
+        i += 1
+    return i
+
+
+def _piece(part: str, *, keep_indent: bool) -> str:
+    """One physical line made ready to join: trailing space goes unless it is a hard break."""
+    text = part if keep_indent else part.lstrip()
+    return text if _HARD_BREAK.search(text) else text.rstrip()
+
+
+def _join(parts: list[str], out: list[str]) -> None:
+    """Emit a paragraph: one line, except a hard break keeps the following line separate."""
+    current = _piece(parts[0], keep_indent=True)
+    for part in parts[1:]:
+        if _HARD_BREAK.search(current):
+            out.append(current)
+            current = _piece(part, keep_indent=True)
+        else:
+            current = f"{current} {_piece(part, keep_indent=False)}"
+    out.append(current)
+
+
+def _take_paragraph(lines: list[str], i: int, min_indent: int) -> tuple[list[str], int]:
+    """Collect the physical lines of one paragraph starting at ``i``.
+
+    A following line joins while it is non-blank, does not open a block, and (for a list
+    item) is a lazy or indented continuation rather than a dedented new paragraph.
+    """
+    parts = [lines[i]]
+    i += 1
+    while i < len(lines):
+        line = lines[i]
+        if not line.strip() or _starts_block(line):
+            break
+        if _SETEXT.match(line):
+            break
+        if min_indent and _indent(line) < min_indent and _indent(line) > 0:
+            break
+        parts.append(line)
+        i += 1
+    return parts, i
+
+
+def unwrap_lines(lines: list[str]) -> list[str]:
+    out: list[str] = []
+    i = 0
+    n = len(lines)
+    if n and lines[0] == "---":
+        i = _copy_front_matter(lines, out)
+    while i < n:
+        line = lines[i]
+        if _FENCE.match(line):
+            i = _copy_fence(lines, i, out)
+            continue
+        if _MATH_FENCE.match(line):
+            out.append(line)
+            i = _copy_until(lines, i + 1, out, _MATH_FENCE)
+            continue
+        if _COMMENT_OPEN.match(line):
+            i = _copy_until(lines, i, out, "-->")
+            continue
+        if not line.strip() or _HEADING.match(line) or _RULE.match(line) or _TABLE.match(line):
+            out.append(line)
+            i += 1
+            continue
+        if _LINK_DEF.match(line) or _SETEXT.match(line):
+            out.append(line)
+            i += 1
+            continue
+        if _QUOTE.match(line):
+            i = _unwrap_quote(lines, i, out)
+            continue
+        item = _LIST.match(line)
+        if item:
+            content_indent = (
+                len(item.group("indent")) + len(item.group("marker")) + len(item.group("gap"))
+            )
+            parts, i = _take_paragraph(lines, i, min_indent=content_indent)
+            _join(parts, out)
+            continue
+        if i + 1 < n and _SETEXT.match(lines[i + 1]):
+            out.append(line)
+            out.append(lines[i + 1])
+            i += 2
+            continue
+        parts, i = _take_paragraph(lines, i, min_indent=0)
+        _join(parts, out)
+    return out
+
+
+def _unwrap_quote(lines: list[str], i: int, out: list[str]) -> int:
+    """Strip one level of ``>``, unwrap the inside recursively, and put the prefix back."""
+    inner: list[str] = []
+    while i < len(lines):
+        line = lines[i]
+        if _QUOTE.match(line):
+            inner.append(re.sub(r"^ {0,3}> ?", "", line))
+        elif line.strip() and inner and inner[-1].strip() and not _starts_block(line):
+            inner.append(line)
+        else:
+            break
+        i += 1
+    for flat in unwrap_lines(inner):
+        out.append(f"> {flat}" if flat else ">")
+    return i
+
+
+def unwrap(text: str) -> str:
+    return "\n".join(unwrap_lines(text.split("\n")))
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="mdunwrap",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("files", nargs="*", type=Path, help="markdown files; stdin when omitted")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("-i", "--in-place", action="store_true", help="rewrite each file in place")
+    mode.add_argument("--check", action="store_true", help="exit 1 if any file would change")
+    args = parser.parse_args(argv)
+
+    if not args.files:
+        if args.in_place or args.check:
+            parser.error("--in-place and --check need file arguments")
+        sys.stdout.write(unwrap(sys.stdin.read()))
+        return 0
+
+    still_wrapped: list[Path] = []
+    for path in args.files:
+        original = path.read_text()
+        flat = unwrap(original)
+        if args.check:
+            if flat != original:
+                still_wrapped.append(path)
+        elif args.in_place:
+            if flat != original:
+                path.write_text(flat)
+                print(f"unwrapped {path}", file=sys.stderr)
+        else:
+            sys.stdout.write(flat)
+    for path in still_wrapped:
+        print(f"wrapped: {path}", file=sys.stderr)
+    return 1 if still_wrapped else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

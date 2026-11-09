@@ -23,15 +23,31 @@ BANNED_VOCAB=(
   enhance garner vibrant nestled
   breathtaking stunning testament profound
   spine
+  bolstered exemplifies valuable
+  renowned esteemed acclaimed
+  lift
 )
 
 BANNED_ATMOSPHERIC=(
   liminal
 )
 
+# The article is part of each pattern: the tic is "stands as a testament", while
+# "the review stands as posted" and "sub-features are" are plain English.
 COPULA_AVOIDANCE=(
-  "serves as" "stands as" "marks a" "represents a"
-  "boasts a" "features a" "offers a"
+  "serves as" "stands as (a|an|the)" "marks (a|an)" "represents (a|an)"
+  "boasts (a|an)" "features (a|an)" "offers (a|an)"
+  "functions as" "operates as" "maintains (a|an)"
+  # "refers to" is legitimate in definitional technical prose; it is listed
+  # because LLM copyedits reach for it to dodge "is". Expect false positives.
+  "refers to"
+)
+
+# Indirect links that abstract away a relationship the sentence should name.
+# "associated with" is correct in statistical writing about correlation; treat
+# hits in that context as expected, not as defects.
+VAGUE_CONNECTION=(
+  "in connection with" "in association with" "associated with"
 )
 
 FILLER_PHRASES=(
@@ -56,10 +72,15 @@ SIGNIFICANCE_PUFFERY=(
 )
 
 NEGATIVE_PARALLELISMS=(
-  "not only.*but also"
+  "not only.*but"
   "it's not just.*it's"
   "it's not merely.*it's"
   "doesn't just"
+  "is(n't| not) just [^,.;:!?]+[,—-]+ (it|they|that)"
+  "\\bnot (a|an|the) [^,.;:!?]{1,40}, but (a|an|the)\\b"
+  # The "X rather than Y" variant only reads as parallelism in this framing;
+  # a bare "rather than" is ordinary English and is deliberately not matched.
+  "^rather, (it|this|that|they) "
 )
 
 UNNECESSARY_WORDS=(
@@ -68,11 +89,20 @@ UNNECESSARY_WORDS=(
 
 UNNECESSARY_PHRASES=(
   "in many ways" "to some extent" "it could be said"
-  "it's worth noting" "note that" "observe that"
+  "it's worth noting"
 )
 
+# "Note that X" is filler only as the imperative that opens a sentence or a list
+# item; "I sent the lane a note that the fix landed" uses the noun.
+IMPERATIVE_NOTE="(^|[.!?:;(][[:space:]]+)[[:space:]]*([-*+]|[0-9]+[.)])?[[:space:]]*"
+IMPERATIVE_NOTE+="(\\*\\*|__?)?(please )?(note|observe) that\\b"
+
 BANNED_PHRASES=(
-  "dive into" "align with" "in conclusion" "that said"
+  "dive into" "deep dive" "align with" "in conclusion" "that said"
+  "diverse array" "wide range of" "a multitude of"
+  "commitment to" "resonate with"
+  "in the heart of" "natural beauty"
+  "focal point" "reflects broader"
 )
 
 TAKEAWAY_ANNOUNCEMENTS=(
@@ -90,23 +120,39 @@ PUNCHLINE_ABSTRACTIONS=(
 
 total_hits=0
 
+# Prints the hit as `[category] "matched text"  whole line  file:line`. The
+# matched text comes first so a reader of a long line can find the culprit.
 warn() {
-  local category="$1" match="$2" file="$3" line="$4"
+  local category="$1" span="$2" match="$3" file="$4" line="$5"
   ((total_hits++)) || true
-  printf "${YELLOW}%-24s${RESET} ${RED}%s${RESET}  ${CYAN}%s:%s${RESET}\n" \
-    "[$category]" "$match" "$file" "$line"
+  printf "${YELLOW}%-24s${RESET} ${RED}\"%s\"${RESET}  %s  ${CYAN}%s:%s${RESET}\n" \
+    "[$category]" "$span" "$match" "$file" "$line"
+}
+
+# A phrase as a whole-word pattern: "here is a" must not match "there is a",
+# nor "marks a" the start of "marks an".
+phrase_re() {
+  local re="\\b$1" word_end='[[:alnum:])]$'
+  [[ "$1" =~ $word_end ]] && re+="\\b"
+  printf '%s' "$re"
 }
 
 scan_pattern() {
-  local category="$1" pattern="$2"
+  local category="$1" pattern="$2" span
   shift 2
   while IFS=: read -r file line match; do
     # Skip non-prose lines: markdown tables, imports, YAML frontmatter keys
     [[ "$match" =~ ^[[:space:]]*\| ]] && continue
     [[ "$match" =~ ^import[[:space:]] ]] && continue
     [[ "$match" =~ ^[a-z][a-zA-Z_-]*:([[:space:]]|$) ]] && continue
-    warn "$category" "$match" "$file" "$line"
-  done < <(rg -inH --no-heading "$pattern" "$@" 2>/dev/null || true)
+    # One hit per distinct match, so a second banned word on the line is not
+    # hidden behind the first. Patterns that anchor on a neighbouring character
+    # carry it into the span, so it is trimmed before duplicates are dropped.
+    while IFS= read -r span; do
+      warn "$category" "$span" "$match" "$file" "$line"
+    done < <(rg -io -- "$pattern" <<<"$match" | sed -E 's/^[^[:alnum:]]+//' |
+      awk '!seen[tolower($0)]++')
+  done < <(rg -inH --no-heading -- "$pattern" "$@" 2>/dev/null || true)
 }
 
 # --- Determine input files ---
@@ -122,8 +168,10 @@ printf "${BOLD}Scanning %d file(s) for AI writing patterns...${RESET}\n\n" "${#f
 
 # --- 1. Banned vocabulary ---
 
+# A banned word that ends a hyphenated compound is a term, not vocabulary:
+# "obfuscation-robust features" names a property.
 vocab_pattern=$(IFS='|'; echo "${BANNED_VOCAB[*]}")
-scan_pattern "banned-vocab" "\\b($vocab_pattern)\\b" "${files[@]}"
+scan_pattern "banned-vocab" "(^|[^-_[:alnum:]])($vocab_pattern)\\b" "${files[@]}"
 
 # --- 2. Banned atmospheric words ---
 
@@ -133,31 +181,37 @@ scan_pattern "banned-atmospheric" "\\b($atmo_pattern)\\b" "${files[@]}"
 # --- 3. Copula avoidance ---
 
 for phrase in "${COPULA_AVOIDANCE[@]}"; do
-  scan_pattern "copula-avoidance" "$phrase" "${files[@]}"
+  scan_pattern "copula-avoidance" "$(phrase_re "$phrase")" "${files[@]}"
+done
+
+# --- 3b. Vague expression of connection ---
+
+for phrase in "${VAGUE_CONNECTION[@]}"; do
+  scan_pattern "vague-connection" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 4. Filler phrases ---
 
 for phrase in "${FILLER_PHRASES[@]}"; do
-  scan_pattern "filler-phrase" "$phrase" "${files[@]}"
+  scan_pattern "filler-phrase" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 5. Sycophantic tone ---
 
 for phrase in "${SYCOPHANTIC[@]}"; do
-  scan_pattern "sycophantic" "$phrase" "${files[@]}"
+  scan_pattern "sycophantic" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 6. Significance puffery ---
 
 for phrase in "${SIGNIFICANCE_PUFFERY[@]}"; do
-  scan_pattern "significance-puffery" "$phrase" "${files[@]}"
+  scan_pattern "significance-puffery" "$(phrase_re "$phrase")" "${files[@]}"
 done
 
 # --- 7. Negative parallelisms ---
 
 for pattern in "${NEGATIVE_PARALLELISMS[@]}"; do
-  scan_pattern "negative-parallelism" "$pattern" "${files[@]}"
+  scan_pattern "negative-parallelism" "$(phrase_re "$pattern")" "${files[@]}"
 done
 
 # --- 7b. Unnecessary words and hedge phrases ---
@@ -168,6 +222,7 @@ scan_pattern "unnecessary-word" "\\b($unnecessary_pattern)\\b" "${files[@]}"
 for phrase in "${UNNECESSARY_PHRASES[@]}"; do
   scan_pattern "unnecessary-word" "\\b$phrase\\b" "${files[@]}"
 done
+scan_pattern "unnecessary-word" "$IMPERATIVE_NOTE" "${files[@]}"
 
 # --- 7c. Banned multi-word phrases ---
 
@@ -198,11 +253,42 @@ for f in "${files[@]}"; do
   fi
 done
 
+# --- 8b. Formatting tells ---
+# Counted per file rather than reported per line: one instance is a choice,
+# a page of them is a paste. Counts are matching lines, not occurrences.
+
+format_count() {
+  local category="$1" pattern="$2" threshold="$3" noun="$4" file="$5"
+  local n
+  n=$(rg -c "$pattern" "$file" 2>/dev/null || echo 0)
+  if [[ "$n" -gt "$threshold" ]]; then
+    ((total_hits++)) || true
+    printf "${YELLOW}%-24s${RESET} ${RED}%s %s${RESET}  ${CYAN}%s${RESET}\n" \
+      "[$category]" "$n" "$noun" "$file"
+  fi
+}
+
+for f in "${files[@]}"; do
+  # shellcheck disable=SC1112  # the curly quotes are the pattern, not syntax
+  format_count curly-quotes '[“”‘’]' 0 "lines with curly quotes" "$f"
+  format_count emoji-heading \
+    '^#{1,6} .*[\x{1F300}-\x{1FAFF}\x{2190}-\x{27BF}\x{FE0F}]' \
+    0 "emoji headings" "$f"
+  # Three consecutive capitalised words in a heading; "Signs of AI Writing"
+  # does not match, because the lowercase "of" breaks the run.
+  format_count title-case-heading '^#{1,6} ([A-Z][a-z]+ ){2,}[A-Z][a-z]+' \
+    0 "Title Case headings" "$f"
+  format_count bold-lead-in-list '^[[:space:]]*[-*] \*\*[^*]+\*\*:?' \
+    4 "bold lead-in bullets" "$f"
+  # Threshold 2 allows the pair of YAML frontmatter delimiters.
+  format_count thematic-break '^-{3,}$' 2 "horizontal rules" "$f"
+done
+
 # --- 9. Superficial -ing phrases ---
 
-ing_pattern="\\b(highlighting|underscoring|emphasizing|ensuring|"
-ing_pattern+="reflecting|symbolizing|contributing to|cultivating|"
-ing_pattern+="fostering|encompassing|showcasing)\\b"
+ing_pattern="\\b(highlighting|underscoring|emphasi[sz]ing|ensuring|"
+ing_pattern+="reflecting|symboli[sz]ing|contributing to|cultivating|"
+ing_pattern+="fostering|encompassing|showcasing|enhancing)\\b"
 scan_pattern "superficial-ing" "$ing_pattern" "${files[@]}"
 
 # --- 10. Vague attribution ---
@@ -212,10 +298,16 @@ vague_pattern+="several sources|observers have cited)"
 scan_pattern "vague-attribution" "$vague_pattern" "${files[@]}"
 
 # --- 11. Rule of three (balanced "X, Y, and Z" tricolons) ---
-# Heuristic: a clause with exactly two commas before "and". The character
-# classes exclude commas, so four-item lists (the recommended fix) do not match.
+# Heuristic: three short items (one to three words each) joined by two commas
+# and "and"/"or", the last ending the clause. Short items are what make a
+# tricolon rhetorical ("fast, reliable, and secure"); a list of clause-length
+# steps ("loaded the image, appended the vars, and recreated the gateway") is a
+# plain account and does not match. The first item must not follow a comma, so
+# four-item lists (the recommended fix) do not match on their last three.
 
-scan_pattern "rule-of-three" "(^|[.;:!?] )[^,.;:!?]+, [^,.;:!?]+, and [^,.;:!?]+" "${files[@]}"
+triad_item="[[:alnum:]'’-]+( [[:alnum:]'’-]+){0,2}"
+triad_pattern="(^|[^,] )${triad_item}, ${triad_item},? (and|or) ${triad_item}([.;:!?)]|$)"
+scan_pattern "rule-of-three" "$triad_pattern" "${files[@]}"
 
 # --- Summary ---
 

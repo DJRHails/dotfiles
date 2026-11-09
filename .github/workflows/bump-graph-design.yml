@@ -1,0 +1,66 @@
+name: Bump graph-design skill
+
+# Moves the modules/agents/skills/graph-design submodule pin to DJRHails/graphs
+# main. Fired by graphs' notify-dotfiles.yml on every push to its main; the daily
+# schedule catches a missed dispatch.
+#
+# Works purely through the git data API — no checkout — so encrypted files are
+# never touched: it writes one tree entry (the gitlink) on top of main's tree and
+# fast-forwards main. If main moved meanwhile the ref update is refused (no force)
+# and the next run retries.
+
+on:
+  repository_dispatch:
+    types: [graphs-main-updated]
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: bump-graph-design
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump submodule pin to graphs main
+    # No pull_request trigger, so only writers (and the dispatch) reach the pool.
+    runs-on: >-
+      ${{ vars.CI_FALLBACK == 'true'
+      && 'ubuntu-latest'
+      || fromJSON('["self-hosted", "linux", "x64", "taffy"]') }}
+    timeout-minutes: 5
+    permissions:
+      contents: write # create the bump commit and fast-forward main
+    steps:
+      - name: Fast-forward the submodule pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SUBMODULE: modules/agents/skills/graph-design
+          UPSTREAM: DJRHails/graphs
+        run: |
+          set -euo pipefail
+          target="$(gh api "repos/${UPSTREAM}/commits/main" --jq .sha)"
+          current="$(gh api "repos/${REPO}/contents/${SUBMODULE}?ref=main" --jq .sha)"
+          if [ "$target" = "$current" ]; then
+            echo "pin already at ${UPSTREAM}@${target}"
+            exit 0
+          fi
+          version="$(gh api "repos/${UPSTREAM}/contents/graphs/__init__.py?ref=${target}" \
+            --jq .content | base64 -d | sed -nE 's/^__version__ = "([^"]+)".*/\1/p')"
+          [ -n "$version" ] || { echo "::error::no __version__ in ${UPSTREAM}@${target}"; exit 1; }
+
+          head="$(gh api "repos/${REPO}/git/ref/heads/main" --jq .object.sha)"
+          base_tree="$(gh api "repos/${REPO}/git/commits/${head}" --jq .tree.sha)"
+          tree="$(jq -n --arg base "$base_tree" --arg path "$SUBMODULE" --arg sha "$target" \
+            '{base_tree: $base, tree: [{path: $path, mode: "160000", type: "commit", sha: $sha}]}' |
+            gh api "repos/${REPO}/git/trees" --input - --jq .sha)"
+          commit="$(jq -n --arg tree "$tree" --arg parent "$head" \
+            --arg msg "graph-design: bump to v${version} (${UPSTREAM}@${target:0:12})" \
+            '{message: $msg, tree: $tree, parents: [$parent]}' |
+            gh api "repos/${REPO}/git/commits" --input - --jq .sha)"
+          gh api --method PATCH "repos/${REPO}/git/refs/heads/main" \
+            -f sha="$commit" -F force=false >/dev/null
+          echo "bumped ${SUBMODULE}: ${current:0:12} -> ${target:0:12} (v${version}) as ${commit:0:12}"

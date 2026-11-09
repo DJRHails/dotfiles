@@ -15,8 +15,7 @@ alias sqdel='scancel'
 # and several array tasks. Cancel by explicit job id (`sqdel <jobid>`), or sweep only
 # this worker's jobs by name prefix with `scancel-mine` (see bin/scancel-mine). A
 # block_unscoped_scancel.py PreToolUse hook blocks the unscoped forms outright.
-# (Incident details live in the runpod-ant-cluster skill, which is encrypted at rest —
-# this file is public, so keep them out of it.)
+# (This file is public — keep incident details out of it.)
 #
 # `squeue -n` (like `scancel --name`) is an EXACT name match with no globbing, so
 # filter the prefix ourselves rather than passing it as a name.

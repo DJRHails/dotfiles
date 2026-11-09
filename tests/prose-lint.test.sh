@@ -105,6 +105,75 @@ ignores "plain statement of a number" takeaway-announcement \
 ignores "abstract contribution sentence" takeaway-announcement \
   "Our key insight is that caching wins."
 
+# --- phrases match whole words only ------------------------------------------
+# Each negative is a line the response gate sent back for a rewrite on the gantry
+# fleet (2026-10-09/10): the phrase matched inside a longer word or the literal
+# sense of the verb, and the rewrite cost a whole turn.
+
+flags "stands as a testament" copula-avoidance \
+  "The archive stands as a testament to the team."
+flags "serves as" copula-avoidance \
+  "The cache serves as the source of truth."
+flags "features a" copula-avoidance \
+  "The release features a new scheduler."
+ignores "features are" copula-avoidance \
+  "Name sub-features are destroyed by both JS adversaries."
+ignores "features and" copula-avoidance \
+  "The sample set starts once the features and the dataset land."
+ignores "stands as posted" copula-avoidance \
+  "My review stands as posted, with the fix in ec7dc9a."
+flags "here is a" sycophantic \
+  "Here is a summary of the run."
+ignores "there is a" sycophantic \
+  "The jury's role there is a robustness check."
+flags "imperative note that" unnecessary-word \
+  "Note that the cache is cold on the first run."
+flags "list item note that" unnecessary-word \
+  "- **Note that** the cache is cold on the first run."
+ignores "the noun note" unnecessary-word \
+  "I sent the lane a note that the correction is relayed."
+flags "banned word alone" banned-vocab \
+  "This is a robust solution."
+ignores "banned word ending a compound" banned-vocab \
+  "A multivariate model over the obfuscation-robust features."
+flags "functions as" copula-avoidance \
+  "The service functions as a gateway."
+flags "associated with" vague-connection \
+  "He is associated with the orchestra."
+ignores "disassociated with" vague-connection \
+  "She disassociated with the group in 2019."
+flags "isn't just, it" negative-parallelism \
+  "It isn't just a tool, it is a platform."
+flags "not a X, but a" negative-parallelism \
+  "It was not a bug, but a feature."
+flags "rather, it" negative-parallelism \
+  "Rather, it constitutes a change."
+ignores "bare rather than" negative-parallelism \
+  "We cached it rather than recomputing it."
+
+# --- file-level formatting tells fire on counts, not single lines -----------
+
+flags "title case heading" title-case-heading "## The Big Fancy Heading"
+ignores "sentence case heading" title-case-heading "## Signs of AI writing"
+flags "emoji heading" emoji-heading "## Launch 🚀 plan"
+# shellcheck disable=SC1111  # the curly quotes are the sample, not syntax
+flags "curly quotes" curly-quotes "He said “cheap” twice."
+flags "five bold lead-ins" bold-lead-in-list \
+  "$(printf -- '- **Item %s:** text\n' 1 2 3 4 5)"
+ignores "four bold lead-ins" bold-lead-in-list \
+  "$(printf -- '- **Item %s:** text\n' 1 2 3 4)"
+flags "three rules" thematic-break "$(printf -- '---\nx\n---\ny\n---\n')"
+ignores "frontmatter delimiters" thematic-break "$(printf -- '---\ntitle: x\n---\nbody\n')"
+
+# A word repeated on a line is one hit, whatever character precedes each use.
+repeats=$(categories_for "Robust, robust and (robust results." | grep -c '^\[banned-vocab\]$')
+if [[ "$repeats" == 1 ]]; then
+  printf 'ok   repeated word is one hit\n'
+else
+  printf 'FAIL repeated word is one hit: got %s [banned-vocab] hits\n' "$repeats"
+  ((fails++))
+fi
+
 if ((fails)); then
   printf '\n%d check(s) failed\n' "$fails"
   exit 1

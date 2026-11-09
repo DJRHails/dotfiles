@@ -6,9 +6,36 @@ timer, or cron fallback).
 
 **Safe by construction** — [`update.sh`](./update.sh):
 
-- skips if the working tree has local changes (never clobbers WIP),
+- carries local changes over the pull on a stash, and keeps the stash instead of
+  popping it when it would conflict (never clobbers WIP),
 - **fast-forward only** — a diverged branch is left for a human, never auto-merged,
 - **never pushes** — pull-only, one direction.
+
+**Submodules follow their pins** — [`sync-submodules.sh`](./sync-submodules.sh), run after a
+fast-forward and on an already-up-to-date tree. Vendored skills load live from the checkout, so
+a bumped pin must reach the submodule's worktree. Each initialised submodule that lags the
+commit recorded at `HEAD` is checked out (detached) at that commit, fetching it first if it
+is missing — but only when that is safe:
+
+- its HEAD is **detached** — a checked-out branch is somebody's work, so it is skipped
+  (`skip — on branch <name>`),
+- it has **no modified or staged tracked files** — otherwise skipped
+  (`skip — modified tracked files`),
+- its HEAD is reachable from a branch, remote-tracking ref or tag, or is a commit the
+  superproject itself pinned — otherwise it holds commits made on the detached HEAD,
+  which the move would orphan, so it is skipped
+  (`skip — HEAD is on no branch, remote or tag`),
+- untracked files (e.g. a `.data/` of worktrees) never block the move and are kept,
+- a failed fetch skips that submodule only (`skip — pin <sha> not available`).
+
+Uninitialised submodules are left to `bootstrap.sh`. Nothing is forced or reset.
+
+**Homebrew formulae are upgraded on macOS** — `brew update`, `brew upgrade --formula`,
+`brew cleanup`, non-interactively, with a one-line summary of what moved. **Formulae only,
+never casks**: a cask upgrade can quit a running GUI app (the terminal included) and can need
+sudo, and the casks that matter mostly self-update. Hold a formula back with `brew pin`. A
+failing brew is logged and never stops the steps after it; Linux hosts and hosts without
+`brew` skip the step.
 
 Logs to `$XDG_STATE_HOME/dotfiles/autoupdate.log` (default
 `~/.local/state/dotfiles/autoupdate.log`).
@@ -16,8 +43,8 @@ Logs to `$XDG_STATE_HOME/dotfiles/autoupdate.log` (default
 ## Pull now
 
 `dotfiles::update` ([`aliases.zsh`](./aliases.zsh)) is the manual counterpart —
-same fast-forward-only, submodule-skipping pull, but run on demand and with
-git's output on the terminal instead of in the log.
+same fast-forward-only pull and the same submodule step, but run on demand and
+with the output on the terminal instead of in the log.
 
 ## Install
 

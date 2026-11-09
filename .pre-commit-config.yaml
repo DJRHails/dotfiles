@@ -14,6 +14,18 @@ repos:
         entry: scripts/check-crypt-patterns.sh
         language: script
         pass_filenames: false
+      - id: check-dockerignore-crypt
+        name: check .dockerignore excludes glassine-encrypted files
+        entry: scripts/check-dockerignore-crypt.sh
+        language: script
+        pass_filenames: false
+      # The check above fails quiet: if it stops seeing encrypted files it passes every
+      # commit while decrypted files go into image layers.
+      - id: dockerignore-crypt-tests
+        name: dockerignore-crypt check behaviour suite
+        entry: bash tests/dockerignore-crypt.test.sh
+        language: system
+        pass_filenames: false
       - id: glassine-check
         name: staged glassine-managed files are encrypted
         entry: glassine check
@@ -77,5 +89,39 @@ repos:
       - id: claude-resume-tests
         name: claude::resume resolution suite
         entry: zsh -f tests/claude-resume.test.zsh
+        language: system
+        pass_filenames: false
+      - id: session-resume-tests
+        name: Claude/Codex native session conversion suite
+        entry: python3 tests/session-resume.test.py
+        language: system
+        pass_filenames: false
+      # mdunwrap rewrites markdown in place, and a reflow bug fails quietly: two bullets
+      # merged, a table row swallowed, a code block joined — the file still parses.
+      - id: mdunwrap-tests
+        name: mdunwrap reflow behaviour suite
+        entry: bash tests/mdunwrap.test.sh
+        language: system
+        pass_filenames: false
+      # The release-age gate is a security control with a quiet failure mode: a
+      # setup that skips a tool, or a value that drifts in one of six units, leaves
+      # installs ungated while the module still looks applied.
+      - id: release-age-tests
+        name: release-age module behaviour suite
+        entry: bash tests/release-age.test.sh
+        language: system
+        pass_filenames: false
+      # /note must block exactly the command and nothing else: a miss spends a model
+      # turn on a status-line note, a false match swallows an ordinary prompt.
+      - id: note-hook-tests
+        name: /note hook behaviour suite
+        entry: bash tests/note-hook.test.sh
+        language: system
+        pass_filenames: false
+      # The response gate reopens finished turns. Without its cap, reset, code
+      # exemption and off switch a misfiring rule loops a session.
+      - id: response-gate-tests
+        name: response gate behaviour suite
+        entry: bash tests/response-gate.test.sh
         language: system
         pass_filenames: false

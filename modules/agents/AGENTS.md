@@ -221,6 +221,17 @@ Pin actions to version tags: `actions/checkout@v4` (use `persist-credentials: fa
   alive, and the harness will eventually report the lane as failed with exit 143. If you are done
   with a lane, kill its process group (`kill -TERM -- -<pid>`, found via the
   `sessions/*/artifacts/*.sh` wrapper) rather than leaving idle panes to accumulate.
+- **Judge in-session with subagents, not with paid API calls, for tooling and model-choice evals.**
+  When an A/B picks a model or prompt for our own infrastructure (control-plane classifiers,
+  summarisers, a CLI's helper model), the expensive parts are the baseline and the judge, not the
+  candidates. Reuse the baseline outputs production already paid for, keeping only inputs whose
+  stored output provably came from that exact input. Then have a subagent judge the blind,
+  order-randomised comparison sheets **in-session**: it is a frontier Claude model on the plan
+  login, with no per-token bill. Only the candidates go over the paid API. Restructured this way,
+  gantry's cheap-classifier eval (2026-10-08) was re-planned from a ~$20 budget (OpenRouter Sonnet
+  baseline plus an Opus judge) to a $1.50 cap on candidate calls. This does
+  **not** apply to research results: a monitor sweep or a headline number keeps its registered,
+  API-run arms and judges, per that project's rules.
 
 ### Pi-specific configuration
 

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Daily auto-update — fast-forward pull of the dotfiles repo, then convergence
-# steps bootstrap couldn't finish (the gh-stack extension) and a refresh of
-# pi's installed extension packages.
+# Daily auto-update — fast-forward pull of the dotfiles repo, moving clean
+# submodules to their recorded pins, then convergence steps bootstrap couldn't
+# finish (the gh-stack extension), a refresh of pi's installed extension
+# packages, and on macOS a Homebrew formula upgrade (formulae only, never casks).
 #
-# Safe by construction: never clobbers local work (skips a dirty tree), never
+# Safe by construction: never clobbers local work (stashes and reapplies, or
+# keeps the stash on conflict; skips submodules with local work), never
 # merges/rebases (fast-forward only), never pushes. Scheduled once a day by
 # this module's install scripts: launchd on macOS, a systemd user timer on
 # Linux. Logs to $XDG_STATE_HOME/dotfiles/autoupdate.log.
@@ -50,6 +52,7 @@ update_dotfiles() {
   local_rev="$(git rev-parse @)"
   if [ "$local_rev" = "$(git rev-parse '@{u}')" ]; then
     log "ok: up to date ($branch @ ${local_rev:0:8})"
+    sync_submodules
     return 0
   fi
 
@@ -71,9 +74,9 @@ update_dotfiles() {
   fi
 
   # Fast-forward only — a diverged branch needs a human, never an auto-merge.
-  # Submodules are left untouched (never checked out over possible in-submodule
-  # WIP); run `git submodule update` by hand to follow a bumped pin.
+  local fast_forwarded=false
   if git merge --ff-only --quiet '@{u}' 2>>"$LOG"; then
+    fast_forwarded=true
     log "updated: $branch ${local_rev:0:8} -> $(git rev-parse --short @)"
   elif git merge-base --is-ancestor @ '@{u}'; then
     log "ERROR: $branch is behind upstream but the fast-forward FAILED (see errors above)"
@@ -88,6 +91,22 @@ update_dotfiles() {
   if [ "$stashed" = true ]; then
     restore_stash
   fi
+  if [ "$fast_forwarded" = true ]; then
+    sync_submodules
+  fi
+}
+
+# Follow bumped submodule pins where that is safe — clean, detached worktrees
+# only; anything else is skipped with the reason logged. The logic lives in
+# sync-submodules.sh, shared with the manual `dotfiles::update`. Never fatal:
+# a failure here must not cost the steps after the pull.
+sync_submodules() {
+  local script line
+  script="$(dirname "${BASH_SOURCE[0]}")/sync-submodules.sh"
+  while IFS= read -r line; do
+    log "$line"
+  done < <(bash "$script" "$DOTFILES" 2>>"$LOG" ||
+    echo "ERROR: submodule sync failed (see errors above)")
 }
 
 # Reapply the stash taken above — but only when it applies cleanly.
@@ -220,6 +239,58 @@ refresh_pi_packages() {
       log "pi: FAILED to refresh $source"
     fi
   done < <(jq -r '.packages[]? // empty' "$settings")
+}
+
+# brew with every prompt switched off: NONINTERACTIVE is brew's own "never ask"
+# switch, stdin is closed so nothing can wait on a terminal that isn't there, and
+# HOMEBREW_NO_AUTO_UPDATE stops each call re-running the `brew update` that
+# upgrade_homebrew has already done once.
+brew_batch() {
+  NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1 brew "$@" </dev/null
+}
+
+# Upgrade Homebrew formulae (macOS only — Linux hosts get their packages from
+# apt, and a linuxbrew there is not ours to drive). Without this, CLI tools only
+# move when someone remembers to run `brew upgrade`, so hosts drift apart for
+# months.
+#
+# Formulae only, deliberately NOT casks: a cask upgrade replaces an app bundle,
+# which can quit the running GUI app — the terminal hosting every session among
+# them — and some casks need sudo, which would hang or fail unattended. The casks
+# that matter mostly self-update anyway. Pinned formulae (`brew pin`) are skipped
+# by `brew upgrade` itself, so pinning is the way to hold one back.
+#
+# The upgraded set is `brew outdated` before minus after, so pinned formulae and
+# ones that failed to build are never reported as upgraded. Every failure path
+# returns 0 and the cleanup still runs: a broken formula must not cost the steps
+# after it.
+upgrade_homebrew() {
+  [ "$(uname -s)" = Darwin ] || return 0
+  command -v brew >/dev/null 2>&1 || return 0
+
+  if ! brew_batch update --quiet >>"$LOG" 2>&1; then
+    log "brew: update FAILED (offline?); upgrading against the existing index"
+  fi
+
+  # `brew upgrade` carries on past a formula that fails and exits 1 at the end,
+  # so the diff runs whatever its status; an unreadable `after` claims nothing.
+  local before after upgraded upgrade_ok=1
+  before="$(brew_batch outdated --formula --quiet 2>>"$LOG")" || before=""
+  if ! brew_batch upgrade --formula >>"$LOG" 2>&1; then
+    upgrade_ok=0
+    log "brew: FAILED to upgrade formulae (see errors above)"
+  fi
+  after="$(brew_batch outdated --formula --quiet 2>>"$LOG")" || after="$before"
+  upgraded="$(comm -23 <(sort <<<"$before") <(sort <<<"$after") | xargs)"
+  if [ -n "$upgraded" ]; then
+    log "brew: upgraded $upgraded"
+  elif ((upgrade_ok)); then
+    log "brew: formulae up to date"
+  fi
+
+  if ! brew_batch cleanup >>"$LOG" 2>&1; then
+    log "brew: cleanup FAILED (see errors above)"
+  fi
 }
 
 # Keep the Socket Firewall binary current. Socket drops support for old sfw
@@ -390,3 +461,4 @@ ensure_gantry_cli_fresh
 ensure_github_ssh_rewrite
 ensure_gh_stack
 refresh_pi_packages
+upgrade_homebrew

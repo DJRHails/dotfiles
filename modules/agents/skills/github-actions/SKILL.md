@@ -188,19 +188,28 @@ count entirely can send the job token up front, as gauntlet's `ci.yml` does.
 
 ## Runner pools
 
-Pools are declared in
+Personal accounts cannot have account-level runners, so **every repo needs its
+own registration**. A new repo gets one **automatically**: a taffy cron runs
+gantry's `provision_runners.sh --discover` every 10 minutes and registers taffy
+runners for any recently pushed repo that has a job queued on the `taffy` label
+(or `CI_FALLBACK=true`) and no online taffy runner. So for a new repo, just merge
+the workflow: the first job queues for up to ~10 minutes, then runs on taffy.
+
+**Do not set `CI_FALLBACK=true` to bridge that wait.** It moves every job to
+billed hosted runners, and a worker that did it "until the pool exists" left a
+repo there with nothing queued for discovery to notice (2026-10-05).
+Discovery now catches that case too and flips the variable back once the pool is
+online, but a ten-minute queue is the intended path.
+
+To size a pool beyond the default, declare it in
 [`modules/ci-runners/runners.conf`](../../../ci-runners/runners.conf) and
-reconciled by `provision.sh` **run on taffy**:
+reconcile with `provision.sh` **run on taffy** (needs host sudo, so a gantry
+worker cannot do it — leave it to the operator):
 
 ```sh
 ./provision.sh                       # reconcile every repo in the conf
 ./provision.sh DJRHails/<repo>       # just one
 ```
-
-Personal accounts cannot have account-level runners, so **every repo needs its
-own registration** — adding a `runs-on` pointing at `taffy` in a repo with no
-pool means jobs queue against a label nothing answers. Add the repo to
-`runners.conf` and provision *before* merging the workflow change.
 
 Size the pool to the widest fan-out in the repo's workflows: a 2-job CI wants 2
 runners or the second job waits.
@@ -218,7 +227,8 @@ is tuned to it.
 Do **not** add new repos. That watcher is what "burned 11,020 hosted minutes off
 touchstone during the Aug 2-4 taffy OOM window and tripped the ACCOUNT-level
 spending limit, blocking every repo" (its own docstring, touchstone#2734). For
-everything else `CI_FALLBACK` stays a manual, deliberate switch, so a taffy
+everything else `CI_FALLBACK` stays a manual, deliberate switch (an operator
+call, not a worker's), so a taffy
 outage **queues** jobs — visible and free — instead of silently billing.
 
 touchstone and bogusbench go further and are hard-pinned to the pool with no

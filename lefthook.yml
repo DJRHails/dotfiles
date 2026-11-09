@@ -7,6 +7,12 @@ pre-commit:
   commands:
     crypt-patterns:
       run: scripts/check-crypt-patterns.sh
+    dockerignore-crypt:
+      run: scripts/check-dockerignore-crypt.sh
+    # The check above fails quiet: if it stops seeing encrypted files it passes every
+    # commit while decrypted files go into image layers.
+    dockerignore-crypt-tests:
+      run: bash tests/dockerignore-crypt.test.sh
     glassine-check:
       run: glassine check
     # The scancel guard is a safety control: a bypass in it costs peer workers' queued
@@ -36,3 +42,22 @@ pre-commit:
     # means installs bypass the firewall while it still looks installed.
     sfw-aliases-tests:
       run: zsh -f tests/sfw-aliases.test.zsh
+    session-resume-tests:
+      run: python3 tests/session-resume.test.py
+    # mdunwrap rewrites markdown in place, and a reflow bug fails quietly: two bullets
+    # merged, a table row swallowed, a code block joined — the file still parses.
+    mdunwrap-tests:
+      run: bash tests/mdunwrap.test.sh
+    # The release-age gate is a security control with a quiet failure mode: a
+    # setup that skips a tool, or a value that drifts in one of six units, leaves
+    # installs ungated while the module still looks applied.
+    release-age-tests:
+      run: bash tests/release-age.test.sh
+    # /note must block exactly the command and nothing else: a miss spends a model
+    # turn on a status-line note, a false match swallows an ordinary prompt.
+    note-hook-tests:
+      run: bash tests/note-hook.test.sh
+    # The response gate reopens finished turns. Without its cap, reset, code
+    # exemption and off switch a misfiring rule loops a session.
+    response-gate-tests:
+      run: bash tests/response-gate.test.sh

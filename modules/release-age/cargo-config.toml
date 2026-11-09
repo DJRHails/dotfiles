@@ -1,0 +1,7 @@
+# Stable from cargo 1.100 (rust-lang/cargo#17335, due 2026-11-12). Earlier
+# cargo ignores the key without a warning, so the gate switches itself on at
+# the next `rustup update`. Versions already in Cargo.lock are kept and
+# `cargo install` is never gated. Bypass once with
+# CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow cargo update -p <crate>.
+[registry]
+global-min-publish-age = "7 days"

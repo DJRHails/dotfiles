@@ -90,8 +90,8 @@ resolve_claude() {
   PROJ="${info#*$'\t'}"
   [[ -n "$PROJ" ]] || PROJ="$PWD"
 
-  # Pick the launcher that matches the session's config dir. claude::ant sources auth
-  # (.env.ant) + runs its ensure step; a bare `CLAUDE_CONFIG_DIR=… claude` skips that
+  # Pick the launcher that matches the session's config dir. claude::ant scrubs ambient
+  # API keys + runs its ensure step; a bare `CLAUDE_CONFIG_DIR=… claude` skips that
   # (→ "Not logged in"). The fork runs in an interactive shell, so the wrapper is available.
   local launch
   case "$cfg" in
