@@ -21,10 +21,21 @@ is missing — but only when that is safe:
   (`skip — on branch <name>`),
 - it has **no modified or staged tracked files** — otherwise skipped
   (`skip — modified tracked files`),
+- its HEAD is reachable from a branch, remote-tracking ref or tag, or is a commit the
+  superproject itself pinned — otherwise it holds commits made on the detached HEAD,
+  which the move would orphan, so it is skipped
+  (`skip — HEAD is on no branch, remote or tag`),
 - untracked files (e.g. a `.data/` of worktrees) never block the move and are kept,
 - a failed fetch skips that submodule only (`skip — pin <sha> not available`).
 
 Uninitialised submodules are left to `bootstrap.sh`. Nothing is forced or reset.
+
+**Homebrew formulae are upgraded on macOS** — `brew update`, `brew upgrade --formula`,
+`brew cleanup`, non-interactively, with a one-line summary of what moved. **Formulae only,
+never casks**: a cask upgrade can quit a running GUI app (the terminal included) and can need
+sudo, and the casks that matter mostly self-update. Hold a formula back with `brew pin`. A
+failing brew is logged and never stops the steps after it; Linux hosts and hosts without
+`brew` skip the step.
 
 Logs to `$XDG_STATE_HOME/dotfiles/autoupdate.log` (default
 `~/.local/state/dotfiles/autoupdate.log`).

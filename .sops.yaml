@@ -3,6 +3,7 @@ creation_rules:
   - path_regex: '^modules/agents/skills/diagram-design/.*$' # glob: modules/agents/skills/diagram-design/**
     key_groups:
       - age:
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMDZz6qZUwfsFnK2oS+a3m76qy1qdkk8Bn0iB7rcbBbq' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIESvGuL264sdGqVwDkWPw/nkSI/cQKCnqCOhzEigF6xV' # gantry-bot
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJLQyH6488PfF9QzyV+OB+Qh26Pgy552/aKtsWD6fZu7' # github:NxtGenLegend
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFUXjq+3oXIFC6WhwqlW8XcPhLGWxVzShqhSs3SzuHI' # github:NxtGenLegend
@@ -14,13 +15,12 @@ creation_rules:
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC/+Ziaqy11tLwos1sVvaBo+kKI14Y/zRtMTUK85rSL8' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUhwKeMY/N/+vFiMr/jjz1GWUZ14XgTfctDphaUIJh5' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJe3wmGlGSjzUhnmCGKKrHStmXGyZKQwCGROEfPBdTIP' # github:DJRHails
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGayLhDYjABZUNZKUfOMZeo4zka57Sl12wUHdt0zr7p' # github:DJRHails
   - key_groups:
       - age:
+          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMDZz6qZUwfsFnK2oS+a3m76qy1qdkk8Bn0iB7rcbBbq' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIESvGuL264sdGqVwDkWPw/nkSI/cQKCnqCOhzEigF6xV' # gantry-bot
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE+bl01iRKRVYvOtFYSQWqKtqo2N2TG9H5+nGSxJSxE0' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJQpQsoOwzcytS+AjXSB7bZbHjI90oX2uf80xNDBjXaL' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC/+Ziaqy11tLwos1sVvaBo+kKI14Y/zRtMTUK85rSL8' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINUhwKeMY/N/+vFiMr/jjz1GWUZ14XgTfctDphaUIJh5' # github:DJRHails
           - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJe3wmGlGSjzUhnmCGKKrHStmXGyZKQwCGROEfPBdTIP' # github:DJRHails
-          - 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILGayLhDYjABZUNZKUfOMZeo4zka57Sl12wUHdt0zr7p' # github:DJRHails
