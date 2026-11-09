@@ -119,7 +119,7 @@ main() {
   . "scripts/deps.sh"
 
   # Check if we need help
-  doc::maybe_help "$@"
+  doc::maybe_help "$@" || exit 0
 
   # Check for arguments
   scanned_valid_modules=()

@@ -14,6 +14,18 @@ repos:
         entry: scripts/check-crypt-patterns.sh
         language: script
         pass_filenames: false
+      - id: check-dockerignore-crypt
+        name: check .dockerignore excludes glassine-encrypted files
+        entry: scripts/check-dockerignore-crypt.sh
+        language: script
+        pass_filenames: false
+      # The check above fails quiet: if it stops seeing encrypted files it passes every
+      # commit while decrypted files go into image layers.
+      - id: dockerignore-crypt-tests
+        name: dockerignore-crypt check behaviour suite
+        entry: bash tests/dockerignore-crypt.test.sh
+        language: system
+        pass_filenames: false
       - id: glassine-check
         name: staged glassine-managed files are encrypted
         entry: glassine check
@@ -77,6 +89,11 @@ repos:
       - id: claude-resume-tests
         name: claude::resume resolution suite
         entry: zsh -f tests/claude-resume.test.zsh
+        language: system
+        pass_filenames: false
+      - id: session-resume-tests
+        name: Claude/Codex native session conversion suite
+        entry: python3 tests/session-resume.test.py
         language: system
         pass_filenames: false
       # mdunwrap rewrites markdown in place, and a reflow bug fails quietly: two bullets

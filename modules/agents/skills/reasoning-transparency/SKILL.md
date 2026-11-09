@@ -1,6 +1,6 @@
 ---
 name: reasoning-transparency
-description: How to write analyses, research reports, recommendations, and decision memos so a reader can answer "How should I update my view in response to this?" — open with linked key takeaways, flag which considerations matter most, and state confidence + kind of support for every major claim. Load when drafting or reviewing a research write-up, evaluation, literature review, cost-effectiveness or recommendation doc, or any argument meant to move someone's beliefs; when deciding how to hedge / express uncertainty in prose; or when the user asks to make a document "more rigorous", "more transparent", "better calibrated", or "easier to trust". Distilled from Coefficient Giving (formerly Open Philanthropy) "Reasoning Transparency" by Luke Muehlhauser.
+description: How to write analyses, research reports, recommendations, and decision memos so a reader can answer "How should I update my view in response to this?" — open with linked key takeaways, flag which considerations matter most, and state confidence + kind of support for every major claim. Load when drafting or reviewing a research write-up, evaluation, literature review, cost-effectiveness or recommendation doc, or any argument meant to move someone's beliefs; when deciding how to hedge / express uncertainty in prose; or when the user asks to make a document "more rigorous", "more transparent", "better calibrated", or "easier to trust". Not for software READMEs or user docs. Distilled from Coefficient Giving (formerly Open Philanthropy) "Reasoning Transparency" by Luke Muehlhauser.
 ---
 
 # Reasoning Transparency
@@ -8,6 +8,16 @@ description: How to write analyses, research reports, recommendations, and decis
 How to write an analysis so the reader can answer the only question that matters when they read it: **"How should I update my view in response to this?"** Distilled from [Reasoning Transparency](https://coefficientgiving.org/research/reasoning-transparency/) (Luke Muehlhauser, Open Philanthropy / now Coefficient Giving, Dec 2017).
 
 A reasoning-transparent document lets the reader cheaply judge: Is the evidence presented fairly or selectively? How much does the author know? What was the research process — what shortcuts were taken? How confident is the author in each claim, and on what basis? What's the key takeaway, and what would change the author's mind? Most scientific norms (methods sections, open data, COI statements) target this; the two things they routinely miss are **per-claim confidence** and **per-claim support** — which is where most of the cheap wins are.
+
+## Not for READMEs
+
+A README for a tool, library or config repo is documentation, not an argument: it tells a reader
+what the thing is and how to use it. Don't apply this skill to one. A 2026-10 sweep did, adding
+key-takeaway lists, `[confidence: ~NN%]` tags, "what the value rests on" paragraphs, audit logs
+and commit-count provenance to dozens of READMEs, and they read like audit reports about the
+project. In a software README, state limitations plainly in a short "Limitations" section and
+give test *instructions*, not a narrative of what was run. A research repo's results section is
+the exception: there, report N, seeds and caveats next to each number, in plain prose.
 
 ## The three recommendations (do these first)
 
