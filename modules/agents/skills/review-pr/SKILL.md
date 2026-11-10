@@ -76,10 +76,21 @@ starts `## Review Summary` gives the reviewed head
 (`gh api repos/<owner>/<repo>/issues/$ARGUMENTS/comments --jq '[.[] | select(.body | startswith("## Review Summary"))] | last | .body'`),
 and the PR's review threads give the findings.
 
+**A delta that merges the base branch in** still needs one check even when
+it touches none of the PR's files: code newly arriving from base may call a
+symbol this PR removed or renamed, and that breakage is never in the PR's
+diff. `rg` each removed or renamed symbol across the merged tree and run the
+tests of any merged file that hits. A hit is a candidate, not yet a finding
+(it may be a comment, a string, or a same-named symbol); one that still
+calls the removed symbol is a P1 (the head fails its own tests). If the
+delta touches no file in the PR and no hit is live, there is
+nothing new to report: update your existing summary comment in place (§5)
+rather than posting another one.
+
 ## 2. Review (single verified pass)
 
 Read every hunk once against the repo's CLAUDE.md/AGENTS.md and judge it
-through all five lenses — this pass replaces a five-agent fan-out, so walk
+through all six lenses — this pass replaces a multi-agent fan-out, so walk
 them deliberately per hunk rather than reading for a general impression:
 
 1. **Correctness** — wrong logic, broken invariants, off-by-ones, races,
@@ -96,6 +107,35 @@ them deliberately per hunk rather than reading for a general impression:
    Re-measure a quantitative claim when the data is at hand.
 5. **Types and invariants** — states representable that should not be,
    flags where an enum belongs, validation that lives in a docstring.
+6. **Hidden links** — a rule, value or decision the diff writes a second
+   time (a filter, a cutoff date, a key format, a list of providers) that
+   must change together with its twin while nothing in the code shows it,
+   and links the diff leaves half-updated: it changes one copy and not the
+   others. `rg` a distinctive literal or call for the twins. The test is
+   "would changing one copy without the other be a bug?" — same shape for
+   a different reason is not a finding. Some copies are forced (vendored
+   code kept byte-identical, a CI job that cannot install the shared module,
+   a function whose source keys a paid cache); there the finding is a
+   missing comment naming the twin, not a merge. Only links this diff
+   creates, breaks or half-updates — structure the PR merely sits next to
+   is P4 at most.
+
+**Refactor PRs** (the description says structural, moves, or no behaviour
+change) carry their own bar, because passing tests is weak evidence when
+the moved code is thinly tested:
+
+- Every behaviour difference against base is a finding unless the
+  description names it as intended. Diff outputs, not just tests: run a
+  script the PR touched on base and head over the same local data and
+  compare, when that is free.
+- A difference that undoes a deliberate earlier change (`git log -L` or
+  `git log -S` on the old lines names the PR that introduced it) is **P2**,
+  whatever its size today — a magnitude estimate does not lower it.
+- A function whose source keys a cache (decorated `@cached`-style, keyed on
+  `inspect.getsource` or its qualified name) that moved, was renamed or was
+  edited re-keys that cache: P1 if the cache holds paid results, else P2.
+- Each bug fix the PR claims needs a test that fails on base (the Tests
+  lens); check by reverting the fix locally.
 
 Verify each candidate before it becomes a finding: read the code path, run
 the command, or reproduce the number. Chase a bug class across the PR's
@@ -245,3 +285,11 @@ Threads without a `finding:` token are not yours — leave them.
 you pushed one, else the head you reviewed; §1's re-entry check reads it
 from this comment. Name what you could not verify. If your agent contract requires a
 `Verdict:` line, it goes after the table and before the sign-off.
+
+**Re-entry with nothing new** (no new finding, no fix pushed — typically a
+base merge, §1): edit your newest `## Review Summary` comment instead of
+posting a new one, rewriting its **Verified** and **Reviewed head** lines
+and adding a line `Re-checked through <sha>: <what the delta was>`:
+`gh api --method PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@/tmp/review/summary.md`.
+Re-entry still finds it as the newest summary, and the PR does not collect
+a copy of the same table for every merge of the base branch.
