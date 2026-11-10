@@ -80,8 +80,10 @@ and the PR's review threads give the findings.
 it touches none of the PR's files: code newly arriving from base may call a
 symbol this PR removed or renamed, and that breakage is never in the PR's
 diff. `rg` each removed or renamed symbol across the merged tree and run the
-tests of any merged file that hits — a hit is a P1 (the head fails its own
-tests). If the delta touches no file in the PR and nothing hits, there is
+tests of any merged file that hits. A hit is a candidate, not yet a finding
+(it may be a comment, a string, or a same-named symbol); one that still
+calls the removed symbol is a P1 (the head fails its own tests). If the
+delta touches no file in the PR and no hit is live, there is
 nothing new to report: update your existing summary comment in place (§5)
 rather than posting another one.
 
