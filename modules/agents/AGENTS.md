@@ -2,7 +2,8 @@
 
 Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) files override these defaults.
 
-Personal notes (accounts, services, local set-up) live in an encrypted file, imported here:
+Personal notes (accounts, services, local set-up) live in an encrypted file. Claude Code imports
+it via the line below; agents that don't expand `@` imports (pi) should read that file directly.
 @~/.files/modules/agents/AGENTS.personal.md
 
 ## Philosophy
