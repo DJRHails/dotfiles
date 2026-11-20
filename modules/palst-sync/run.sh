@@ -24,7 +24,9 @@ die() {
 
 [[ -x "$PALST" ]] || die "no palst CLI at $PALST; run: $INSTALL_HINT"
 
-installed="$(uv tool list 2>/dev/null | awk '$1 == "palst" { sub(/^v/, "", $2); print $2 }')"
+command -v uv >/dev/null || die "uv not on PATH ($PATH); palst must be installed as a uv tool"
+installed="$(uv tool list 2>/dev/null | awk '$1 == "palst" { sub(/^v/, "", $2); print $2 }')" ||
+  die "'uv tool list' failed; run it by hand to see why"
 [[ -n "$installed" ]] || die "cannot read the palst version from 'uv tool list'"
 lowest="$(printf '%s\n%s\n' "$MIN_VERSION" "$installed" | sort -V | head -n1)"
 [[ "$lowest" == "$MIN_VERSION" ]] ||
