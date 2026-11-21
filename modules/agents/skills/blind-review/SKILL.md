@@ -16,6 +16,10 @@ A reviewer handed your hypothesis tends to return it confirmed.
    Note whether it has uncommitted edits; reviewers read the working copy, so say so.
    Don't read the draft closely yourself before spawning — that's what anchors briefs.
 2. **Spawn the three reviewers in one message** so they run in parallel (briefs below).
+   Each must be a **fresh** agent whose only context is its brief: never a fork, a
+   resumed session, or a message to an existing agent. Those inherit your conversation
+   about the draft, which is the anchoring this skill exists to avoid, and nothing in
+   the returned review would show it.
    Each gets the absolute file path and nothing about your view. Each writes its full
    review to the scratchpad and replies with a ≤15-line summary plus the path.
    None of them edits files.
