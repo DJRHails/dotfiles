@@ -20,6 +20,7 @@ modules/agents/skills/slack
 modules/agents/skills/tailscale-topology
 modules/agents/skills/uptime-alerts
 modules/agents/skills/web-animation-design
+modules/agents/AGENTS.personal.md
 modules/agents/commands/archive-book.md
 modules/claude/safe.zsh
 modules/onepassword/ssh/agent.toml

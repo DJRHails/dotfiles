@@ -1,12 +1,12 @@
 ---
-name: review-pr
-description: Review an existing GitHub PR — one verified single-pass read of the diff, inline P1–P3 findings, fixes for the P1/P2s pushed to the PR branch, scoped verification, resolved threads, a summary. Escalates to a two-reader second opinion only for large source changes. Use when asked to review and fix a PR, or to run the review-pr flow on a PR number.
+name: pr-review
+description: Review an existing GitHub PR — one verified single-pass read of the diff, inline P1–P3 findings, fixes for the P1/P2s pushed to the PR branch, scoped verification, resolved threads, a summary. Escalates to a two-reader second opinion only for large source changes. Use when asked to review and fix a PR, or to run the pr-review flow on a PR number.
 argument-hint: <pr-number>
 ---
 
 # Review and Fix PR
 
-`$ARGUMENTS` is the PR number (e.g. `/review-pr 42`). Without one, ask which PR.
+`$ARGUMENTS` is the PR number (e.g. `/pr-review 42`). Without one, ask which PR.
 
 Every finding must be **verified** before it is posted (a code path you read or
 ran), and P1/P2 findings are **fixed** on the PR branch. Those two properties
