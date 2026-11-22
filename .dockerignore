@@ -22,6 +22,7 @@ modules/agents/skills/uptime-alerts
 modules/agents/skills/web-animation-design
 modules/agents/AGENTS.personal.md
 modules/agents/commands/archive-book.md
+modules/agents/AGENTS.personal.md
 modules/claude/safe.zsh
 modules/onepassword/ssh/agent.toml
 docs/legacy-transcrypt.md
