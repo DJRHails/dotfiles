@@ -123,7 +123,8 @@ contextual_re+='|^\[copula-avoidance\] +"(marks|represents) |^\[unnecessary-word
 drop_contextual() {
   local hit kept=()
   for hit in "${hits[@]}"; do
-    if [[ "${hit,,}" =~ $contextual_re ]]; then
+    # tr, not ${hit,,}: macOS /bin/bash is 3.2, where ${,,} is a "bad substitution".
+    if [[ "$(tr '[:upper:]' '[:lower:]' <<<"$hit")" =~ $contextual_re ]]; then
       printf '%s\t%s\t  unjudged, dropped: %s\n' "$(stamp)" "${sid:0:8}" "$hit" >>"$log"
     else
       kept+=("$hit")
