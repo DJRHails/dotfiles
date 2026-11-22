@@ -49,7 +49,8 @@ CHECKOUT_WORKERS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # On macOS APFS, we can skip the serial ~12k-file checkout write by:
 #   1. `git worktree add --no-checkout --detach <wt> <HEAD>`  (instant)
 #   2. `git read-tree HEAD`                                   (populates index)
-#   3. `cpow --batch-files` over every tracked path          (~3-5s for 12k files)
+#   3. `cpow --batch-files` over every tracked file          (~3-5s for 12k files;
+#      gitlinks become empty dirs, filled by worktree::init_submodules)
 #   4. `update-index --refresh` w/ core.checkStat=minimal     (validates stat cache)
 #   5. `git checkout <branch>` w/ core.checkStat=minimal      (tree-diff walk)
 #
@@ -91,10 +92,24 @@ worktree::create_fast() {
     >/dev/null 2>&1 || return 1
   git -C "$wt" read-tree HEAD >/dev/null 2>&1 || return 1
 
-  if ! git -C "$MAIN" ls-files -z \
-     | cpow --batch-files "$MAIN" "$wt" 2>/dev/null; then
-    return 1
-  fi
+  # Gitlinks (submodules) are not cloned: MAIN's copy carries a relative `.git` gitfile that
+  # resolves to nothing from inside the worktree, which makes every git command there fatal.
+  # Each gets the empty directory `git worktree add` would create, and
+  # worktree::init_submodules populates it during bootstrap.
+  local index="$TMPDIR_WT/fast-path-index" files="$TMPDIR_WT/fast-path-files"
+  local entry link gitlinks=()
+  git -C "$MAIN" ls-files -z --stage > "$index" || return 1
+  while IFS= read -r -d '' entry; do
+    if [[ "$entry" == 160000\ * ]]; then
+      gitlinks+=("${entry#*$'\t'}")
+    else
+      printf '%s\0' "${entry#*$'\t'}"
+    fi
+  done < "$index" > "$files"
+  cpow --batch-files "$MAIN" "$wt" < "$files" 2>/dev/null || return 1
+  for link in "${gitlinks[@]}"; do
+    mkdir -p "$wt/$link" || return 1
+  done
 
   git -C "$wt" -c core.checkStat=minimal update-index --refresh \
     >/dev/null 2>&1 || true
@@ -290,7 +305,8 @@ fi
 export -f worktree::info worktree::warn
 
 # Initialise each submodule that MAIN has checked out, borrowing MAIN's objects through
-# `--reference` instead of cloning from the remote. A worktree keeps its own submodule
+# `--reference`, so the clone from the remote transfers only what MAIN lacks (the remote must
+# still be reachable). A worktree keeps its own submodule
 # repositories under .git/worktrees/<name>/modules; left to a later
 # `git submodule update --init`, each is a full clone (158 MB a worktree in hails.info,
 # 2026-11-21). With the reference it stores only what the branch adds. Submodules MAIN
