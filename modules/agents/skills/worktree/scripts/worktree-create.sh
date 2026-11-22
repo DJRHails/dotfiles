@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # Create git worktrees under .data/worktrees/ and bootstrap them with
-# copy-on-write copies of node_modules and untracked config files.
+# copy-on-write copies of node_modules and untracked config files, plus the
+# submodules main has checked out (sharing main's objects).
 #
 # Usage:
 #   worktree-create.sh [-v] <branch> [<branch> ...]
@@ -288,6 +289,29 @@ if declare -F cpow >/dev/null 2>&1; then
 fi
 export -f worktree::info worktree::warn
 
+# Initialise each submodule that MAIN has checked out, borrowing MAIN's objects through
+# `--reference` instead of cloning from the remote. A worktree keeps its own submodule
+# repositories under .git/worktrees/<name>/modules; left to a later
+# `git submodule update --init`, each is a full clone (158 MB a worktree in hails.info,
+# 2026-11-21). With the reference it stores only what the branch adds. Submodules MAIN
+# has not checked out are left for the caller, as before.
+worktree::init_submodules() {
+  local branch="$1" wt="$2" path main_gitdir
+  [[ -f "$wt/.gitmodules" ]] || return 0
+  while IFS= read -r path; do
+    [[ -z "$path" || -e "$wt/$path/.git" || ! -e "$MAIN/$path/.git" ]] && continue
+    main_gitdir=$(git -C "$MAIN/$path" rev-parse --absolute-git-dir) || continue
+    if git -C "$wt" submodule update --init --reference "$main_gitdir" -- "$path" \
+      >/dev/null 2>&1; then
+      echo "  [$branch] submodule from local reference: $path"
+    else
+      local hint="run 'git submodule update --init -- $path' in the worktree"
+      worktree::warn "  [$branch] submodule init failed: $path ($hint)"
+    fi
+  done < <(git -C "$wt" config -f .gitmodules --get-regexp '\.path$' | awk '{print $2}')
+}
+export -f worktree::init_submodules
+
 worktree::bootstrap() {
   local branch="$1"
   local wt="$2"
@@ -347,6 +371,8 @@ worktree::bootstrap() {
     cpow "$f" "$wt_f"
     echo "  [$branch] copied: $rel"
   done < "$CONFIG_LIST"
+
+  worktree::init_submodules "$branch" "$wt"
 
   if [[ -f "$wt/.envrc" ]]; then
     direnv allow "$wt" 2>/dev/null || true
