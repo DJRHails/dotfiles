@@ -95,7 +95,9 @@ git branch -d <branch>
 ### Step 6 — Create missing worktrees
 
 Use the `worktree::create` script which handles the full flow: checkout the
-branch, copy-on-write `node_modules`, and copy untracked config files.
+branch, copy-on-write `node_modules`, copy untracked config files, and initialise
+the submodules main has checked out with `--reference` to main's objects, so a
+worktree's submodules cost about 1 MB rather than a full clone each.
 
 **Always pass all branches in a single invocation** — the script batches
 network I/O and parallelises the expensive CoW bootstrap phase:
