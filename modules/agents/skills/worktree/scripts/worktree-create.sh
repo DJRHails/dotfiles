@@ -114,13 +114,15 @@ worktree::create_fast() {
   git -C "$wt" -c core.checkStat=minimal update-index --refresh \
     >/dev/null 2>&1 || true
 
+  # submodule.recurse is off for the switch: with it on (modules/git/gitconfig sets it), a branch
+  # whose gitlink differs from MAIN's makes checkout update the still-uninitialised submodule,
+  # which dies with "could not reset submodule index". init_submodules checks it out afterwards.
+  local checkout=(git -C "$wt" -c core.checkStat=minimal -c submodule.recurse=false checkout)
   if echo "$LOCAL_BRANCHES" | grep -qxF "$branch" \
      || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
-    git -C "$wt" -c core.checkStat=minimal checkout "$branch" \
-      >/dev/null 2>&1 || return 1
+    "${checkout[@]}" "$branch" >/dev/null 2>&1 || return 1
   else
-    git -C "$wt" -c core.checkStat=minimal checkout -b "$branch" \
-      >/dev/null 2>&1 || return 1
+    "${checkout[@]}" -b "$branch" >/dev/null 2>&1 || return 1
   fi
 }
 
