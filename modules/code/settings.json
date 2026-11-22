@@ -1,4 +1,6 @@
 {
+    "llmSaveMerge.envFile": "~/.config/llm-save-merge/.env",
+    "application.shellEnvironmentResolutionTimeout": 30,
     "editor.inlineSuggest.enabled": true,
     "github.copilot.enable": {
         "*": false,
@@ -68,6 +70,7 @@
         "editor.defaultFormatter": "foxundermoon.shell-format"
     },
     "cSpell.userWords": [
+        "patronising",
         "targetting"
     ],
     "flake8.args": [
@@ -81,7 +84,7 @@
     "gitlens.ai.experimental.openai.model": "gpt-4-turbo-preview",
     "supermaven.enable": {
         "dotenv": false,
-        "*": true
+        "*": false
     },
     "git.confirmSync": false,
     "terminal.integrated.scrollback": 10000,
@@ -122,5 +125,7 @@
         ]
     },
     "isogram.enabled": true,
-    "files.autoSave": "afterDelay"
+    "files.autoSave": "afterDelay",
+    "editor.accessibilitySupport": "off",
+    "isogram.view": "spans"
 }
