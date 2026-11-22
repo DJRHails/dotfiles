@@ -2,6 +2,9 @@
 
 Global instructions for all projects. Project-specific AGENTS.md (or CLAUDE.md) files override these defaults.
 
+Personal notes (accounts, services, local set-up) live in an encrypted file, imported here:
+@~/.files/modules/agents/AGENTS.personal.md
+
 ## Philosophy
 
 - **No speculative features** - Don't add features, flags, or configuration unless users actively need them
