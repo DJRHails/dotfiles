@@ -69,6 +69,7 @@ links in `symlinks.conf` (and `symlinks.<os>.conf`), then runs `install.sh`, `in
 | `node`                  | Node.js via NodeSource signed repo.
 | `onepassword`           | 1Password app + `op` CLI, and the SSH agent config naming which vaults offer keys.
 | `pentest`               | Aliases useful in penetration tests / deobfuscation.
+| `palst-sync`            | Mirrors this host's Claude Code sessions to palst with `palst sync --watch` (launchd or systemd user service). The first start backfills every existing session.
 | `pi`                    | pi coding agent config.
 | `piknik`                | Cross-machine clipboard.
 | `python`                | python3, uv, and virtualenv quality-of-life aliases.
