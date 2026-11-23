@@ -21,8 +21,11 @@ GREEN="\033[0;32m"
 YELLOW="\033[0;33m"
 CLEAR="\033[0m"
 
-worktree::die()  { printf '%b%s%b\n' "$RED"    "$1" "$CLEAR" >&2; exit 1; }
-worktree::info() { printf '%b%s%b\n' "$GREEN"  "$1" "$CLEAR"; }
+worktree::die() {
+  printf '%b%s%b\n' "$RED" "$1" "$CLEAR" >&2
+  exit 1
+}
+worktree::info() { printf '%b%s%b\n' "$GREEN" "$1" "$CLEAR"; }
 worktree::warn() { printf '%b%s%b\n' "$YELLOW" "$1" "$CLEAR"; }
 
 # All CoW copy operations go through the `cpow` binary (~/.files/bin/cpow):
@@ -31,11 +34,17 @@ worktree::warn() { printf '%b%s%b\n' "$YELLOW" "$1" "$CLEAR"; }
 # downstream don't need to branch.
 if ! command -v cpow >/dev/null 2>&1; then
   cpow() {
-    [[ -e "$2" ]] && { echo >&2 "cpow: destination already exists: $2"; return 1; }
+    [[ -e "$2" ]] && {
+      echo >&2 "cpow: destination already exists: $2"
+      return 1
+    }
     /bin/cp -Rc "$1" "$2" 2>/dev/null \
       || /bin/cp -R --reflink=auto "$1" "$2" 2>/dev/null \
       || /bin/cp -R "$1" "$2" 2>/dev/null \
-      || { echo >&2 "cpow: unable to copy $1 to $2"; return 1; }
+      || {
+        echo >&2 "cpow: unable to copy $1 to $2"
+        return 1
+      }
   }
   export -f cpow
 fi
@@ -100,7 +109,7 @@ worktree::create_fast() {
   # committed stay out. Files MAIN has deleted are skipped here and restored by the reset below.
   local tree="$TMPDIR_WT/fast-path-tree" files="$TMPDIR_WT/fast-path-files"
   local entry path link gitlinks=()
-  git -C "$MAIN" ls-tree -r -z --full-tree "$main_head" > "$tree" || return 1
+  git -C "$MAIN" ls-tree -r -z --full-tree "$main_head" >"$tree" || return 1
   while IFS= read -r -d '' entry; do
     path="${entry#*$'\t'}"
     if [[ "$entry" == 160000\ * ]]; then
@@ -108,8 +117,8 @@ worktree::create_fast() {
     elif [[ -e "$MAIN/$path" || -L "$MAIN/$path" ]]; then
       printf '%s\0' "$path"
     fi
-  done < "$tree" > "$files"
-  cpow --batch-files "$MAIN" "$wt" < "$files" 2>/dev/null || return 1
+  done <"$tree" >"$files"
+  cpow --batch-files "$MAIN" "$wt" <"$files" 2>/dev/null || return 1
   for link in "${gitlinks[@]}"; do
     mkdir -p "$wt/$link" || return 1
   done
@@ -128,7 +137,7 @@ worktree::create_fast() {
   # which dies with "could not reset submodule index". init_submodules checks it out afterwards.
   local checkout=(git -C "$wt" -c core.checkStat=minimal -c submodule.recurse=false checkout)
   if echo "$LOCAL_BRANCHES" | grep -qxF "$branch" \
-     || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
+    || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
     "${checkout[@]}" "$branch" >/dev/null 2>&1 || return 1
   else
     "${checkout[@]}" -b "$branch" >/dev/null 2>&1 || return 1
@@ -139,8 +148,11 @@ worktree::create_fast() {
 VERBOSE=
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -v|--verbose) VERBOSE=true; shift ;;
-    -h|--help)
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
       echo "usage: worktree-create.sh [-v] <branch> [<branch> ...]"
       exit 0
       ;;
@@ -172,7 +184,7 @@ for branch in "${BRANCHES[@]}"; do
     MISSING_REFSPECS+=("refs/heads/$branch:refs/remotes/origin/$branch")
   fi
 done
-if (( ${#MISSING_REFSPECS[@]} > 0 )); then
+if ((${#MISSING_REFSPECS[@]} > 0)); then
   git fetch origin "${MISSING_REFSPECS[@]}" 2>/dev/null || true
 fi
 
@@ -192,7 +204,7 @@ fi
 if [[ "$NEW_BRANCH_BASE" != HEAD ]]; then
   git fetch --quiet origin 2>/dev/null || true
   BEHIND=$(git rev-list --count "HEAD..$NEW_BRANCH_BASE" 2>/dev/null || echo 0)
-  if (( BEHIND > 0 )); then
+  if ((BEHIND > 0)); then
     worktree::info "new branches will base on $NEW_BRANCH_BASE (local HEAD is $BEHIND behind)"
   fi
 fi
@@ -220,20 +232,20 @@ PRUNE_EXPR=()
 for d in "${PRUNE_DIRS[@]}"; do
   PRUNE_EXPR+=(-name "$d" -o)
 done
-unset 'PRUNE_EXPR[${#PRUNE_EXPR[@]}-1]'  # drop trailing -o
+unset 'PRUNE_EXPR[${#PRUNE_EXPR[@]}-1]' # drop trailing -o
 
 NM_LIST="$TMPDIR_WT/node_modules.txt"
 find "$MAIN" -maxdepth 6 \
   \( "${PRUNE_EXPR[@]}" \) -prune \
-  -o -type d -name node_modules -print 2>/dev/null > "$NM_LIST"
+  -o -type d -name node_modules -print 2>/dev/null >"$NM_LIST"
 
 CONFIG_LIST="$TMPDIR_WT/config_files.txt"
 find "$MAIN" -maxdepth 4 \
   \( "${PRUNE_EXPR[@]}" -o -name node_modules \) -prune \
   -o -type f \( \
-       -name '.env' -o -name '.env.local' -o -name '.envrc' \
-    -o -name '.tool-versions' -o -name 'mise.toml' \
-  \) -print 2>/dev/null > "$CONFIG_LIST"
+  -name '.env' -o -name '.env.local' -o -name '.envrc' \
+  -o -name '.tool-versions' -o -name 'mise.toml' \
+  \) -print 2>/dev/null >"$CONFIG_LIST"
 
 # --- Phase 1: create worktrees sequentially (git lock) ----------------
 # Prefer the clonefile(2) fast path when conditions allow; fall back to
@@ -270,13 +282,19 @@ for branch in "${BRANCHES[@]}"; do
   fi
 
   if echo "$LOCAL_BRANCHES" | grep -qxF "$branch" \
-     || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
+    || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
     git -c "checkout.workers=$CHECKOUT_WORKERS" worktree add "$wt" "$branch" \
-      || { worktree::warn "failed to create worktree for $branch"; continue; }
+      || {
+        worktree::warn "failed to create worktree for $branch"
+        continue
+      }
   else
     git -c "checkout.workers=$CHECKOUT_WORKERS" worktree add -b "$branch" "$wt" \
       "$NEW_BRANCH_BASE" \
-      || { worktree::warn "failed to create worktree for $branch"; continue; }
+      || {
+        worktree::warn "failed to create worktree for $branch"
+        continue
+      }
   fi
 
   WORKTREE_PATHS["$branch"]="$wt"
@@ -338,7 +356,7 @@ worktree::bootstrap() {
     [[ -d "$parent" ]] || continue
     [[ -e "$wt_nm" ]] && continue
     pairs+="${main_nm}"$'\t'"${wt_nm}"$'\n'
-  done < "$NM_LIST"
+  done <"$NM_LIST"
 
   # Parallel directory-level clonefile(2). One syscall per directory —
   # orders of magnitude faster than `cp -Rc` which recurses per-file.
@@ -363,7 +381,7 @@ worktree::bootstrap() {
       [[ -d "$parent" ]] || continue
       [[ -e "$wt_nm" ]] && continue
       cpow "$main_nm" "$wt_nm"
-    done < "$NM_LIST"
+    done <"$NM_LIST"
   fi
 
   local f wt_f
@@ -374,7 +392,7 @@ worktree::bootstrap() {
     [[ -e "$wt_f" ]] && continue
     cpow "$f" "$wt_f"
     echo "  [$branch] copied: $rel"
-  done < "$CONFIG_LIST"
+  done <"$CONFIG_LIST"
 
   worktree::init_submodules "$branch" "$wt"
 
