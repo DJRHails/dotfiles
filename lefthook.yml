@@ -61,3 +61,8 @@ pre-commit:
     # exemption and off switch a misfiring rule loops a session.
     response-gate-tests:
       run: bash tests/response-gate.test.sh
+    # worktree-create.sh runs against the root checkout other sessions are editing live.
+    # It once stashed their edits and popped them on exit, and failed pops stranded the
+    # work in dangling stash commits; this suite pins that the root is never modified.
+    worktree-create-tests:
+      run: bash tests/worktree-create.test.sh

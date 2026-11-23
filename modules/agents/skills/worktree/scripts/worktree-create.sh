@@ -21,8 +21,11 @@ GREEN="\033[0;32m"
 YELLOW="\033[0;33m"
 CLEAR="\033[0m"
 
-worktree::die()  { printf '%b%s%b\n' "$RED"    "$1" "$CLEAR" >&2; exit 1; }
-worktree::info() { printf '%b%s%b\n' "$GREEN"  "$1" "$CLEAR"; }
+worktree::die() {
+  printf '%b%s%b\n' "$RED" "$1" "$CLEAR" >&2
+  exit 1
+}
+worktree::info() { printf '%b%s%b\n' "$GREEN" "$1" "$CLEAR"; }
 worktree::warn() { printf '%b%s%b\n' "$YELLOW" "$1" "$CLEAR"; }
 
 # All CoW copy operations go through the `cpow` binary (~/.files/bin/cpow):
@@ -31,11 +34,17 @@ worktree::warn() { printf '%b%s%b\n' "$YELLOW" "$1" "$CLEAR"; }
 # downstream don't need to branch.
 if ! command -v cpow >/dev/null 2>&1; then
   cpow() {
-    [[ -e "$2" ]] && { echo >&2 "cpow: destination already exists: $2"; return 1; }
+    [[ -e "$2" ]] && {
+      echo >&2 "cpow: destination already exists: $2"
+      return 1
+    }
     /bin/cp -Rc "$1" "$2" 2>/dev/null \
       || /bin/cp -R --reflink=auto "$1" "$2" 2>/dev/null \
       || /bin/cp -R "$1" "$2" 2>/dev/null \
-      || { echo >&2 "cpow: unable to copy $1 to $2"; return 1; }
+      || {
+        echo >&2 "cpow: unable to copy $1 to $2"
+        return 1
+      }
   }
   export -f cpow
 fi
@@ -49,22 +58,22 @@ CHECKOUT_WORKERS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 # On macOS APFS, we can skip the serial ~12k-file checkout write by:
 #   1. `git worktree add --no-checkout --detach <wt> <HEAD>`  (instant)
 #   2. `git read-tree HEAD`                                   (populates index)
-#   3. `cpow --batch-files` over every tracked file          (~3-5s for 12k files;
+#   3. `cpow --batch-files` over every file in HEAD's tree   (~3-5s for 12k files;
 #      gitlinks become empty dirs, filled by worktree::init_submodules)
 #   4. `update-index --refresh` w/ core.checkStat=minimal     (validates stat cache)
-#   5. `git checkout <branch>` w/ core.checkStat=minimal      (tree-diff walk)
+#   5. `reset --hard HEAD`                                    (rewrites only dirty files)
+#   6. `git checkout <branch>` w/ core.checkStat=minimal      (tree-diff walk)
 #
 # End-to-end: ~7-8s vs ~180s for a 46GB repo with 12k tracked files.
-# Requires main worktree to be clean (no dirty tracked files), otherwise
-# we'd smuggle uncommitted content into the new worktree outside tree-diff.
-# If MAIN is dirty we auto-stash tracked/staged changes before the fast
-# path snapshots the tree and pop them back on EXIT (see stash block
-# below TMPDIR setup).
+#
+# MAIN is never modified. It is shared by live agent sessions, and the old answer to a dirty
+# MAIN (stash its edits, pop them on EXIT) reverted their files mid-flight and stranded their
+# work in dangling stash commits when the pop conflicted, popped someone else's stash, or never
+# ran. Instead, step 3 clones whatever MAIN's working tree holds, and step 5 throws away, inside
+# the new worktree only, any uncommitted content that came with it.
 worktree::fast_path_available() {
   [[ "$(uname)" == "Darwin" ]] || return 1
   command -v cpow >/dev/null 2>&1 || return 1
-  git -C "$MAIN" diff --quiet HEAD 2>/dev/null || return 1
-  git -C "$MAIN" diff --cached --quiet 2>/dev/null || return 1
   # This path clonefiles MAIN's *working tree*, so its ref and its files must agree — it
   # cannot base on the upstream tip the way the standard path does. When the local checkout
   # has drifted behind that base, decline, so the caller falls through to a checkout that
@@ -96,30 +105,39 @@ worktree::create_fast() {
   # resolves to nothing from inside the worktree, which makes every git command there fatal.
   # Each gets the empty directory `git worktree add` would create, and
   # worktree::init_submodules populates it during bootstrap.
-  local index="$TMPDIR_WT/fast-path-index" files="$TMPDIR_WT/fast-path-files"
-  local entry link gitlinks=()
-  git -C "$MAIN" ls-files -z --stage > "$index" || return 1
+  # The list comes from the commit's tree, not MAIN's index, so files MAIN has staged but not
+  # committed stay out. Files MAIN has deleted are skipped here and restored by the reset below.
+  local tree="$TMPDIR_WT/fast-path-tree" files="$TMPDIR_WT/fast-path-files"
+  local entry path link gitlinks=()
+  git -C "$MAIN" ls-tree -r -z --full-tree "$main_head" >"$tree" || return 1
   while IFS= read -r -d '' entry; do
+    path="${entry#*$'\t'}"
     if [[ "$entry" == 160000\ * ]]; then
-      gitlinks+=("${entry#*$'\t'}")
-    else
-      printf '%s\0' "${entry#*$'\t'}"
+      gitlinks+=("$path")
+    elif [[ -e "$MAIN/$path" || -L "$MAIN/$path" ]]; then
+      printf '%s\0' "$path"
     fi
-  done < "$index" > "$files"
-  cpow --batch-files "$MAIN" "$wt" < "$files" 2>/dev/null || return 1
+  done <"$tree" >"$files"
+  cpow --batch-files "$MAIN" "$wt" <"$files" 2>/dev/null || return 1
   for link in "${gitlinks[@]}"; do
     mkdir -p "$wt/$link" || return 1
   done
 
   git -C "$wt" -c core.checkStat=minimal update-index --refresh \
     >/dev/null 2>&1 || true
+  # The clone carried MAIN's uncommitted edits along. The refresh above has flagged each file
+  # whose content differs from the commit, so this rewrites just those (and restores deleted
+  # ones) inside the new worktree. Fails closed: anything left dirty falls back to the slow path.
+  git -C "$wt" -c core.checkStat=minimal -c submodule.recurse=false reset --hard --quiet HEAD \
+    >/dev/null 2>&1 || return 1
+  git -C "$wt" -c submodule.recurse=false diff --quiet HEAD >/dev/null 2>&1 || return 1
 
   # submodule.recurse is off for the switch: with it on (modules/git/gitconfig sets it), a branch
   # whose gitlink differs from MAIN's makes checkout update the still-uninitialised submodule,
   # which dies with "could not reset submodule index". init_submodules checks it out afterwards.
   local checkout=(git -C "$wt" -c core.checkStat=minimal -c submodule.recurse=false checkout)
   if echo "$LOCAL_BRANCHES" | grep -qxF "$branch" \
-     || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
+    || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
     "${checkout[@]}" "$branch" >/dev/null 2>&1 || return 1
   else
     "${checkout[@]}" -b "$branch" >/dev/null 2>&1 || return 1
@@ -130,8 +148,11 @@ worktree::create_fast() {
 VERBOSE=
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -v|--verbose) VERBOSE=true; shift ;;
-    -h|--help)
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
       echo "usage: worktree-create.sh [-v] <branch> [<branch> ...]"
       exit 0
       ;;
@@ -163,7 +184,7 @@ for branch in "${BRANCHES[@]}"; do
     MISSING_REFSPECS+=("refs/heads/$branch:refs/remotes/origin/$branch")
   fi
 done
-if (( ${#MISSING_REFSPECS[@]} > 0 )); then
+if ((${#MISSING_REFSPECS[@]} > 0)); then
   git fetch origin "${MISSING_REFSPECS[@]}" 2>/dev/null || true
 fi
 
@@ -183,7 +204,7 @@ fi
 if [[ "$NEW_BRANCH_BASE" != HEAD ]]; then
   git fetch --quiet origin 2>/dev/null || true
   BEHIND=$(git rev-list --count "HEAD..$NEW_BRANCH_BASE" 2>/dev/null || echo 0)
-  if (( BEHIND > 0 )); then
+  if ((BEHIND > 0)); then
     worktree::info "new branches will base on $NEW_BRANCH_BASE (local HEAD is $BEHIND behind)"
   fi
 fi
@@ -200,30 +221,7 @@ REMOTE_BRANCHES=$(
 # Pruning huge gitignored dirs (.venv, .next, .terraform, caches) is
 # critical — without it, a 46GB repo takes ~60s to walk.
 TMPDIR_WT=$(mktemp -d)
-
-# If MAIN has dirty tracked/staged changes, stash them so the fast path
-# can snapshot a clean tree, then pop on EXIT so the user's work is
-# never lost (even on Ctrl-C or mid-script failure). Untracked files
-# are left alone — ls-files -z ignores them so they don't leak into
-# the new worktree anyway.
-STASHED=
-if ! git -C "$MAIN" diff --quiet HEAD 2>/dev/null \
-   || ! git -C "$MAIN" diff --cached --quiet 2>/dev/null; then
-  if git -C "$MAIN" stash push -m "worktree-create: auto-stash" >/dev/null 2>&1; then
-    STASHED=1
-    worktree::info "stashed dirty main worktree (will pop on exit)"
-  else
-    worktree::warn "failed to stash dirty main — fast path will be skipped"
-  fi
-fi
-
-trap '
-  rm -rf "$TMPDIR_WT"
-  if [[ -n "${STASHED:-}" ]]; then
-    git -C "$MAIN" stash pop >/dev/null 2>&1 \
-      || echo "stash pop failed — run: git -C $MAIN stash pop" >&2
-  fi
-' EXIT
+trap 'rm -rf "$TMPDIR_WT"' EXIT
 
 # Shared prune expression for heavy/uninteresting trees.
 PRUNE_DIRS=(
@@ -234,20 +232,20 @@ PRUNE_EXPR=()
 for d in "${PRUNE_DIRS[@]}"; do
   PRUNE_EXPR+=(-name "$d" -o)
 done
-unset 'PRUNE_EXPR[${#PRUNE_EXPR[@]}-1]'  # drop trailing -o
+unset 'PRUNE_EXPR[${#PRUNE_EXPR[@]}-1]' # drop trailing -o
 
 NM_LIST="$TMPDIR_WT/node_modules.txt"
 find "$MAIN" -maxdepth 6 \
   \( "${PRUNE_EXPR[@]}" \) -prune \
-  -o -type d -name node_modules -print 2>/dev/null > "$NM_LIST"
+  -o -type d -name node_modules -print 2>/dev/null >"$NM_LIST"
 
 CONFIG_LIST="$TMPDIR_WT/config_files.txt"
 find "$MAIN" -maxdepth 4 \
   \( "${PRUNE_EXPR[@]}" -o -name node_modules \) -prune \
   -o -type f \( \
-       -name '.env' -o -name '.env.local' -o -name '.envrc' \
-    -o -name '.tool-versions' -o -name 'mise.toml' \
-  \) -print 2>/dev/null > "$CONFIG_LIST"
+  -name '.env' -o -name '.env.local' -o -name '.envrc' \
+  -o -name '.tool-versions' -o -name 'mise.toml' \
+  \) -print 2>/dev/null >"$CONFIG_LIST"
 
 # --- Phase 1: create worktrees sequentially (git lock) ----------------
 # Prefer the clonefile(2) fast path when conditions allow; fall back to
@@ -256,7 +254,7 @@ FAST_PATH=
 if worktree::fast_path_available; then
   FAST_PATH=1
   MAIN_HEAD=$(git -C "$MAIN" rev-parse HEAD)
-  worktree::info "using APFS clonefile fast path (main clean, cpow on PATH)"
+  worktree::info "using APFS clonefile fast path (cpow on PATH, main not behind base)"
 else
   worktree::info "using standard checkout path (fast path unavailable)"
 fi
@@ -284,13 +282,19 @@ for branch in "${BRANCHES[@]}"; do
   fi
 
   if echo "$LOCAL_BRANCHES" | grep -qxF "$branch" \
-     || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
+    || echo "$REMOTE_BRANCHES" | grep -qxF "$branch"; then
     git -c "checkout.workers=$CHECKOUT_WORKERS" worktree add "$wt" "$branch" \
-      || { worktree::warn "failed to create worktree for $branch"; continue; }
+      || {
+        worktree::warn "failed to create worktree for $branch"
+        continue
+      }
   else
     git -c "checkout.workers=$CHECKOUT_WORKERS" worktree add -b "$branch" "$wt" \
       "$NEW_BRANCH_BASE" \
-      || { worktree::warn "failed to create worktree for $branch"; continue; }
+      || {
+        worktree::warn "failed to create worktree for $branch"
+        continue
+      }
   fi
 
   WORKTREE_PATHS["$branch"]="$wt"
@@ -352,7 +356,7 @@ worktree::bootstrap() {
     [[ -d "$parent" ]] || continue
     [[ -e "$wt_nm" ]] && continue
     pairs+="${main_nm}"$'\t'"${wt_nm}"$'\n'
-  done < "$NM_LIST"
+  done <"$NM_LIST"
 
   # Parallel directory-level clonefile(2). One syscall per directory —
   # orders of magnitude faster than `cp -Rc` which recurses per-file.
@@ -377,7 +381,7 @@ worktree::bootstrap() {
       [[ -d "$parent" ]] || continue
       [[ -e "$wt_nm" ]] && continue
       cpow "$main_nm" "$wt_nm"
-    done < "$NM_LIST"
+    done <"$NM_LIST"
   fi
 
   local f wt_f
@@ -388,7 +392,7 @@ worktree::bootstrap() {
     [[ -e "$wt_f" ]] && continue
     cpow "$f" "$wt_f"
     echo "  [$branch] copied: $rel"
-  done < "$CONFIG_LIST"
+  done <"$CONFIG_LIST"
 
   worktree::init_submodules "$branch" "$wt"
 
