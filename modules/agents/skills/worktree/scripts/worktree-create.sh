@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This script needs bash >= 4.4: associative arrays (4.0), and empty arrays that expand under
+# `set -u` (4.4). macOS ships 3.2 as /bin/bash, which is the `bash` a non-interactive shell
+# finds first, and there the script used to die on `declare -A` half-way through. So before
+# anything else runs, hand over to a new enough bash, or stop. Everything in this block must
+# itself run on bash 3.2.
+worktree::bash_is_new_enough() {
+  "$1" -c '((BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4)))' \
+    2>/dev/null
+}
+if ! worktree::bash_is_new_enough "$BASH"; then
+  while IFS= read -r candidate; do
+    if worktree::bash_is_new_enough "$candidate"; then
+      exec "$candidate" "${BASH_SOURCE[0]}" "$@"
+    fi
+  done < <(
+    type -ap bash
+    printf '%s\n' /opt/homebrew/bin/bash /usr/local/bin/bash
+  )
+  {
+    echo "worktree-create.sh needs bash >= 4.4, but is running under bash $BASH_VERSION ($BASH)"
+    echo "and found no newer bash on PATH, at /opt/homebrew/bin/bash or at /usr/local/bin/bash."
+    echo "Install one (macOS: brew install bash) and run this command again."
+  } >&2
+  exit 1
+fi
+
 # Create git worktrees under .data/worktrees/ and bootstrap them with
 # copy-on-write copies of node_modules and untracked config files, plus the
 # submodules main has checked out (sharing main's objects).

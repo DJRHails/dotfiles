@@ -17,19 +17,21 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 create="$(cd "$script_dir/.." && pwd)/modules/agents/skills/worktree/scripts/worktree-create.sh"
 
-# The script needs bash 4+ (associative arrays); macOS's /bin/bash is 3.2 and may come
-# first on PATH, so take the first bash on PATH that is new enough.
-modern_bash=
+# SKILL.md documents `bash worktree-create.sh`, and in a non-interactive shell on macOS that
+# bash is the stock /bin/bash 3.2. The script needs a newer one and must find it by itself:
+# it once died on `declare -A` half-way through, after its pre-scan. So run it under the
+# oldest bash here; where every bash is new enough, the run still covers the plain path.
+runner=bash
 while IFS= read -r candidate; do
-  if "$candidate" -c '((BASH_VERSINFO[0] >= 4))' 2>/dev/null; then
-    modern_bash="$candidate"
+  if "$candidate" -c '((BASH_VERSINFO[0] < 4))' 2>/dev/null; then
+    runner="$candidate"
     break
   fi
-done < <(type -ap bash)
-[[ -n "$modern_bash" ]] || {
-  echo "FAIL no bash >= 4 on PATH" >&2
-  exit 1
-}
+done < <(
+  type -ap bash
+  echo /bin/bash
+)
+printf 'running worktree-create.sh under %s: %s\n' "$runner" "$("$runner" --version | head -1)"
 
 work="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf -- "$work"' EXIT
@@ -100,7 +102,7 @@ HOOK
 chmod +x "$hooks/post-checkout"
 git -C "$main" config core.hooksPath "$hooks"
 
-out="$(cd "$main" && "$modern_bash" "$create" feature 2>&1)" || {
+out="$(cd "$main" && "$runner" "$create" feature 2>&1)" || {
   printf 'FAIL worktree-create.sh exited non-zero:\n%s\n' "$out"
   exit 1
 }
