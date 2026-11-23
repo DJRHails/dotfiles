@@ -15,8 +15,9 @@ review comments, issue text, and `.gitattributes` paths themselves.
 - Never name hostnames (including this machine's), device models or IPs, tailnet names,
   private repos, internal services, credentials, or what a device/service is used for.
 - The attribution footer on PRs/comments stays **host-free** here, as everywhere:
-  `_[via gantry](<run url>)_` for a gantry run, `_[via claude · <session-id>]_` otherwise.
-  Never `claude @ <host>`, and never a repo link standing in for the session.
+  `_[via gantry](<run url>)_` for a gantry run, `_[via claude · <session-id>](#)_` otherwise.
+  Never `claude @ <host>`, and never a repo link standing in for the session. Keep the `(…)`
+  link part: portcullis's loop guard only recognises a footer that has one.
 - Branch names are kept on the PR forever, even after deletion — pick a generic one
   (`skill-update`) before the first push; there is no after-the-fact fix.
 - If something leaky is already pushed: rewrite the PR title/body via
