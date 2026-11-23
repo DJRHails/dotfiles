@@ -125,3 +125,11 @@ repos:
         entry: bash tests/response-gate.test.sh
         language: system
         pass_filenames: false
+      # worktree-create.sh runs against the root checkout other sessions are editing live.
+      # It once stashed their edits and popped them on exit, and failed pops stranded the
+      # work in dangling stash commits; this suite pins that the root is never modified.
+      - id: worktree-create-tests
+        name: worktree-create root-isolation suite
+        entry: bash tests/worktree-create.test.sh
+        language: system
+        pass_filenames: false
