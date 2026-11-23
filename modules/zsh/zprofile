@@ -15,4 +15,11 @@ if [[ -z ${HOMEBREW_PREFIX:-} ]]; then
     break
   done
   unset _brew
+else
+  # A nested login shell inherits the exports but not the order. On macOS,
+  # /etc/zprofile's path_helper has just re-sorted the inherited PATH with the
+  # system directories first, so `bash`, `git` and the rest resolve to the
+  # system copies (bash 3.2) ahead of brew's. Put brew back in front, where
+  # `brew shellenv` puts it.
+  path=("$HOMEBREW_PREFIX/bin" "$HOMEBREW_PREFIX/sbin" "${(@)path:#$HOMEBREW_PREFIX/(bin|sbin)}")
 fi
