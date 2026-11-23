@@ -14,8 +14,9 @@ review comments, issue text, and `.gitattributes` paths themselves.
   encrypted skill" — and put the real rationale inside the encrypted file.
 - Never name hostnames (including this machine's), device models or IPs, tailnet names,
   private repos, internal services, credentials, or what a device/service is used for.
-- The attribution footer on PRs/comments stays **host-free** here: `_[via claude](<link>)_`,
-  not `claude @ <host>`.
+- The attribution footer on PRs/comments stays **host-free** here, as everywhere:
+  `_[via gantry](<run url>)_` for a gantry run, `_[via claude · <session-id>]_` otherwise.
+  Never `claude @ <host>`, and never a repo link standing in for the session.
 - Branch names are kept on the PR forever, even after deletion — pick a generic one
   (`skill-update`) before the first push; there is no after-the-fact fix.
 - If something leaky is already pushed: rewrite the PR title/body via
