@@ -105,6 +105,22 @@ drives taffy's shared host daemon:
 
 Units are `enabled`, so pools survive a reboot.
 
+## Disk
+
+Each self-update unpacks a new `bin.<version>/` and `externals.<version>/`
+beside the old ones and leaves its ~680 MB download in `_work/_update/`;
+the runner never removes any of them, nor its `_diag` logs. On 2026-11-24
+that came to ~112 GB across 84 runners, with taffy's root disk at 9 GB free.
+`provision.sh` installs `runner-gc` and a daily `actions-runner-gc.timer`
+that removes every version the `bin` symlink does not point at, the
+`_update` download, and `_diag` logs older than 14 days. It keeps anything
+touched in the last day, so it never races an update in progress.
+
+```sh
+sudo /usr/local/lib/actions-runner/runner-gc --dry-run
+journalctl -u actions-runner-gc --no-pager | tail
+```
+
 ## Checking on it
 
 ```sh

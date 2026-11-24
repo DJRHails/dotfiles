@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Reclaim the disk the self-hosted runners strand on every self-update.
+#
+# Installed by provision.sh as /usr/local/lib/actions-runner/runner-gc and run
+# daily as root by actions-runner-gc.timer. Safe to run by hand at any time:
+#
+#     sudo /usr/local/lib/actions-runner/runner-gc            # reclaim
+#     sudo /usr/local/lib/actions-runner/runner-gc --dry-run  # list only
+#
+# The runner self-updates into fresh bin.<version>/ and externals.<version>/
+# dirs, repoints the bin/externals symlinks, and keeps every previous version
+# plus the ~680 MB download it unpacked them from in _work/_update. Nothing
+# ever removes them: on 2026-11-24 taffy carried ~112 GB of them across 84
+# runners (two old versions and one stale _update each, ~1.4 GB a runner)
+# while its root disk sat at 9 GB free. The runner's _diag logs are also
+# never rotated.
+#
+# What goes, per runner dir under RUNNER_HOME with a bin symlink:
+#   - bin.<v>/ and externals.<v>/ for every <v> the symlinks do not point at
+#   - _work/_update/
+#   - _diag/*.log older than DIAG_AGE_DAYS
+# Anything modified within MIN_AGE_MINUTES is kept, so a self-update that is
+# unpacking right now (new version dirs exist, symlink not yet swapped) is
+# never cut from under the runner.
+set -euo pipefail
+
+RUNNER_HOME="/home/actions"
+MIN_AGE_MINUTES=1440
+DIAG_AGE_DAYS=14
+
+dry_run=0
+case "${1:-}" in
+--dry-run) dry_run=1 ;;
+'') ;;
+*)
+  echo "usage: runner-gc [--dry-run]" >&2
+  exit 2
+  ;;
+esac
+
+[ "$(id -u)" = 0 ] || {
+  echo "error: runner-gc must run as root (the runner dirs are 0750 actions)" >&2
+  exit 1
+}
+
+reclaimed_kb=0
+
+# Remove one explicit path, after checking it sits inside a runner dir and has
+# aged past the in-flight window.
+reclaim() {
+  local path="$1" kb
+  case "$path" in
+  "${RUNNER_HOME}"/*-runner-*/*) ;;
+  *)
+    echo "  refusing '${path}': outside ${RUNNER_HOME}/*-runner-*/" >&2
+    return 0
+    ;;
+  esac
+  [ -e "$path" ] || return 0
+  if [ -n "$(find "$path" -maxdepth 0 -mmin "-${MIN_AGE_MINUTES}")" ]; then
+    echo "  keep ${path}: modified in the last ${MIN_AGE_MINUTES} min"
+    return 0
+  fi
+  kb="$(du -xsk "$path" | cut -f1)"
+  echo "  $([ "$dry_run" = 1 ] && echo would remove || echo remove) ${path} ($((kb / 1024)) MB)"
+  [ "$dry_run" = 1 ] || rm -r --one-file-system -- "$path"
+  reclaimed_kb=$((reclaimed_kb + kb))
+}
+
+# The version a runner's bin symlink points at, e.g. 2.338.2.
+current_version() {
+  local target
+  target="$(readlink "$1/bin")"
+  target="${target##*/}"
+  echo "${target#bin.}"
+}
+
+gc_runner() {
+  local dir="$1" current versioned
+  current="$(current_version "$dir")"
+  case "$current" in
+  '' | *[!0-9.]*)
+    echo "  skip ${dir}: bin points at '$(readlink "${dir}/bin")', not bin.<version>" >&2
+    return 0
+    ;;
+  esac
+  if [ "$(readlink "${dir}/externals")" != "${dir}/externals.${current}" ] &&
+    [ "$(readlink "${dir}/externals")" != "externals.${current}" ]; then
+    echo "  skip ${dir}: bin and externals point at different versions" >&2
+    return 0
+  fi
+  for versioned in "${dir}"/bin.* "${dir}"/externals.*; do
+    if [ ! -d "$versioned" ] || [ -L "$versioned" ]; then continue; fi
+    case "${versioned##*/}" in
+    "bin.${current}" | "externals.${current}") continue ;;
+    esac
+    reclaim "$versioned"
+  done
+  reclaim "${dir}/_work/_update"
+  if [ -d "${dir}/_diag" ]; then
+    find "${dir}/_diag" -maxdepth 1 -type f -name '*.log' -mtime "+${DIAG_AGE_DAYS}" \
+      -print0 | while IFS= read -r -d '' log; do
+      if [ "$dry_run" = 1 ]; then echo "  would remove ${log}"; else rm -f -- "$log"; fi
+    done
+  fi
+}
+
+main() {
+  local dir before after
+  before="$(df -Pk "$RUNNER_HOME" | awk 'NR==2{print $4}')"
+  for dir in "${RUNNER_HOME}"/*-runner-*; do
+    [ -L "${dir}/bin" ] || continue
+    gc_runner "$dir"
+  done
+  after="$(df -Pk "$RUNNER_HOME" | awk 'NR==2{print $4}')"
+  echo "runner-gc: $([ "$dry_run" = 1 ] && echo would reclaim || echo reclaimed)" \
+    "$((reclaimed_kb / 1048576)) GB (du); free $((before / 1048576)) -> $((after / 1048576)) GB"
+}
+
+main
