@@ -109,8 +109,9 @@ Units are `enabled`, so pools survive a reboot.
 
 Each self-update unpacks a new `bin.<version>/` and `externals.<version>/`
 beside the old ones and leaves its ~680 MB download in `_work/_update/`;
-the runner only prunes them at the start of its next self-update, and never
-prunes its `_diag` logs. On 2026-11-24
+the runner only clears them during its next self-update, which unpacks the
+newer version before deleting the older ones, and never prunes its `_diag`
+logs. On 2026-11-24
 that came to ~112 GB across 84 runners, with taffy's root disk at 9 GB free.
 `provision.sh` installs `runner-gc` and a daily `actions-runner-gc.timer`
 that removes every version the `bin` symlink does not point at, the
