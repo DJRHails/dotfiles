@@ -93,6 +93,45 @@ Code should be self-documenting. No commented-out code—delete it. If you need 
 - **Mock boundaries, not logic.** Only mock things that are slow, non-deterministic, or external services you don't control.
 - **Verify tests catch failures.** Break the code, confirm the test fails, then fix.
 
+### Async and maximum parallelism
+
+- **Default to async for I/O.** Network calls, LLM calls, scrapes and subprocess fan-outs are
+  `async` with one shared `httpx.AsyncClient` (or the SDK's async client), run with
+  `asyncio.gather` / `TaskGroup`. Re-colour a sync call chain to async rather than wrapping it in
+  thread pools; keep sync only at genuine sync boundaries (a CLI entry point's `asyncio.run`, a
+  library that has no async API).
+- **One client factory per project.** Build clients in one place (user agent, gzip, timeouts,
+  redirects, proxy by host), reuse connections, and make every caller go through it. Don't
+  scatter `httpx.Client(...)` calls.
+- **Measure the ceiling before you cap it.** Never pick a concurrency limit, semaphore size or
+  rate limit from a guess or a default. Ramp concurrency (e.g. 8 → 32 → 128 → 512) on a cached
+  or cheap probe and watch throughput, latency and error rate (429s, 5xx, timeouts). The limit
+  is just under the knee where throughput stops rising or errors start, and the code states
+  where it came from (`# measured 2026-11-24: 429s above ~200 in flight`). Re-measure when the
+  provider, tier or host changes. A limit nobody measured is a guess that silently costs
+  wall-clock time.
+- **Back off on the signal, not on a schedule.** Respect `Retry-After` and 429s with adaptive
+  backoff, and robots.txt crawl delays on scraped hosts, rather than throttling everything to the
+  slowest case up front.
+
+### Cache every paid call with emboss
+
+Every call that costs money or quota (LLM APIs, paid scraping or proxy bandwidth, metered APIs)
+goes through [`emboss`](https://github.com/DJRHails/emboss)'s `@cached`, `async` functions
+included, unless the project already has its own equivalent cache (then use that, never a
+second one). The key is the function's source plus its arguments, so a re-run of the same call
+comes from disk until you edit the function.
+
+- **Cache at the narrowest paid primitive** (the one function that makes the request), not a
+  wrapper several layers up, so every caller shares the hits.
+- **Never delete a cache of paid answers** to "start fresh"; change the code or the arguments.
+- **Editing a cached function re-keys it.** For a behaviour-preserving refactor, carry the old
+  identity with `also_accept=[cache_id(...)]` captured before the edit, or pin it with
+  `unsafe_manual_key` when you accept the staleness risk. Don't lose a warm cache by accident.
+- **Prove a re-run is free** with `EMBOSS_CACHE_ONLY=1` (or `with emboss.cache_only():`): any
+  miss raises instead of spending. Use it for re-analysis and figure regeneration.
+- Cache only successful answers; never cache an error, a 429 or a transient failure.
+
 
 
 ## Development
