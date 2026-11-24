@@ -128,8 +128,11 @@ comes from disk until you edit the function.
 - **Editing a cached function re-keys it.** For a behaviour-preserving refactor, carry the old
   identity with `also_accept=[cache_id(...)]` captured before the edit, or pin it with
   `unsafe_manual_key` when you accept the staleness risk. Don't lose a warm cache by accident.
-- **Prove a re-run is free** with `EMBOSS_CACHE_ONLY=1` (or `with emboss.cache_only():`): any
-  miss raises instead of spending. Use it for re-analysis and figure regeneration.
+- **Prove a re-run is free** with `EMBOSS_CACHE_ONLY=1`: any miss raises instead of spending.
+  Use it for re-analysis and figure regeneration. A `with emboss.cache_only():` block seals
+  only its own thread's context (asyncio tasks and `asyncio.to_thread` included):
+  `ThreadPoolExecutor` / `threading.Thread` workers and subprocesses escape it, so prove a
+  threaded or multi-process run with the env var.
 - Cache only successful answers; never cache an error, a 429 or a transient failure.
 
 
