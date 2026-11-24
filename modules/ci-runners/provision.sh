@@ -33,6 +33,9 @@ CONF="${MODULE_DIR}/runners.conf"
 GIT_HELPER_SRC="${MODULE_DIR}/git-credential-public-read"
 GIT_HELPER="/usr/local/lib/actions-runner/git-credential-public-read"
 GITHUB_TOKEN_DIR="/etc/actions-runner"
+GC_SRC="${MODULE_DIR}/runner-gc"
+GC="/usr/local/lib/actions-runner/runner-gc"
+GC_UNIT="actions-runner-gc"
 
 die() {
   echo "error: $*" >&2
@@ -267,6 +270,55 @@ install_git_helper() {
   # The slot the token goes in, created before any token exists so `ls` on the
   # host reads "not installed yet" rather than "never wired up".
   sudo install -d -m 0750 -o root -g "$RUNNER_USER" "$GITHUB_TOKEN_DIR"
+}
+
+# The daily sweep that removes what each runner's self-update strands (old
+# bin.<v>/externals.<v> dirs, the _work/_update download) and its aged _diag
+# logs. runner-gc's header has the why; 112 GB of it filled taffy's disk once.
+gc_service_content() {
+  cat <<UNIT
+[Unit]
+Description=Reclaim disk stranded by self-hosted runner self-updates
+
+[Service]
+Type=oneshot
+ExecStart=${GC}
+Nice=19
+IOSchedulingClass=idle
+UNIT
+}
+
+gc_timer_content() {
+  cat <<UNIT
+[Unit]
+Description=Daily self-hosted runner disk reclaim
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+}
+
+install_gc_timer() {
+  local changed=0 unit want
+  if ! sudo cmp -s "$GC_SRC" "$GC"; then
+    echo ">> installing ${GC}"
+    sudo install -D -m 0755 -o root -g root "$GC_SRC" "$GC"
+  fi
+  for unit in service timer; do
+    want="$("gc_${unit}_content")"
+    if [ "$(sudo cat "/etc/systemd/system/${GC_UNIT}.${unit}" 2>/dev/null || true)" != "$want" ]; then
+      echo ">> writing ${GC_UNIT}.${unit}"
+      printf '%s\n' "$want" | sudo tee "/etc/systemd/system/${GC_UNIT}.${unit}" >/dev/null
+      changed=1
+    fi
+  done
+  [ "$changed" = 0 ] || sudo systemctl daemon-reload
+  sudo systemctl enable --now "${GC_UNIT}.timer" >/dev/null
 }
 
 # Point every runner's own $HOME gitconfig at the helper, scoped to github.com.
@@ -504,6 +556,7 @@ main() {
   [ -f "$CONF" ] || die "missing $CONF"
   gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
   install_git_helper
+  install_gc_timer
 
   if [ $# -gt 0 ]; then
     local repo="$1" n="${2:-}"
