@@ -161,7 +161,9 @@ all, not worth the plumbing.
 
 Older self-updates unpacked each new `bin.<version>/` and
 `externals.<version>/` beside the old ones and left their ~680 MB download in
-`_work/_update/`; the runner never removes any of them, nor its `_diag` logs.
+`_work/_update/`. The runner clears those only during its next self-update,
+which unpacks the newer version before deleting the older ones, so with
+self-update now disabled they stay put; it never prunes its `_diag` logs either.
 On 2026-11-24 that came to ~112 GB across 84 runners, with taffy's root disk
 at 9 GB free. `provision.sh` installs `runner-gc` and a daily
 `actions-runner-gc.timer` that removes every version the `bin` symlink does
