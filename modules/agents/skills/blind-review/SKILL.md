@@ -69,6 +69,11 @@ The cold reader gets the URL **only**: the source would show them the author's
 comments and TODOs, which no reader sees. The line editor and the sceptic get both,
 the page for what the reader meets and the source for exact quotes and data.
 
+When there is no rendered page (step 2's fallback), drop the viewing paragraph and give
+every reviewer `<FILE>` in place of `<URL>`. Tell the cold reader to read the source in
+full, skip the frontmatter, component mechanics and MDX comments, and take each figure
+as what its props and alt text say.
+
 ### Cold reader
 
 > You are a cold, first-time reader of an essay draft, rendered at `<URL>`. View the
