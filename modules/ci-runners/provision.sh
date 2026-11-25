@@ -24,7 +24,6 @@
 # actions.runner.<owner>-<repo>.taffy-<i>.service (enabled => reboot-durable).
 set -euo pipefail
 
-RUNNER_VERSION="2.335.1" # bootstrap only — the runner self-updates on first connect
 LABELS="self-hosted,linux,x64,taffy"
 RUNNER_USER="actions"
 RUNNER_HOME="/home/${RUNNER_USER}"
@@ -36,6 +35,9 @@ GITHUB_TOKEN_DIR="/etc/actions-runner"
 GC_SRC="${MODULE_DIR}/runner-gc"
 GC="/usr/local/lib/actions-runner/runner-gc"
 GC_UNIT="actions-runner-gc"
+UPDATER_SRC="${MODULE_DIR}/runner-update"
+UPDATER="/usr/local/lib/actions-runner/runner-update"
+UPDATER_UNIT="actions-runner-update"
 
 die() {
   echo "error: $*" >&2
@@ -272,26 +274,36 @@ install_git_helper() {
   sudo install -d -m 0750 -o root -g "$RUNNER_USER" "$GITHUB_TOKEN_DIR"
 }
 
-# The daily sweep that removes what each runner's self-update strands (old
-# bin.<v>/externals.<v> dirs, the _work/_update download) and its aged _diag
-# logs. runner-gc's header has the why; 112 GB of it filled taffy's disk once.
-gc_service_content() {
+# Two daily root jobs, each a script plus a oneshot service and timer:
+#   - runner-update rolls every runner onto the latest actions/runner release
+#     from one shared, hardlinked copy, with self-update disabled (its header
+#     has the why: one download and one copy per release, not 84 of each);
+#   - runner-gc removes what older self-updates stranded (old bin.<v>/
+#     externals.<v> dirs, the _work/_update download) and aged _diag logs.
+#     112 GB of that filled taffy's disk once.
+# Daily is the floor for runner-update: GitHub stops sending jobs to a runner
+# with updates disabled once it falls too far behind the latest release.
+daily_service_content() {
+  local description="$1" exec="$2"
   cat <<UNIT
 [Unit]
-Description=Reclaim disk stranded by self-hosted runner self-updates
+Description=${description}
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=${GC}
+ExecStart=${exec}
 Nice=19
 IOSchedulingClass=idle
 UNIT
 }
 
-gc_timer_content() {
+daily_timer_content() {
+  local description="$1"
   cat <<UNIT
 [Unit]
-Description=Daily self-hosted runner disk reclaim
+Description=Daily: ${description}
 
 [Timer]
 OnCalendar=daily
@@ -303,22 +315,22 @@ WantedBy=timers.target
 UNIT
 }
 
-install_gc_timer() {
-  local changed=0 unit want
-  if ! sudo cmp -s "$GC_SRC" "$GC"; then
-    echo ">> installing ${GC}"
-    sudo install -D -m 0755 -o root -g root "$GC_SRC" "$GC"
+install_daily_job() {
+  local src="$1" dest="$2" name="$3" description="$4" changed=0 unit want
+  if ! sudo cmp -s "$src" "$dest"; then
+    echo ">> installing ${dest}"
+    sudo install -D -m 0755 -o root -g root "$src" "$dest"
   fi
   for unit in service timer; do
-    want="$("gc_${unit}_content")"
-    if [ "$(sudo cat "/etc/systemd/system/${GC_UNIT}.${unit}" 2>/dev/null || true)" != "$want" ]; then
-      echo ">> writing ${GC_UNIT}.${unit}"
-      printf '%s\n' "$want" | sudo tee "/etc/systemd/system/${GC_UNIT}.${unit}" >/dev/null
+    want="$("daily_${unit}_content" "$description" "$dest")"
+    if [ "$(sudo cat "/etc/systemd/system/${name}.${unit}" 2>/dev/null || true)" != "$want" ]; then
+      echo ">> writing ${name}.${unit}"
+      printf '%s\n' "$want" | sudo tee "/etc/systemd/system/${name}.${unit}" >/dev/null
       changed=1
     fi
   done
   [ "$changed" = 0 ] || sudo systemctl daemon-reload
-  sudo systemctl enable --now "${GC_UNIT}.timer" >/dev/null
+  sudo systemctl enable --now "${name}.timer" >/dev/null
 }
 
 # Point every runner's own $HOME gitconfig at the helper, scoped to github.com.
@@ -390,7 +402,7 @@ install_runners() {
 
   # `sudo env` (not bare `sudo VAR=…`) so the assignments don't depend on a
   # SETENV-shaped sudoers rule.
-  sudo env REPO="$repo" INDICES="$indices" VER="$RUNNER_VERSION" LABELS="$LABELS" \
+  sudo env REPO="$repo" INDICES="$indices" UPDATER="$UPDATER" LABELS="$LABELS" \
     RU="$RUNNER_USER" HD="$RUNNER_HOME" TOKFILE="$tokfile" RMTOKFILE="$rmtokfile" \
     RESTART_DROPIN="$(restart_dropin_content)" bash <<'REMOTE'
 set -euo pipefail
@@ -403,18 +415,6 @@ usermod -aG docker "$RU"
 # Explicit mode: `install -d` on an existing directory resets it to 0755,
 # silently making every runner $HOME world-traversable on a shared host.
 install -d -m 0750 -o "$RU" -g "$RU" "$HD"
-
-# Download the runner tarball once; every runner dir extracts from this cache.
-CACHE="${HD}/.runner-cache"
-runuser -u "$RU" -- mkdir -p "$CACHE"
-if [ ! -f "${CACHE}/runner-${VER}.tgz" ]; then
-  echo "  caching actions-runner v${VER}"
-  # Download to a temp name — a partial file left by a dead curl would satisfy
-  # the -f guard forever and wedge every later install at the tar step.
-  runuser -u "$RU" -- curl -fsSL -o "${CACHE}/runner-${VER}.tgz.tmp" \
-    "https://github.com/actions/runner/releases/download/v${VER}/actions-runner-linux-x64-${VER}.tar.gz"
-  runuser -u "$RU" -- mv "${CACHE}/runner-${VER}.tgz.tmp" "${CACHE}/runner-${VER}.tgz"
-fi
 
 k=0
 for i in $INDICES; do
@@ -454,11 +454,13 @@ for i in $INDICES; do
   # would make config.sh refuse with "already configured" (--replace only
   # resolves the server-side name collision, not the local guard).
   rm -rf -- "${DIR:?}"
-  runuser -u "$RU" -- bash -c 'mkdir -p "$1" && cd "$1" && tar xzf "$2"' _ \
-    "$DIR" "${CACHE}/runner-${VER}.tgz"
+  # Lay the runner out from the host's shared, hardlinked release (fetched once
+  # by runner-update), and register it with self-update off: runner-update
+  # rolls every runner onto each new release instead.
+  "$UPDATER" --seed "$DIR"
   runuser -u "$RU" -- env RTOK="$TOK" bash -c \
     'cd "$1" && ./config.sh --url "$2" --token "$RTOK" \
-      --name "$3" --labels "$4" --unattended --replace' _ \
+      --name "$3" --labels "$4" --unattended --replace --disableupdate' _ \
     "$DIR" "https://github.com/${REPO}" "taffy-${i}" "$LABELS"
   (cd "$DIR" && ./svc.sh install "$RU")
   # The drop-in goes on before the first start so a fresh runner is never
@@ -556,7 +558,10 @@ main() {
   [ -f "$CONF" ] || die "missing $CONF"
   gh auth status >/dev/null 2>&1 || die "gh is not authenticated"
   install_git_helper
-  install_gc_timer
+  install_daily_job "$UPDATER_SRC" "$UPDATER" "$UPDATER_UNIT" \
+    "Roll self-hosted runners onto the latest shared actions/runner release"
+  install_daily_job "$GC_SRC" "$GC" "$GC_UNIT" \
+    "Reclaim disk stranded by self-hosted runner self-updates"
 
   if [ $# -gt 0 ]; then
     local repo="$1" n="${2:-}"

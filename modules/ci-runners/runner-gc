@@ -26,10 +26,13 @@
 #   - _diag/*.log older than DIAG_AGE_DAYS
 # Anything modified within MIN_AGE_MINUTES is kept, so a self-update that is
 # unpacking right now (new version dirs exist, symlink not yet swapped) is
-# never cut from under the runner.
+# never cut from under the runner. That guard cannot see runner-update's rolls:
+# its bin.<v>.staged and new bin.<v> trees are cp -al copies that keep the
+# tarball's old mtimes. So the sweep holds runner-update's lock instead.
 set -euo pipefail
 
 RUNNER_HOME="/home/actions"
+LOCK_FILE="/run/lock/actions-runner-update.lock" # runner-update's LOCK_FILE
 MIN_AGE_MINUTES=1440
 DIAG_AGE_DAYS=14
 
@@ -47,6 +50,12 @@ esac
   echo "error: runner-gc must run as root (the runner dirs are 0750 actions)" >&2
   exit 1
 }
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "runner-gc: waiting for runner-update to finish its roll" >&2
+  flock 9
+fi
 
 reclaimed_kb=0
 

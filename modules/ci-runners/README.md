@@ -105,18 +105,74 @@ drives taffy's shared host daemon:
 
 Units are `enabled`, so pools survive a reboot.
 
+## Updates: one download, one copy
+
+Left alone, every runner self-updates on its own: each release was 84
+downloads of the ~230 MB tarball, each unpacked into its own ~680 MB
+`bin.<version>/` + `externals.<version>/` (57 GB of identical bytes), plus the
+leftovers below. So the runners are registered with `--disableupdate`
+(`disableUpdate` in `.runner` for ones that predate it) and
+[`runner-update`](./runner-update), on a daily `actions-runner-update.timer`,
+does the update for all of them:
+
+1. it reads the latest `actions/runner` release, downloads the linux-x64
+   tarball **once**, checks its SHA-256 against the release notes, and unpacks
+   it root-owned into `/var/cache/actions-runner/<version>/`;
+2. per runner, it hardlinks that tree in (`cp -al`) as `bin.<v>/` and
+   `externals.<v>/`, copies the small top-level scripts, and repoints the
+   `bin`/`externals` symlinks. The runner is stopped only for the swap and only
+   when idle (no `Runner.Worker` in its cgroup); busy runners are retried every
+   minute for up to three hours. A runner that does not come back listening is
+   put back on its previous tree.
+
+**Hardlinks, not symlinks into the cache.** The runner takes its root
+directory to be the parent of the directory its binary *resolves* to, so a
+`bin` symlink into `/var/cache` would make every runner use the cache as its
+root and read one shared `.runner`. Hardlinks keep each runner's real path
+inside its own dir while sharing the bytes; the files are root-owned, so no
+job can write through to another runner's copy. `provision.sh` seeds new
+runners the same way (`runner-update --seed <dir>`), so a new runner costs no
+download and no disk.
+
+GitHub stops sending jobs to a runner with updates disabled once it is too far
+behind the latest release, so a failed roll is loud: the run exits 1 and
+`actions-runner-update.service` shows `failed`, with the runners it could not
+roll in the journal.
+
+```sh
+sudo /usr/local/lib/actions-runner/runner-update --dry-run
+journalctl -u actions-runner-update --no-pager | tail
+```
+
+### The tool cache stays per runner
+
+`_work/_tool` held 18 GB across the fleet on 2026-11-24, nearly all of it
+duplicates (`uv` 10.2 GB over 58 runners, `node` 8.2 GB over 39). It is **not**
+shared through `RUNNER_TOOL_CACHE`: `@actions/tool-cache`'s `cacheDir` deletes
+the version directory before copying into it, and only a `.complete` marker
+written afterwards tells readers it is ready. A matrix that fans out onto four
+runners just after a new uv release has all four miss at once, and each
+install deletes the tree another job is already running from. Per-runner
+caches never race, which is why `provision.sh` scopes every cache to its runner
+in the first place (see `runner_env_content`). `_work/_actions` was 1.4 GB in
+all, not worth the plumbing.
+
 ## Disk
 
-Each self-update unpacks a new `bin.<version>/` and `externals.<version>/`
-beside the old ones and leaves its ~680 MB download in `_work/_update/`;
-the runner only clears them during its next self-update, which unpacks the
-newer version before deleting the older ones, and never prunes its `_diag`
-logs. On 2026-11-24
-that came to ~112 GB across 84 runners, with taffy's root disk at 9 GB free.
-`provision.sh` installs `runner-gc` and a daily `actions-runner-gc.timer`
-that removes every version the `bin` symlink does not point at, the
-`_update` download, and `_diag` logs older than 14 days. It keeps anything
-touched in the last day, so it never races an update in progress.
+Older self-updates unpacked each new `bin.<version>/` and
+`externals.<version>/` beside the old ones and left their ~680 MB download in
+`_work/_update/`. The runner clears those only during its next self-update,
+which unpacks the newer version before deleting the older ones, so with
+self-update now disabled they stay put; it never prunes its `_diag` logs either.
+On 2026-11-24 that came to ~112 GB across 84 runners, with taffy's root disk
+at 9 GB free. `provision.sh` installs `runner-gc` and a daily
+`actions-runner-gc.timer` that removes every version the `bin` symlink does
+not point at, the `_update` download, and `_diag` logs older than 14 days. It
+keeps anything touched in the last day, so it never races a self-update in
+progress, and it holds `runner-update`'s lock, so it never races a roll either
+(the hardlinked trees keep the tarball's old mtimes, which the age check would
+miss). With `runner-update` in place it mostly sweeps the previous
+version's hardlinks and any `.staged`/`.replaced` trees a cut-short roll left.
 
 ```sh
 sudo /usr/local/lib/actions-runner/runner-gc --dry-run

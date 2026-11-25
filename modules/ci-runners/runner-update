@@ -1,0 +1,454 @@
+#!/usr/bin/env bash
+# Keep every self-hosted runner on taffy on the latest actions/runner release,
+# from ONE download and ONE copy on disk.
+#
+# Installed by provision.sh as /usr/local/lib/actions-runner/runner-update and
+# run daily as root by actions-runner-update.timer:
+#
+#     sudo /usr/local/lib/actions-runner/runner-update            # roll the fleet
+#     sudo /usr/local/lib/actions-runner/runner-update --dry-run  # say what would change
+#     sudo /usr/local/lib/actions-runner/runner-update --seed DIR # lay out a new runner
+#
+# Why: left to itself each runner self-updates on its own. Every release then
+# costs one ~230 MB download per runner (84 on 2026-11-24), each unpacked into
+# its own ~680 MB bin.<v>/ + externals.<v>/ beside the last one: ~57 GB of
+# identical bytes per release, plus the leftovers runner-gc reclaims.
+#
+# What it does instead:
+#   1. Reads the latest release, downloads the linux-x64 tarball once, checks
+#      its SHA-256 against the checksum in the release notes (and the asset
+#      digest when GitHub gives one), and unpacks it, root-owned and read-only
+#      to the runners, into CACHE_DIR/<version>/.
+#   2. For each runner: hardlinks that tree in as bin.<v>/ and externals.<v>/
+#      (cp -al), copies the small top-level scripts, sets disableUpdate in
+#      .runner (and .runner_migrated), and repoints the bin/externals symlinks.
+#      The runner is stopped only for the swap, and only when no job is running
+#      (no Runner.Worker in its cgroup); busy runners are retried every minute
+#      for up to BUSY_DEADLINE_MINUTES.
+#   3. Keeps the newest KEEP_VERSIONS trees in CACHE_DIR.
+#
+# Hardlinks, not symlinks into the cache: the runner finds its root as the
+# parent of the directory its own binary resolves to (HostContext: Root =
+# dirname(Assembly.Location)/..), and the apphost resolves /proc/self/exe. A
+# bin symlink into CACHE_DIR would make every runner treat CACHE_DIR/<v> as its
+# root, and read one shared .runner. Hardlinks keep the real path inside the
+# runner dir while sharing the bytes, and deleting the cache tree later never
+# breaks a runner (each holds its own links).
+#
+# Runners with updates disabled are refused jobs once they fall too far behind
+# the latest release, so a failed roll must be loud: any runner that could not
+# be rolled (or stayed busy past the deadline) makes the run exit 1, which
+# leaves the unit `failed` with the reason in `journalctl -u actions-runner-update`.
+set -euo pipefail
+
+RUNNER_HOME="/home/actions"
+RUNNER_USER="actions"
+CACHE_DIR="/var/cache/actions-runner"
+# Shared with runner-gc (its LOCK_FILE): our trees are cp -al copies that keep
+# the tarball's old mtimes, so runner-gc's age guard cannot see a roll in flight.
+LOCK_FILE="/run/lock/actions-runner-update.lock"
+RELEASE_API="https://api.github.com/repos/actions/runner/releases/latest"
+DOWNLOAD_BASE="https://github.com/actions/runner/releases/download"
+GITHUB_TOKEN_FILE="/etc/actions-runner/github-public-read-token"
+KEEP_VERSIONS=2
+BUSY_DEADLINE_MINUTES=180
+BUSY_RETRY_SECONDS=60
+START_SETTLE_SECONDS=10
+BUSY=75 # roll_runner's "a job is running" status (EX_TEMPFAIL)
+
+dry_run=0
+seed_dir=""
+
+usage() {
+  echo "usage: runner-update [--dry-run | --seed <runner-dir>]" >&2
+  exit 2
+}
+
+warn() { echo "warn: $*" >&2; }
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+say() {
+  if [ "$dry_run" = 1 ]; then echo "  would $*"; else echo "  $*"; fi
+}
+
+# Remove one explicit path, only if it sits inside a runner dir or the cache.
+remove_tree() {
+  local path="$1"
+  case "$path" in
+  "${RUNNER_HOME}"/*-runner-*/?* | "${CACHE_DIR}"/?*) ;;
+  *) die "refusing to remove '${path}': outside ${RUNNER_HOME}/*-runner-*/ and ${CACHE_DIR}/" ;;
+  esac
+  [ -e "$path" ] || [ -L "$path" ] || return 0
+  rm -r --one-file-system -- "$path"
+}
+
+github_curl() {
+  local auth=()
+  if [ -r "$GITHUB_TOKEN_FILE" ]; then
+    auth=(-H "Authorization: Bearer $(cat "$GITHUB_TOKEN_FILE")")
+  fi
+  curl -fsSL --retry 3 "${auth[@]}" "$@"
+}
+
+# Print "<version> <sha256>" for the latest release, checked two ways.
+latest_release() {
+  local json version sha digest
+  json="$(github_curl -H 'Accept: application/vnd.github+json' "$RELEASE_API")" ||
+    die "could not read ${RELEASE_API}"
+  version="$(jq -r '.tag_name' <<<"$json")"
+  version="${version#v}"
+  case "$version" in
+  '' | *[!0-9.]*) die "latest actions/runner tag '${version}' is not <major>.<minor>.<patch>" ;;
+  esac
+  sha="$(jq -r '.body' <<<"$json" |
+    sed -n 's/.*<!-- BEGIN SHA linux-x64 -->\([0-9a-f]\{64\}\)<!-- END SHA linux-x64 -->.*/\1/p')"
+  [ "${#sha}" = 64 ] || die "no linux-x64 SHA-256 in the v${version} release notes"
+  digest="$(jq -r --arg n "actions-runner-linux-x64-${version}.tar.gz" \
+    '.assets[] | select(.name == $n) | .digest // empty' <<<"$json")"
+  if [ -n "$digest" ] && [ "$digest" != "sha256:${sha}" ]; then
+    die "v${version}: release notes say sha256:${sha} but the asset digest is ${digest}"
+  fi
+  echo "$version $sha"
+}
+
+# Download, verify and unpack one release into CACHE_DIR/<version>/. The tree is
+# moved into place only after it is verified, so its existence means complete.
+ensure_cached() {
+  local version="$1" sha="$2" dest="${CACHE_DIR}/${1}" staging
+  [ -x "${dest}/bin/Runner.Listener" ] && return 0
+  if [ "$dry_run" = 1 ]; then
+    echo "  would download and unpack actions-runner v${version} into ${dest}"
+    return 0
+  fi
+  echo ">> caching actions-runner v${version}"
+  install -d -m 0755 -o root -g root "$CACHE_DIR"
+  staging="${CACHE_DIR}/.staging-${version}"
+  remove_tree "$staging"
+  remove_tree "$dest"
+  install -d -m 0755 "${staging}/tree"
+  github_curl -o "${staging}/runner.tgz" \
+    "${DOWNLOAD_BASE}/v${version}/actions-runner-linux-x64-${version}.tar.gz"
+  echo "${sha}  ${staging}/runner.tgz" | sha256sum --check --quiet - ||
+    die "v${version} tarball does not match sha256:${sha}"
+  tar -xzf "${staging}/runner.tgz" -C "${staging}/tree" --no-same-owner
+  # Root-owned and not group/other-writable: every runner shares these inodes,
+  # so no job on any of them may write through to the others.
+  chown -R root:root "${staging}/tree"
+  chmod -R go-w "${staging}/tree"
+  [ -x "${staging}/tree/bin/Runner.Listener" ] || die "v${version} tarball has no bin/Runner.Listener"
+  mv -T "${staging}/tree" "$dest"
+  remove_tree "$staging"
+}
+
+prune_cache() {
+  local old
+  [ -d "$CACHE_DIR" ] || return 0
+  find "$CACHE_DIR" -mindepth 1 -maxdepth 1 -type d -regex '.*/[0-9.]+' -printf '%f\n' |
+    sort -V | head -n "-${KEEP_VERSIONS}" | while read -r old; do
+    say "drop cached v${old} (runners keep their own hardlinks)"
+    [ "$dry_run" = 1 ] || remove_tree "${CACHE_DIR}/${old}"
+  done
+}
+
+# The runner's top-level scripts as the package ships them; the self-updater
+# replaces these too. runsvc.sh is copied out of bin/ by svc.sh install.
+top_level_files() {
+  find "${CACHE_DIR}/${1}" -mindepth 1 -maxdepth 1 -type f -printf '%f\n'
+}
+
+same_inode() {
+  [ -e "$1" ] && [ -e "$2" ] && [ "$(stat -c %d:%i "$1")" = "$(stat -c %d:%i "$2")" ]
+}
+
+# One regular file under externals/, as a probe that a tree is our hardlinks.
+externals_probe() {
+  find "${CACHE_DIR}/${1}/externals" -type f -print -quit | sed "s#^${CACHE_DIR}/${1}/externals/##"
+}
+
+# 0 when <tree> is hardlinked to the cached <version>/<part> (probe file shared).
+tree_is_shared() {
+  local tree="$1" version="$2" part="$3" probe
+  if [ "$part" = bin ]; then probe="Runner.Listener"; else probe="$(externals_probe "$version")"; fi
+  same_inode "${tree}/${probe}" "${CACHE_DIR}/${version}/${part}/${probe}"
+}
+
+updates_disabled() {
+  local dir="$1" f
+  for f in "${dir}/.runner" "${dir}/.runner_migrated"; do
+    [ -f "$f" ] || continue
+    jq -e '.disableUpdate == true' "$f" >/dev/null || return 1
+  done
+}
+
+runner_is_current() {
+  local dir="$1" version="$2" part f
+  for part in bin externals; do
+    [ "$(readlink "${dir}/${part}")" = "${dir}/${part}.${version}" ] || return 1
+    tree_is_shared "${dir}/${part}.${version}" "$version" "$part" || return 1
+  done
+  updates_disabled "$dir" || return 1
+  while read -r f; do
+    cmp -s "${CACHE_DIR}/${version}/${f}" "${dir}/${f}" || return 1
+  done < <(top_level_files "$version")
+}
+
+runner_unit() { cat "${1}/.service"; }
+
+# 0 while a job runs: the listener spawns one Runner.Worker per job.
+runner_busy() {
+  local cg pid
+  cg="$(systemctl show -p ControlGroup --value "$1")"
+  [ -n "$cg" ] && [ -d "/sys/fs/cgroup${cg}" ] || return 1
+  while read -r pid; do
+    [ "$(cat "/proc/${pid}/comm" 2>/dev/null || true)" = "Runner.Worker" ] && return 0
+  done < <(find "/sys/fs/cgroup${cg}" -name cgroup.procs -exec cat {} +)
+  return 1
+}
+
+# Hardlink the cached bin/ and externals/ in as <part>.<version>.staged, ready
+# to swap, while the runner is still serving. Reused across busy retries; a
+# part already shared needs none.
+stage_trees() {
+  local dir="$1" version="$2" part staged
+  for part in bin externals; do
+    staged="${dir}/${part}.${version}.staged"
+    if tree_is_shared "${dir}/${part}.${version}" "$version" "$part" ||
+      tree_is_shared "$staged" "$version" "$part"; then
+      continue
+    fi
+    remove_tree "$staged"
+    cp -al "${CACHE_DIR}/${version}/${part}" "$staged"
+  done
+}
+
+# With the runner stopped: move the staged trees into place (keeping a replaced
+# same-version copy as <part>.<version>.replaced), repoint the symlinks, copy
+# the top-level scripts, and disable self-update.
+swap_in() {
+  local dir="$1" version="$2" part target f src
+  for part in bin externals; do
+    target="${dir}/${part}.${version}"
+    if ! tree_is_shared "$target" "$version" "$part"; then
+      if [ -e "$target" ]; then
+        remove_tree "${target}.replaced"
+        mv -T "$target" "${target}.replaced"
+      fi
+      mv -T "${target}.staged" "$target"
+    fi
+    remove_tree "${target}.staged"
+    ln -sfn "$target" "${dir}/${part}.link"
+    chown -h "${RUNNER_USER}:${RUNNER_USER}" "${dir}/${part}.link"
+    mv -T "${dir}/${part}.link" "${dir}/${part}"
+  done
+  while read -r f; do
+    src="${CACHE_DIR}/${version}/${f}"
+    cmp -s "$src" "${dir}/${f}" ||
+      install -o "$RUNNER_USER" -g "$RUNNER_USER" -m "$(stat -c %a "$src")" "$src" "${dir}/${f}"
+  done < <(top_level_files "$version")
+  if [ -f "${dir}/runsvc.sh" ] && ! cmp -s "${dir}/bin/runsvc.sh" "${dir}/runsvc.sh"; then
+    install -o "$RUNNER_USER" -g "$RUNNER_USER" -m 0755 "${dir}/bin/runsvc.sh" "${dir}/runsvc.sh"
+  fi
+  for f in "${dir}/.runner" "${dir}/.runner_migrated"; do
+    [ -f "$f" ] || continue
+    jq '.disableUpdate = true' "$f" >"${f}.new"
+    chown --reference="$f" "${f}.new"
+    chmod --reference="$f" "${f}.new"
+    mv -T "${f}.new" "$f"
+  done
+}
+
+# Undo swap_in's tree moves after a failed start: restore a replaced
+# same-version tree, or point back at the version the runner was on.
+swap_back() {
+  local dir="$1" version="$2" prev_bin="$3" prev_ext="$4" part target
+  for part in bin externals; do
+    target="${dir}/${part}.${version}"
+    if [ -d "${target}.replaced" ]; then
+      remove_tree "${target}.failed"
+      mv -T "$target" "${target}.failed"
+      mv -T "${target}.replaced" "$target"
+    fi
+  done
+  ln -sfn "$prev_bin" "${dir}/bin"
+  ln -sfn "$prev_ext" "${dir}/externals"
+  chown -h "${RUNNER_USER}:${RUNNER_USER}" "${dir}/bin" "${dir}/externals"
+}
+
+runner_listening() {
+  local unit="$1" cg pid
+  [ "$(systemctl show -p ActiveState --value "$unit")" = active ] || return 1
+  cg="$(systemctl show -p ControlGroup --value "$unit")"
+  while read -r pid; do
+    [ "$(cat "/proc/${pid}/comm" 2>/dev/null || true)" = "Runner.Listener" ] && return 0
+  done < <(find "/sys/fs/cgroup${cg}" -name cgroup.procs -exec cat {} +)
+  return 1
+}
+
+# Roll one runner. Returns 0 rolled, BUSY when a job is running (retry later),
+# anything else failed.
+roll_runner() {
+  local dir="$1" version="$2" unit state prev_bin prev_ext
+  unit="$(runner_unit "$dir")"
+  if [ "$dry_run" = 1 ]; then
+    if runner_busy "$unit"; then echo "  ${dir##*/}: busy — would wait"; else
+      echo "  would roll ${dir##*/} onto v${version}"
+    fi
+    return 0
+  fi
+  stage_trees "$dir" "$version"
+  runner_busy "$unit" && return "$BUSY"
+  state="$(systemctl show -p ActiveState --value "$unit")"
+  prev_bin="$(readlink "${dir}/bin")"
+  prev_ext="$(readlink "${dir}/externals")"
+  systemctl stop "$unit"
+  # In a child process for roll_fleet's reason (set -e must stop a failed
+  # step), so a failure here still restores and restarts the runner we just
+  # stopped. Left down, the next run would see it inactive and count it rolled.
+  swap_in "$dir" "$version" &
+  if ! wait "$!"; then
+    warn "${dir##*/}: swap onto v${version} failed — restoring ${prev_bin##*/}"
+    swap_back "$dir" "$version" "$prev_bin" "$prev_ext" || warn "${dir##*/}: rollback incomplete"
+    case "$state" in
+    active | activating) systemctl start "$unit" || warn "${unit} did not start after the rollback" ;;
+    esac
+    return 1
+  fi
+  case "$state" in
+  active | activating) ;;
+  *)
+    warn "${dir##*/}: unit was ${state}; rolled but left stopped"
+    return 0
+    ;;
+  esac
+  # A failed start falls through to the listener check and the rollback below.
+  systemctl start "$unit" || true
+  sleep "$START_SETTLE_SECONDS"
+  if runner_listening "$unit"; then
+    remove_tree "${dir}/bin.${version}.replaced"
+    remove_tree "${dir}/externals.${version}.replaced"
+    echo "  ${dir##*/}: rolled onto v${version}"
+    return 0
+  fi
+  warn "${dir##*/}: no listener after the roll — restoring ${prev_bin##*/}"
+  systemctl stop "$unit" || true
+  swap_back "$dir" "$version" "$prev_bin" "$prev_ext"
+  systemctl start "$unit" || warn "${unit} did not start after the rollback either"
+  return 1
+}
+
+runner_dirs() {
+  local dir
+  for dir in "${RUNNER_HOME}"/*-runner-*; do
+    [ -L "${dir}/bin" ] && [ -f "${dir}/.runner" ] && [ -f "${dir}/.service" ] || continue
+    echo "$dir"
+  done
+}
+
+# A runner that unpacked an update itself has ignored disableUpdate — worth a
+# look, since then every release is downloaded per runner again.
+check_no_self_updates() {
+  local dir
+  while read -r dir; do
+    [ -d "${dir}/_work/_update" ] &&
+      warn "${dir##*/} has _work/_update — it self-updated despite disableUpdate"
+  done < <(runner_dirs)
+  return 0
+}
+
+roll_fleet() {
+  local version="$1" dir rc deadline rolled=0 current=0
+  local -a pending=() busy=() failed=()
+  while read -r dir; do
+    if [ -d "${CACHE_DIR}/${version}" ] && runner_is_current "$dir" "$version"; then
+      current=$((current + 1))
+    else
+      pending+=("$dir")
+    fi
+  done < <(runner_dirs)
+  echo ">> ${#pending[@]} runner(s) to roll onto v${version}; ${current} already current"
+  deadline=$(($(date +%s) + BUSY_DEADLINE_MINUTES * 60))
+  while [ "${#pending[@]}" -gt 0 ]; do
+    busy=()
+    for dir in "${pending[@]}"; do
+      rc=0
+      # In a child process, not `roll_runner || rc=$?`: bash ignores set -e in
+      # anything called from an || list, so a failed mv mid-swap would carry on.
+      roll_runner "$dir" "$version" &
+      wait "$!" || rc=$?
+      case "$rc" in
+      0) rolled=$((rolled + 1)) ;;
+      "$BUSY") busy+=("$dir") ;;
+      *) failed+=("${dir##*/}") ;;
+      esac
+    done
+    pending=("${busy[@]+"${busy[@]}"}")
+    [ "${#pending[@]}" -gt 0 ] || break
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      for dir in "${pending[@]}"; do failed+=("${dir##*/} (busy past ${BUSY_DEADLINE_MINUTES} min)"); done
+      break
+    fi
+    echo "  ${#pending[@]} busy; retrying in ${BUSY_RETRY_SECONDS}s"
+    sleep "$BUSY_RETRY_SECONDS"
+  done
+  echo "runner-update: v${version}: $([ "$dry_run" = 1 ] && echo checked || echo rolled) ${rolled}," \
+    "${current} already current, ${#failed[@]} failed"
+  if [ "${#failed[@]}" -gt 0 ]; then
+    printf '  not rolled: %s\n' "${failed[@]}" >&2
+    return 1
+  fi
+}
+
+# Lay out a brand-new runner dir from the cache, for provision.sh to configure.
+seed_runner() {
+  local dir="$1" version="$2" part f
+  case "$dir" in
+  "${RUNNER_HOME}"/*-runner-*) ;;
+  *) die "--seed wants a ${RUNNER_HOME}/<repo>-runner-<i> path, got '${dir}'" ;;
+  esac
+  if [ -e "$dir" ] && [ -n "$(ls -A "$dir")" ]; then
+    die "--seed: ${dir} is not empty"
+  fi
+  install -d -m 0755 -o "$RUNNER_USER" -g "$RUNNER_USER" "$dir"
+  while read -r f; do
+    install -o "$RUNNER_USER" -g "$RUNNER_USER" -m "$(stat -c %a "${CACHE_DIR}/${version}/${f}")" \
+      "${CACHE_DIR}/${version}/${f}" "${dir}/${f}"
+  done < <(top_level_files "$version")
+  for part in bin externals; do
+    cp -al "${CACHE_DIR}/${version}/${part}" "${dir}/${part}.${version}"
+    ln -s "${dir}/${part}.${version}" "${dir}/${part}"
+    chown -h "${RUNNER_USER}:${RUNNER_USER}" "${dir}/${part}"
+  done
+  echo "seeded ${dir} with actions-runner v${version}"
+}
+
+main() {
+  case "${1:-}" in
+  --dry-run) dry_run=1 ;;
+  --seed)
+    seed_dir="${2:-}"
+    [ -n "$seed_dir" ] || usage
+    ;;
+  '') ;;
+  *) usage ;;
+  esac
+  [ "$(id -u)" = 0 ] || die "runner-update must run as root (it stops units and owns ${CACHE_DIR})"
+  local release version sha
+  exec 9>"$LOCK_FILE"
+  flock 9
+  release="$(latest_release)"
+  read -r version sha <<<"$release"
+  ensure_cached "$version" "$sha"
+  if [ -n "$seed_dir" ]; then
+    seed_runner "$seed_dir" "$version"
+    return
+  fi
+  roll_fleet "$version"
+  prune_cache
+  check_no_self_updates
+}
+
+main "$@"
