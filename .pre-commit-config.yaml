@@ -84,6 +84,13 @@ repos:
         entry: zsh -f tests/sfw-aliases.test.zsh
         language: system
         pass_filenames: false
+      # zprofile runs in every login shell; if brew slips behind the system dirs,
+      # `bash` quietly becomes macOS's 3.2 and bash-4 scripts die half-way.
+      - id: zprofile-brew-path-tests
+        name: zprofile Homebrew PATH order suite
+        entry: zsh -f tests/zprofile-brew-path.test.zsh
+        language: system
+        pass_filenames: false
       # claude::resume takes an id prefix; a resolver that guessed on an ambiguous
       # prefix would open another session's work under the wrong cwd, silently.
       - id: claude-resume-tests
