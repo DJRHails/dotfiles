@@ -7,15 +7,15 @@
 #     sudo /usr/local/lib/actions-runner/runner-gc            # reclaim
 #     sudo /usr/local/lib/actions-runner/runner-gc --dry-run  # list only
 #
-# The runner self-updates into fresh bin.<version>/ and externals.<version>/
-# dirs, repoints the bin/externals symlinks, and leaves the previous versions
-# plus the ~680 MB download it unpacked them from in _work/_update. Only its
-# *next* self-update clears them (upstream SelfUpdater.cs): DownloadLatestRunner
-# replaces _work/_update and unpacks the newer version beside the old ones, and
-# only then does DeletePreviousVersionRunnerBackup delete every version but the
-# running and target ones. So they sit there between releases, and an update
-# needs room for a new version before it frees an old one: on
-# 2026-11-24 taffy carried ~112 GB of them across 84
+# Older self-updates unpacked fresh bin.<version>/ and externals.<version>/
+# dirs, repointed the bin/externals symlinks, and left the previous versions
+# plus the ~680 MB download they were unpacked from in _work/_update. The
+# runner clears those only during its *next* self-update (upstream
+# SelfUpdater.cs): DownloadLatestRunner replaces _work/_update and unpacks the
+# newer version beside the old ones, and only then does
+# DeletePreviousVersionRunnerBackup delete every version but the running and
+# target ones. With self-update now disabled (runner-update rolls the fleet
+# instead), they stay put: on 2026-11-24 taffy carried ~112 GB of them across 84
 # runners (two old versions and one stale _update each, ~1.4 GB a runner)
 # while its root disk sat at 9 GB free. The runner's _diag logs are also
 # never rotated.
