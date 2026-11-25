@@ -166,8 +166,10 @@ On 2026-11-24 that came to ~112 GB across 84 runners, with taffy's root disk
 at 9 GB free. `provision.sh` installs `runner-gc` and a daily
 `actions-runner-gc.timer` that removes every version the `bin` symlink does
 not point at, the `_update` download, and `_diag` logs older than 14 days. It
-keeps anything touched in the last day, so it never races an update in
-progress. With `runner-update` in place it mostly sweeps the previous
+keeps anything touched in the last day, so it never races a self-update in
+progress, and it holds `runner-update`'s lock, so it never races a roll either
+(the hardlinked trees keep the tarball's old mtimes, which the age check would
+miss). With `runner-update` in place it mostly sweeps the previous
 version's hardlinks and any `.staged`/`.replaced` trees a cut-short roll left.
 
 ```sh

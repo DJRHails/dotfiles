@@ -44,6 +44,8 @@ set -euo pipefail
 RUNNER_HOME="/home/actions"
 RUNNER_USER="actions"
 CACHE_DIR="/var/cache/actions-runner"
+# Shared with runner-gc (its LOCK_FILE): our trees are cp -al copies that keep
+# the tarball's old mtimes, so runner-gc's age guard cannot see a roll in flight.
 LOCK_FILE="/run/lock/actions-runner-update.lock"
 RELEASE_API="https://api.github.com/repos/actions/runner/releases/latest"
 DOWNLOAD_BASE="https://github.com/actions/runner/releases/download"
@@ -303,7 +305,18 @@ roll_runner() {
   prev_bin="$(readlink "${dir}/bin")"
   prev_ext="$(readlink "${dir}/externals")"
   systemctl stop "$unit"
-  swap_in "$dir" "$version"
+  # In a child process for roll_fleet's reason (set -e must stop a failed
+  # step), so a failure here still restores and restarts the runner we just
+  # stopped. Left down, the next run would see it inactive and count it rolled.
+  swap_in "$dir" "$version" &
+  if ! wait "$!"; then
+    warn "${dir##*/}: swap onto v${version} failed — restoring ${prev_bin##*/}"
+    swap_back "$dir" "$version" "$prev_bin" "$prev_ext" || warn "${dir##*/}: rollback incomplete"
+    case "$state" in
+    active | activating) systemctl start "$unit" || warn "${unit} did not start after the rollback" ;;
+    esac
+    return 1
+  fi
   case "$state" in
   active | activating) ;;
   *)
