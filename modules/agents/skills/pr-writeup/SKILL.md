@@ -42,8 +42,10 @@ illustrations; do not invent quotations or present a paraphrase as model output.
   say so rather than equating parse success with valid content.
 - Name what the instrument cannot observe, its preconditions and known confounds. Agreement
   between graders is not accuracy. Correlation between aggregates does not identify individuals.
-- Keep paired comparisons on a common cohort where possible. When arms have different cohorts,
-  show that explicitly and distinguish cohort changes from changes in the measurement.
+- Calculate paired changes only on units matched across arms. Report the matched count and
+  exclusions. Label full-arm summaries separately and explain how differences in cohort
+  composition may affect them. If observations cannot be matched, label any comparison as
+  unpaired and state that limitation.
 - Link the actual prompt definitions, runner, aggregation code, result tables and full writeup.
   Prefer links at the reviewed commit for PR evidence; verify paths and figure provenance.
 - Link existing run records or traces for load-bearing model-call types when available and
